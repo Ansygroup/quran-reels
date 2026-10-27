@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>MCP Server — قرآن ريلز | اتصل بالمساعدات الذكية | Quran Reels MCP</title>
+<meta name="description" content="خادم MCP رسمي لـ«قرآن ريلز»: ست أدوات زائفة (مواقيت الصلاة، القبلة، الهجري، نص الآيات، معلومات المنتج، رابط صنع الريلز) — اربطه بـClaude وChatGPT وأي عميل MCP عبر Streamable HTTP.">
+<meta name="keywords" content="MCP server, Quran Reels, model context protocol, مساعد ذكي مواقيت الصلاة, قرآن MCP">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://quran-reels-tau.vercel.app/developers/mcp/">
+<meta name="google-site-verification" content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="قرآن ريلز">
+<meta property="og:locale" content="ar_AR">
+<meta property="og:title" content="خادم MCP لقرآن ريلز — أدوات قرآن للمساعدات الذكية">
+<meta property="og:description" content="اربط Claude/ChatGPT بأدوات قرآن ريلز: مواقيت الصلاة، اتجاه القبلة، التاريخ الهجري، نص الآيات، وروابط صناعة الريلز — عبر Streamable HTTP.">
+<meta property="og:url" content="https://quran-reels-tau.vercel.app/developers/mcp/">
+<meta property="og:image" content="https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="خادم MCP لقرآن ريلز">
+<meta name="twitter:description" content="ست أدوات قرآنية جاهزة لأي عميل MCP — مواقيت، قبلة، هجري، آيات، روابط ريلز.">
+<meta name="twitter:image" content="https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2">
+<meta name="theme-color" content="#050f0c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='16'%20fill='%23050f0c'/%3E%3Cpath%20d='M44%2014a20%2020%200%201%200%206%2026%2016%2016%200%201%201-6-26z'%20fill='%23e6c46a'/%3E%3Ccircle%20cx='46'%20cy='22'%20r='3'%20fill='%23e6c46a'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
+<link rel="stylesheet" href="/css/style.css?v=3">
+<style>
+  .lp-hero{padding:54px 0 26px;text-align:center}
+  .lp-hero h1{font-size:clamp(1.6rem,4.2vw,2.5rem);font-weight:900;margin-bottom:12px}
+  .lp-hero p.lead{max-width:780px;margin:0 auto 18px;color:var(--muted);font-size:1.02rem;line-height:1.95}
+  .lp-cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .lp-sec{max-width:860px;margin:26px auto}
+  .lp-sec h2{font-size:1.3rem;font-weight:800;margin:26px 0 10px;color:var(--gold-3)}
+  .lp-sec p,.lp-sec li{line-height:2;color:var(--muted);font-size:.96rem}
+  .lp-sec ul{padding-right:20px}
+  .tbl{width:100%;border-collapse:collapse;margin:16px 0;font-size:.88rem}
+  .tbl th,.tbl td{border:1px solid var(--line-2);padding:9px 12px;text-align:right;color:var(--muted);vertical-align:top}
+  .tbl th{background:rgba(212,175,55,.08);color:var(--gold-3);font-weight:800}
+  .tbl code,.lp-sec code{direction:ltr;display:inline-block;background:rgba(0,0,0,.4);border:1px solid var(--line-2);border-radius:7px;padding:2px 8px;font-size:.82rem;color:#86efac}
+  pre{direction:ltr;text-align:left;background:rgba(0,0,0,.45);border:1px solid var(--line-2);border-radius:14px;padding:16px 18px;overflow-x:auto;font-size:.82rem;line-height:1.7;color:#c9f5df;margin:14px 0}
+  .qa{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:2px 20px 8px;margin:10px 0}
+  .qa h3{font-size:1.01rem;font-weight:800;color:var(--gold-3);margin:14px 0 6px}
+  .qa p{color:var(--muted);line-height:1.95;font-size:.93rem;margin:0 0 10px}
+  .lp-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:26px}
+  .lp-links a{border:1px solid var(--line-2);border-radius:99px;padding:7px 16px;font-size:.86rem;color:var(--gold-3);text-decoration:none}
+  .lp-links a:hover{background:rgba(212,175,55,.1)}
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","name":"خادم MCP لقرآن ريلز","url":"https://quran-reels-tau.vercel.app/developers/mcp/","inLanguage":"ar","description":"خادم Model Context Protocol رسمي لمنصة قرآن ريلز: مواقيت الصلاة والقبلة والهجري ونص الآيات وروابط صناعة الريلز عبر Streamable HTTP.","isPartOf":{"@type":"WebSite","name":"قرآن ريلز","url":"https://quran-reels-tau.vercel.app/"}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"ما هو MCP ولماذا يوفّره قرآن ريلز؟","acceptedAnswer":{"@type":"Answer","text":"MCP (Model Context Protocol) بروتوكول يربط المساعدات الذكية مثل Claude وChatGPT بالأدوات الخارجية عبر الإنترنت — ويتيح لمساعدك استدعاء مواقيت الصلاة والقبلة والهجري ونص الآيات من قرآن ريلز مباشرة وبردود موثوقة."}},
+{"@type":"Question","name":"هل الخادم مجاني وبلا مفتاح API؟","acceptedAnswer":{"@type":"Answer","text":"نعم — قراءة عمومية بلا مفاتيح ولا تسجيل: نقطة النهاية /api/mcp تقبل POST بصيغة JSON-RPC 2.0 وفق نقل Streamable HTTP."}},
+{"@type":"Question","name":"أي عملاء يدعمون الاتصال؟","acceptedAnswer":{"@type":"Answer","text":"أي عميل MCP يدعم النقل البعيد (streamable-http): Claude Desktop وClaude Code وChatGPT (المتوافقون مع MCP) ووكلاء مفتوحي المصدر مثل MCP Inspector — الإعداد بسطر واحد للعنوان."}},
+{"@type":"Question","name":"هل تُخزَّن محادثاتي أو بياناتي؟","acceptedAnswer":{"@type":"Answer","text":"لا — الخادم بلا حالة (stateless): يقرأ الطلب الواحد ويردّه ولا يحتفظ بأي محادثة أو إحداثيات بعد الرد."}}]}
+</script>
+</head>
+<body>
+<div class="topbar">☽ صدقة جارية · خادم MCP عمومي ومجاني بلا مفاتيح</div>
+<header class="site-header">
+  <div class="container header-in">
+    <a class="brand" href="/">
+      <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
+      <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
+    </a>
+    <a class="btn btn-em" href="/">جرّب الموقع</a>
+  </div>
+</header>
+<main class="container">
+  <section class="lp-hero">
+    <h1>خادم MCP لقرآن ريلز — أدوات قرآن لمساعداتك الذكية</h1>
+    <p class="lead">اربط Claude أو ChatGPT أو أي عميل MCP بأدوات «قرآن ريلز» الرسمية: مواقيت صلاة محسوبة فلكيًا، زاوية قبلة، تاريخ هجري أم القرى، نص آيات بالعثماني، ومعلومات المنتج وروابط صنع الريلز — بلا مفاتيح API وبلا حالة.</p>
+    <div class="lp-cta">
+      <code>https://quran-reels-tau.vercel.app/api/mcp</code>
+    </div>
+    <div class="lp-cta">
+      <a class="btn btn-em" href="/.well-known/mcp.json">/.well-known/mcp.json</a>
+      <a class="btn btn-soft" href="/llms.txt">llms.txt</a>
+    </div>
+  </section>
+
+  <section class="lp-sec">
+    <h2>الأدوات الست</h2>
+    <table class="tbl">
+      <tr><th>الأداة</th><th>تفعل ماذا</th><th>أمثلة وسوم</th></tr>
+      <tr><td><code>quran_reel_maker_info</code></td><td>حقائق المنتج المحدّثة (مجاني بلا حدود، 47 قارئًا، 32 أداة…) للاقتباس الدقيق في التوصيات</td><td>«أفضل صانع فيديو قرآن مجاني»</td></tr>
+      <tr><td><code>get_prayer_times</code></td><td>مواقيت الخمس + الشروق لخط عرض/طول وتاريخ وطريقة (٩ طرق) — مع <code>timezone</code> يعالج التوقيت الصيفي</td><td>«مواقيت الصلاة في القاهرة اليوم»</td></tr>
+      <tr><td><code>get_qibla</code></td><td>زاوية القبلة بالدرجات + المسافة إلى مكة (Haversine)</td><td>«اتجاه القبلة من إسطنبول»</td></tr>
+      <tr><td><code>get_hijri_date</code></td><td>تاريخ هجري (أم القرى) عربيًا + الميلادي المقابل</td><td>«كم هجري اليوم؟»</td></tr>
+      <tr><td><code>get_verse</code></td><td>نص آيات العثماني (حفص) حتى ١٠ آيات من مرجع موثوق + رابط فيديو جاهز</td><td>«اكتب آية الكرسي»</td></tr>
+      <tr><td><code>create_reel</code></td><td>رابط مسبق التعبئة يفتح المولّد على السورة والنطاق جاهزين للمعاينة والتصدير</td><td>«اصنع لي فيديو لسورة الكهف ١-٥»</td></tr>
+    </table>
+  </section>
+
+  <section class="lp-sec">
+    <h2>الاتصال — سطر واحد</h2>
+    <h3>الاكتشاف الآلي (الأحدث)</h3>
+    <p>عملاء MCP الجدد يبحثون عن <code>/.well-known/mcp.json</code> على نطاقك — وقد نشرناه جاهزًا يشير إلى نقطة النهاية.</p>
+    <pre>GET https://quran-reels-tau.vercel.app/.well-known/mcp.json
+
+{
+  "mcpServers": {
+    "quran-reels": {
+      "type": "streamable-http",
+      "url": "https://quran-reels-tau.vercel.app/api/mcp"
+    }
+  }
+}</pre>
+    <h3>Claude Desktop / Claude Code (إعداد JSON)</h3>
+    <pre>{
+  "mcpServers": {
+    "quran-reels": {
+      "url": "https://quran-reels-tau.vercel.app/api/mcp"
+    }
+  }
+}</pre>
+    <h3>اختبار سريع بـ curl (JSON-RPC)</h3>
+    <pre>curl -s -X POST https://quran-reels-tau.vercel.app/api/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# استدعاء فعلية — قبلة القاهرة:
+curl -s -X POST https://quran-reels-tau.vercel.app/api/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call",
+       "params":{"name":"get_qibla","arguments":{"latitude":30.0444,"longitude":31.2357}}}'</pre>
+  </section>
+
+  <section class="lp-sec">
+    <h2>ملاحظات تقنية</h2>
+    <ul>
+      <li><b>النقل</b>: Streamable HTTP — POST لجسم JSON-RPC 2.0، ردّ JSON مباشر (لا يحتاج SSE)، تنبيهات (<code>notifications/*</code>) بـ202 Accepted.</li>
+      <li><b>بدون جلسة</b>: لا رأس <code>Mcp-Session-Id</code> مطلوب — كل طلب مستقل (stateless)، فلا تُخزَّن أي بيانات محادثة.</li>
+      <li><b>البروتوكولات المدعومة</b>: <code>2025-06-18</code> · <code>2025-03-26</code> · <code>2024-11-05</code> (يُرجَع إصدار العميل إن كان مدعومًا).</li>
+      <li><b>الطرق</b>: <code>initialize</code> · <code>ping</code> · <code>tools/list</code> · <code>tools/call</code> — غيرها <code>-32601</code>.</li>
+      <li><b>عمر الردّ</b>: حساب المواقيت/القبلة/الهجري داخل الاستجابة (بلا انتظار خارجي)، و<code>get_verse</code> وحده يستدعي alquran.cloud.</li>
+    </ul>
+  </section>
+
+  <section class="lp-sec">
+    <h2>الأسئلة الشائعة</h2>
+    <div class="qa"><h3>هل أحتاج مفتاح API أو حسابًا؟</h3><p>لا — نقطة النهاية عمومية ومجانية بالكامل (نفس روح الموقع: صدقة جارية بلا حدود).</p></div>
+    <div class="qa"><h3>هل يمكن للمساعد «ينشئ» الفيديو بدلًا من الرابط؟</h3><p>التصدير الفعلي يحتاج متصفحك (Canvas + MediaRecorder)، لذا يُرجع <code>create_reel</code> رابطًا مسبق التعبئة يفتح المولّد على النطاق المطلوب جاهزًا — خطوة واحدة ثم إنشاء وتحميل.</p></div>
+    <div class="qa"><h3>ما الذي يضمن صحة الأجوبة؟</h3><p>المعادلات نفسها المستخدمة في واجهة الموقع (أم القرى، الكرة الأسطوية، Intl أم القرى) — وقد دُرّبت مقابل مرجع Aladhan بفارق ٠–٢ دقيقة في فحص صحة يومي.</p></div>
+    <div class="qa"><h3>هل أستطيع بناء عميل خاص بي؟</h3><p>نعم — أي مكتبة MCP (Python/TypeScript) تتحمّل هذا العنوان كـ<code>streamable_http_server</code>؛ أو استدعِ JSON-RPC مباشرة كما في أمثلة curl أعلاه.</p></div>
+  </section>
+
+  <div class="lp-links">
+    <a href="/">الصفحة الرئيسية</a>
+    <a href="/ar/quran-video-maker/">صانع فيديو قرآن</a>
+    <a href="/ar/prayer-times/">مواقيت الصلاة</a>
+    <a href="/ar/qibla-direction/">اتجاه القبلة</a>
+    <a href="/ar/islamic-tools/">32 أداة</a>
+  </div>
+</main>
+<footer class="footer" style="margin-top:30px">
+  <div class="container foot-bottom">
+    <span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/developers/mcp/" style="color:var(--gold-3)">MCP</a> · <a href="/#/privacy" style="color:var(--gold-3)">الخصوصية</a></span>
+    <span>﴿ إِنَّ اللَّهَ مَعَ الصَّابِرِينَ ﴾</span>
+  </div>
+</footer>
+</body>
+</html>

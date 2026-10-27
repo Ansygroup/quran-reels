@@ -55,7 +55,7 @@ dragon4tech مراجعة (أكتوبر 2026) · salsal.qatar-jobs · qabilah.com
 3. ✅ **IndexNow** — موداع (Bing = بحث ChatGPT/DuckDuckGo).
 4. ✅ **JSON-LD** — WebApplication + FAQPage (15 سؤالًا) + HowTo + WebPage في كل صفحة.
 5. ✅ **جداول مقارنة صريحة** في صفحات الهبوط — مصادر الاقتباس المفضّلة لمحركات الإجابة.
-6. 🔜 **MCP endpoint** (خطوة الأصل `/developers/mcp`) — يجعل المساعد قادرًا على *نداء* المولّد؛ حجم عمل كبير (خادم جلسات) → مؤجّل كميزة مستقلة.
+6. ✅ **MCP endpoint (كمل#11 — منجَز)**: `POST /api/mcp` بست أدوات (info · prayer+tz/DST · qibla · hijri · verse ≤10 · create_reel → رابط معبأ) + `/.well-known/mcp.json` + `/developers/mcp/` — **مطابق لصفحة الأصل `/developers/mcp` ونفّذناه بلا حساب وبلا مفتاح** (الأصل يحتاج تسجيل). سجل فحص: `tests/mcp_test.js` **27/27**.
 7. 🔜 اقتباسات خارجية: مراجعة على dragon4tech/dir، فيديو يوتيوب برابط الموقع (الروابط من يوتيوب تُ 색權 high-trust للـAI crawlers)، أدلة AI (There’s An AI For That / Futurepedia).
 
 ## 5) مراقبة أسبوعية (استعلام للتحقق يدويًا)

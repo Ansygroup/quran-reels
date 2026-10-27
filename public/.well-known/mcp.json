@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "quran-reels": {
+      "type": "streamable-http",
+      "url": "https://quran-reels-tau.vercel.app/api/mcp",
+      "name": "Quran Reels",
+      "description": "مواقيت الصلاة والقبلة والتاريخ الهجري ونص الآيات وروابط صناعة الريلز القرآني — قرآن ريلز",
+      "websiteUrl": "https://quran-reels-tau.vercel.app/"
+    }
+  }
+}

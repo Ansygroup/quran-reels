@@ -174,6 +174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await Creator.init();
     renderVerseOfDay();
+    applyDeepLink();
     handlePending();
   } catch (e) {
     console.error("creator init", e);
@@ -182,6 +183,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /* ---------- طلبات قادمة من الأدوات ---------- */
+/* روابط مسبقة التعبئة (MCP/عميق): /?s=18&from=1&to=5 — تفتح الصانع على النطاق */
+function applyDeepLink() {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (!q.has("s") && !q.has("surah")) return;
+    const s = parseInt(q.get("s") || q.get("surah"), 10);
+    if (!(s >= 1 && s <= 114)) return;
+    const from = parseInt(q.get("from") || q.get("a"), 10) || 1;
+    const to = parseInt(q.get("to"), 10) || from;
+    sessionStorage.setItem("qr_pending_reel", JSON.stringify({ s, a: from, from, to }));
+  } catch {}
+}
+
 function handlePending() {
   const ready = typeof Creator !== "undefined" && Creator.ready && typeof Quran !== "undefined" && !!Quran.data;
   const onHome = () => !$("#view-home").hidden;
@@ -190,8 +204,8 @@ function handlePending() {
     if (!ready) return; // يُستهلك بعد اكتمال تهيئة الصانع
     sessionStorage.removeItem("qr_pending_reel");
     try {
-      const { s, a } = JSON.parse(reel);
-      Creator.setSelection(s, a, a, true);
+      const { s, a, from, to } = JSON.parse(reel);
+      Creator.setSelection(s, from || a, to || a, true);
       if (onHome()) setTimeout(() => {
         document.getElementById("create")?.scrollIntoView({ behavior: "smooth" });
         toast("تم تجهيز الآية في الصانع 🎬");
