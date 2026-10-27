@@ -65,10 +65,13 @@ function wireCommon(root) {
 const PraySettings = {
   async get() {
     let s = store.get("praySet");
-    if (s && typeof s.lat === "number") return s;
+    if (s && typeof s.lat === "number") {
+      if (s.zone) s.tz = tzFromName(s.zone, s.tz); // اشتقاق حالي (DST) عند كل قراءة
+      return s;
+    }
     const loc = await detectLocation();
     s = {
-      lat: loc.lat, lng: loc.lng, tz: loc.tz, n: loc.n || "موقعك",
+      lat: loc.lat, lng: loc.lng, tz: loc.tz, zone: loc.zone || loc.z || "", n: loc.n || "موقعك",
       method: store.get("prayMethod", "UmmAlQura"),
       asr: store.get("asrMethod", "standard"),
     };
@@ -137,8 +140,9 @@ const PraySettings = {
       wrap.querySelector("[data-city]").addEventListener("change", async e => {
         const c = CITIES[+e.target.value];
         if (!c) return;
-        await this.set({ lat: c.lat, lng: c.lng, tz: c.tz, n: c.n });
-        store.set("loc", { lat: c.lat, lng: c.lng, tz: c.tz, n: c.n });
+        const tzNow = tzFromName(c.z, c.tz); // الإزاحة الفعلية لليوم (تُعالج DST)
+        await this.set({ lat: c.lat, lng: c.lng, tz: tzNow, zone: c.z || "", n: c.n });
+        store.set("loc", { lat: c.lat, lng: c.lng, tz: tzNow, zone: c.z || "", n: c.n });
         wrap.querySelector("[data-loclabel]").textContent = `🌐 ${c.n}`;
         onChange && onChange(await this.get());
       });

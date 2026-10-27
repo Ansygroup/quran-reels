@@ -72,7 +72,7 @@ function hijriParts(date = new Date()) {
     return {
       day: +get("day"), month: +get("month"), year: +get("year"),
       weekday: parts.find(p => p.type === "weekday")?.value || "",
-      raw: fmt.format(date),
+      raw: _HIJRI_FMT.format(date),
     };
   } catch (e) {
     return { day: 1, month: 1, year: 1448, weekday: "", raw: "١ محرم ١٤٤٨ هـ" };
@@ -229,43 +229,46 @@ function distKm(lat1, lon1, lat2, lon2) {
 }
 function kaabaDistance(lat, lng) { return distKm(lat, lng, 21.4225, 39.8262); }
 
-/* ---------- مواقع جاهزة (اختيار سريع) ---------- */
+/* مواقع جاهزة (اختيار سريع).
+   z = المنطقة الزمنية IANA — تُشتق منها الإزاحة الفعلية لليوم الحالي
+   (الجدول الثابت tz كان يخطئ ساعة كاملة أثناء التوقيت الصيفي، مثال:
+    القاهرة tz:2 مقابل Africa/Cairo = +3 صيفًا) */
 const CITIES = [
-  { n: "القاهرة، مصر", lat: 30.0444, lng: 31.2357, tz: 2 },
-  { n: "الإسكندرية، مصر", lat: 31.2001, lng: 29.9187, tz: 2 },
-  { n: "الرياض، السعودية", lat: 24.7136, lng: 46.6753, tz: 3 },
-  { n: "مكة المكرمة، السعودية", lat: 21.3891, lng: 39.8579, tz: 3 },
-  { n: "المدينة المنورة، السعودية", lat: 24.5247, lng: 39.5692, tz: 3 },
-  { n: "جدة، السعودية", lat: 21.4858, lng: 39.1925, tz: 3 },
-  { n: "دبي، الإمارات", lat: 25.2048, lng: 55.2708, tz: 4 },
-  { n: "أبوظبي، الإمارات", lat: 24.4539, lng: 54.3773, tz: 4 },
-  { n: "الدوحة، قطر", lat: 25.2854, lng: 51.531, tz: 3 },
-  { n: "الكويت، الكويت", lat: 29.3759, lng: 47.9774, tz: 3 },
-  { n: "المنامة، البحرين", lat: 26.2285, lng: 50.586, tz: 3 },
-  { n: "مسقط، عُمان", lat: 23.588, lng: 58.3829, tz: 4 },
-  { n: "عمّان، الأردن", lat: 31.9454, lng: 35.9284, tz: 3 },
-  { n: "القدس، فلسطين", lat: 31.7683, lng: 35.2137, tz: 2 },
-  { n: "غزة، فلسطين", lat: 31.5017, lng: 34.4668, tz: 2 },
-  { n: "بيروت، لبنان", lat: 33.8938, lng: 35.5018, tz: 3 },
-  { n: "دمشق، سوريا", lat: 33.5138, lng: 36.2765, tz: 3 },
-  { n: "بغداد، العراق", lat: 33.3152, lng: 44.3661, tz: 3 },
-  { n: "الخرطوم، السودان", lat: 15.5007, lng: 32.5599, tz: 2 },
-  { n: "طرابلس، ليبيا", lat: 32.8872, lng: 13.1913, tz: 2 },
-  { n: "تونس، تونس", lat: 36.8065, lng: 10.1815, tz: 1 },
-  { n: "الجزائر، الجزائر", lat: 36.7538, lng: 3.0588, tz: 1 },
-  { n: "الرباط، المغرب", lat: 34.0209, lng: -6.8416, tz: 1 },
-  { n: "الدار البيضاء، المغرب", lat: 33.5731, lng: -7.5898, tz: 1 },
-  { n: "نواكشوط، موريتانيا", lat: 18.0735, lng: -15.9582, tz: 0 },
-  { n: "إسطنبول، تركيا", lat: 41.0082, lng: 28.9784, tz: 3 },
-  { n: "لندن، بريطانيا", lat: 51.5074, lng: -0.1278, tz: 0 },
-  { n: "باريس، فرنسا", lat: 48.8566, lng: 2.3522, tz: 1 },
-  { n: "برلين، ألمانيا", lat: 52.52, lng: 13.405, tz: 1 },
-  { n: "نيويورك، أمريكا", lat: 40.7128, lng: -74.006, tz: -5 },
-  { n: "تورونتو، كندا", lat: 43.6532, lng: -79.3832, tz: -5 },
-  { n: "كوالالمبور، ماليزيا", lat: 3.139, lng: 101.6869, tz: 8 },
-  { n: "جاكرتا، إندونيسيا", lat: -6.2088, lng: 106.8456, tz: 7 },
-  { n: "إسلام آباد، باكستان", lat: 33.6844, lng: 73.0479, tz: 5 },
-  { n: "دلهي، الهند", lat: 28.7041, lng: 77.1025, tz: 5.5 },
+  { n: "القاهرة، مصر", lat: 30.0444, lng: 31.2357, tz: 2, z: "Africa/Cairo" },
+  { n: "الإسكندرية، مصر", lat: 31.2001, lng: 29.9187, tz: 2, z: "Africa/Cairo" },
+  { n: "الرياض، السعودية", lat: 24.7136, lng: 46.6753, tz: 3, z: "Asia/Riyadh" },
+  { n: "مكة المكرمة، السعودية", lat: 21.3891, lng: 39.8579, tz: 3, z: "Asia/Riyadh" },
+  { n: "المدينة المنورة، السعودية", lat: 24.5247, lng: 39.5692, tz: 3, z: "Asia/Riyadh" },
+  { n: "جدة، السعودية", lat: 21.4858, lng: 39.1925, tz: 3, z: "Asia/Riyadh" },
+  { n: "دبي، الإمارات", lat: 25.2048, lng: 55.2708, tz: 4, z: "Asia/Dubai" },
+  { n: "أبوظبي، الإمارات", lat: 24.4539, lng: 54.3773, tz: 4, z: "Asia/Dubai" },
+  { n: "الدوحة، قطر", lat: 25.2854, lng: 51.531, tz: 3, z: "Asia/Qatar" },
+  { n: "الكويت، الكويت", lat: 29.3759, lng: 47.9774, tz: 3, z: "Asia/Kuwait" },
+  { n: "المنامة، البحرين", lat: 26.2285, lng: 50.586, tz: 3, z: "Asia/Bahrain" },
+  { n: "مسقط، عُمان", lat: 23.588, lng: 58.3829, tz: 4, z: "Asia/Muscat" },
+  { n: "عمّان، الأردن", lat: 31.9454, lng: 35.9284, tz: 3, z: "Asia/Amman" },
+  { n: "القدس، فلسطين", lat: 31.7683, lng: 35.2137, tz: 2, z: "Asia/Jerusalem" },
+  { n: "غزة، فلسطين", lat: 31.5017, lng: 34.4668, tz: 2, z: "Asia/Gaza" },
+  { n: "بيروت، لبنان", lat: 33.8938, lng: 35.5018, tz: 3, z: "Asia/Beirut" },
+  { n: "دمشق، سوريا", lat: 33.5138, lng: 36.2765, tz: 3, z: "Asia/Damascus" },
+  { n: "بغداد، العراق", lat: 33.3152, lng: 44.3661, tz: 3, z: "Asia/Baghdad" },
+  { n: "الخرطوم، السودان", lat: 15.5007, lng: 32.5599, tz: 2, z: "Africa/Khartoum" },
+  { n: "طرابلس، ليبيا", lat: 32.8872, lng: 13.1913, tz: 2, z: "Africa/Tripoli" },
+  { n: "تونس، تونس", lat: 36.8065, lng: 10.1815, tz: 1, z: "Africa/Tunis" },
+  { n: "الجزائر، الجزائر", lat: 36.7538, lng: 3.0588, tz: 1, z: "Africa/Algiers" },
+  { n: "الرباط، المغرب", lat: 34.0209, lng: -6.8416, tz: 1, z: "Africa/Casablanca" },
+  { n: "الدار البيضاء، المغرب", lat: 33.5731, lng: -7.5898, tz: 1, z: "Africa/Casablanca" },
+  { n: "نواكشوط، موريتانيا", lat: 18.0735, lng: -15.9582, tz: 0, z: "Africa/Nouakchott" },
+  { n: "إسطنبول، تركيا", lat: 41.0082, lng: 28.9784, tz: 3, z: "Europe/Istanbul" },
+  { n: "لندن، بريطانيا", lat: 51.5074, lng: -0.1278, tz: 0, z: "Europe/London" },
+  { n: "باريس، فرنسا", lat: 48.8566, lng: 2.3522, tz: 1, z: "Europe/Paris" },
+  { n: "برلين، ألمانيا", lat: 52.52, lng: 13.405, tz: 1, z: "Europe/Berlin" },
+  { n: "نيويورك، أمريكا", lat: 40.7128, lng: -74.006, tz: -5, z: "America/New_York" },
+  { n: "تورونتو، كندا", lat: 43.6532, lng: -79.3832, tz: -5, z: "America/Toronto" },
+  { n: "كوالالمبور، ماليزيا", lat: 3.139, lng: 101.6869, tz: 8, z: "Asia/Kuala_Lumpur" },
+  { n: "جاكرتا، إندونيسيا", lat: -6.2088, lng: 106.8456, tz: 7, z: "Asia/Jakarta" },
+  { n: "إسلام آباد، باكستان", lat: 33.6844, lng: 73.0479, tz: 5, z: "Asia/Karachi" },
+  { n: "دلهي، الهند", lat: 28.7041, lng: 77.1025, tz: 5.5, z: "Asia/Kolkata" },
 ];
 
 /* ---------- حساب مواقيت لموقع ---------- */
@@ -305,7 +308,9 @@ function nowHoursIn(tz = 0) {
 
 /* ---------- موقع المستخدم (محلي ثم IP) ---------- */
 async function detectLocation() {
-  const saved = store.get("loc");
+  // عند التخزين يعاد اشتقاق الإزاحة من المنطقة IANA لكل تاريخ — يمنع تقادم التوقيت الصيفي
+  const withZone = o => (o && o.zone ? { ...o, tz: tzFromName(o.zone, o.tz) } : o);
+  const saved = withZone(store.get("loc"));
   if (saved && typeof saved.lat === "number") return { ...saved, source: "saved" };
   const geo = await new Promise(res => {
     if (!navigator.geolocation) return res(null);
@@ -315,18 +320,20 @@ async function detectLocation() {
     );
   });
   if (geo) {
-    const loc = { ...geo, tz: -new Date().getTimezoneOffset() / 60, n: "موقعي الحالي" };
+    let zone = "";
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch {}
+    const loc = { ...geo, tz: -new Date().getTimezoneOffset() / 60, zone, n: "موقعي الحالي" };
     store.set("loc", loc); return { ...loc, source: "geo" };
   }
   try {
     const r = await fetch("/api/ip"); const j = await r.json();
     if (typeof j.latitude === "number") {
       const devTz = -new Date().getTimezoneOffset() / 60;
-      const loc = { lat: j.latitude, lng: j.longitude, tz: tzFromName(j.timezone, devTz), n: (j.city || j.country_name || "موقعك"), source: "ip" };
+      const loc = { lat: j.latitude, lng: j.longitude, tz: tzFromName(j.timezone, devTz), zone: j.timezone || "", n: (j.city || j.country_name || "موقعك"), source: "ip" };
       store.set("loc", loc); return loc;
     }
   } catch {}
-  return { ...CITIES[0], source: "default" };
+  return { ...CITIES[0], zone: CITIES[0].z, source: "default" };
 }
 
 /* ---------- التنقل (Hash router) ---------- */

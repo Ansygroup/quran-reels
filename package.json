@@ -9,6 +9,9 @@
     "test": "node tests/run.js",
     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
     "test:api": "node tests/api_test.js",
+    "test:smoke": "node tests/tools_smoke.js",
+    "test:interact": "node tests/tools_interact.js",
+    "test:correct": "node tests/correctness_test.js",
     "test:firefox": "SKIP_EXPORT=1 PW_BROWSER=firefox node tests/run.js",
     "test:webkit": "SKIP_EXPORT=1 PW_BROWSER=webkit node tests/run.js"
   }
