@@ -70,7 +70,7 @@ const TRANSLATIONS = [
 
 /* ---------- الخلفيات ---------- */
 const BACKGROUNDS = [
-  { id: "bg-mosque-night", n: "مسجد ليلاً", file: "img/backgrounds/bg-mosque-night.jpg" },
+  { id: "bg-mosque-night", n: "مسجد ليلاً", file: "img/backgrounds/bg-mosque-night.webp" },
   { id: "bg-starry-desert", n: "سماء النجوم", file: "img/backgrounds/bg-starry-desert.jpg" },
   { id: "bg-ocean-sunset", n: "بحر الغروب", file: "img/backgrounds/bg-ocean-sunset.jpg" },
   { id: "bg-forest-rays", n: "شعاع الغابة", file: "img/backgrounds/bg-forest-rays.jpg" },

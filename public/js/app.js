@@ -6,7 +6,7 @@
 function toolCardHTML(t) {
   return `<a class="tool-card" href="#/tool/${t.id}">
     <span class="t-ic">${t.ic}</span>
-    <h4>${esc(t.n)}</h4>
+    <h3>${esc(t.n)}</h3>
     <p>${esc(t.d)}</p>
   </a>`;
 }
@@ -71,7 +71,25 @@ function wireAnchor(id, targetId) {
 }
 
 /* ---------- صفحة الأداة ---------- */
+/* تنفيذات الأدوات (a/b/c) تُجلب عند أول فتح أداة — تسريع الإقلاع، ومقتناة مسبقًا في SHELL للأوفلاين */
+let _toolImplsP = null;
+function ensureToolImpls() {
+  if (!_toolImplsP) {
+    _toolImplsP = Promise.all(
+      ["js/tools-a.js?v=3", "js/tools-b.js?v=3", "js/tools-c.js?v=3"].map(src =>
+        new Promise((res, rej) => {
+          const sc = document.createElement("script");
+          sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error(src));
+          document.head.appendChild(sc);
+        })
+      )
+    ).catch(e => { console.error("tool impls", e); });
+  }
+  return _toolImplsP;
+}
+
 async function mountTool(id) {
+  await ensureToolImpls();
   const def = ToolRegistry[id];
   const mount = $("#toolMount");
   mount.innerHTML = "";

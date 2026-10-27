@@ -367,7 +367,7 @@ button{cursor:pointer;background:none;border:none}
 }
 .tool-card:hover::after{opacity:1;left:10px}
 .tool-card .t-ic{font-size:1.7rem;margin-bottom:10px;display:block}
-.tool-card h4{font-size:1rem;font-weight:700;margin-bottom:5px}
+.tool-card h3{font-size:1rem;font-weight:700;margin-bottom:5px}
 .tool-card p{font-size:.8rem;color:var(--muted);line-height:1.55}
 .tools-search{max-width:520px;margin:0 auto 26px;position:relative}
 .tools-search .input{padding-right:44px;border-radius:99px}
@@ -384,7 +384,7 @@ button{cursor:pointer;background:none;border:none}
   width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:1.5rem;
   background:rgba(212,175,55,.13);border:1px solid var(--line);margin-bottom:14px;
 }
-.feature h4{font-size:1.05rem;margin-bottom:7px}
+.feature h3{font-size:1.05rem;margin-bottom:7px}
 .feature p{color:var(--muted);font-size:.9rem}
 .feature.hot{border-color:rgba(45,212,160,.4)}
 .feature.hot .f-ic{background:rgba(45,212,160,.13);border-color:rgba(45,212,160,.35)}
@@ -398,7 +398,7 @@ button{cursor:pointer;background:none;border:none}
   display:grid;place-items:center;margin:0 auto 12px;font-size:1.05rem;
 }
 .step-card .s-ic{font-size:1.7rem;display:block;margin-bottom:8px}
-.step-card h4{font-size:1rem;margin-bottom:6px}
+.step-card h3{font-size:1rem;margin-bottom:6px}
 .step-card p{font-size:.84rem;color:var(--muted)}
 .step-card:not(:last-child)::after{
   content:'←';position:absolute;top:50%;left:-16px;transform:translateY(-50%);color:var(--gold);font-size:1.2rem;
@@ -540,7 +540,7 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 /* footer */
 .footer{border-top:1px solid var(--line-2);padding:44px 0 30px;margin-top:40px;background:rgba(0,0,0,.25)}
 .foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:30px}
-.footer h5{font-size:.95rem;margin-bottom:12px;color:var(--gold-3)}
+.footer h3{font-size:.95rem;margin-bottom:12px;color:var(--gold-3)}
 .footer .f-links{display:flex;flex-direction:column;gap:7px}
 .footer .f-links a{color:var(--muted);font-size:.88rem;transition:.2s}
 .footer .f-links a:hover{color:var(--gold)}
@@ -679,3 +679,6 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .install-btn{position:fixed;bottom:18px;inset-inline-start:18px;z-index:70;display:inline-flex;align-items:center;gap:.45em;padding:.65em 1.1em;border:0;border-radius:999px;background:linear-gradient(135deg,#e6c46a,#caa744);color:#0b1f18;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.45)}
 .install-btn:hover{filter:brightness(1.06)}
 .install-btn.hidden{display:none!important}
+
+/* عناوين بطاقات الحساب (h2 دلاليًا — بحجم h3 السابق للمظهر المحفوظ) */
+#view-account .card h2{font-size:1.17em;margin:1em 0;font-weight:700}
