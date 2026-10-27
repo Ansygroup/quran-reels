@@ -33,6 +33,13 @@
 - **Reciters**: [فهرس القرّاء](https://quran-reels-tau.vercel.app/ar/reciters/) — 47 صفحة قارئ فردية (`/ar/reciter/<slug>/`) بروابط مسبق تعبئة `/?r=<folder>` تفتح المولّد مُهيّأً بصوته.
 - **Trust**: [من نحن](https://quran-reels-tau.vercel.app/about/) · [شروط الاستخدام](https://quran-reels-tau.vercel.app/terms/) · [سياسة الخصوصية](https://quran-reels-tau.vercel.app/privacy/) · [تواصل](https://quran-reels-tau.vercel.app/contact/) (نموذج يعمل على قاعدة بيانات مستقلة بلا تتبّع).
 
+## المدونة — Blog (مقالات عملية موثّقة · K13)
+
+- الفهرس: https://quran-reels-tau.vercel.app/blog/
+- [٣٠ فكرة فيديو قرآن لتيك توك وإنستغرام](https://quran-reels-tau.vercel.app/blog/quran-video-ideas/) · [هل توجد أداة مجانية لفيديو القرآن؟](https://quran-reels-tau.vercel.app/blog/free-quran-video-maker/) · [قرآن ريلز مقابل أبرز منافسين (جدول مقارنة)](https://quran-reels-tau.vercel.app/blog/compare-quran-video-tools/)
+- [٧ أخطاء في المقاطع القصيرة](https://quran-reels-tau.vercel.app/blog/mistakes-quran-shorts/) · [دليل الجدولة والأتمتة](https://quran-reels-tau.vercel.app/blog/schedule-quran-reels/) · [خطة رمضان 1448 (1 رمضان ≈ 8 فبراير 2027)](https://quran-reels-tau.vercel.app/blog/ramadan-content-plan/)
+- [محتوى الجمعة وآياتها](https://quran-reels-tau.vercel.app/blog/friday-content/) · [أول فيديو قرآن في5 دقائق (للمبتدئين)](https://quran-reels-tau.vercel.app/blog/first-quran-video-tutorial/)
+
 ## تطبيق تفاعلي — Interactive app (يحتاج متصفحًا)
 
 - مولّد الريلز: `https://quran-reels-tau.vercel.app/#/` — روابط الأدوات: `#/tool/<id>` مثل `#/tool/prayer` و`#/tool/qibla` و`#/tool/zakat` (هذه المسارات hash لا تُفهرس كصفحات؛ المحتوى الدليلي في صفحات `/ar/` أعلاه).

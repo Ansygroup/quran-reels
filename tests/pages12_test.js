@@ -17,7 +17,7 @@ const chk = (name, cond, extra = "") => {
   // 1) خريطة الموقع كلها 200 + canonical متطابق
   const sm = await (await fetch(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
-  chk("sitemap = 70 urls", locs.length === 70, String(locs.length));
+  chk("sitemap = 79 urls", locs.length === 79, String(locs.length));
 
   let bad = [];
   for (const loc of locs) {
