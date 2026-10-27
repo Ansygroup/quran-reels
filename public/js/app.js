@@ -188,6 +188,27 @@ function handlePending() {
   }
 }
 
+/* ---------- زر تثبيت التطبيق (PWA) ---------- */
+let deferredInstall = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstall = e;
+  const b = document.getElementById("installBtn");
+  if (b) b.classList.remove("hidden");
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstall = null;
+  const b = document.getElementById("installBtn");
+  if (b) b.classList.add("hidden");
+});
+const _ibtn = document.getElementById("installBtn");
+if (_ibtn) _ibtn.addEventListener("click", async () => {
+  const ev = deferredInstall;
+  if (!ev || typeof ev.prompt !== "function") return;
+  deferredInstall = null;
+  try { await ev.prompt(); } catch {}
+});
+
 /* ---------- PWA: تسجيل عامل الخدمة للعمل دون إنترنت ---------- */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

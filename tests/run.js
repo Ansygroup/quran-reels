@@ -5,8 +5,10 @@
  *   SKIP_EXPORT=1 node run.js            # skip the MP4 export section
  * Requires: npm i playwright && npx playwright install chromium-headless-shell
  *           + system libs: npx playwright install-deps chromium-headless-shell
+ *   PW_BROWSER=firefox node run.js       # cross-browser (npx playwright install firefox)
  */
-const { chromium } = require("playwright");
+const pw = require("playwright");
+const BROWSER = process.env.PW_BROWSER || "chromium";
 
 const BASE = (process.env.BASE || "http://127.0.0.1:8787").replace(/\/+$/, "");
 const PROD = /vercel\.app$/.test(new URL(BASE).hostname.split(".").slice(-2).join(".")) || BASE.includes("vercel.app");
@@ -25,9 +27,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   console.log("BASE =", BASE, PROD ? "(PROD)" : "(LOCAL)");
-  const browser = await chromium.launch({
+  const browser = await pw[BROWSER].launch({
     headless: true,
-    args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required", "--use-gl=swiftshader"],
+    args: BROWSER === "chromium" ? ["--no-sandbox", "--autoplay-policy=no-user-gesture-required", "--use-gl=swiftshader"] : [],
   });
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   const page = await ctx.newPage();
@@ -289,9 +291,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       ]));
       chk("S8 service worker ready", swReady === true, "not ready");
       await page.waitForFunction(() => !!navigator.serviceWorker.controller, { timeout: 8000 }).catch(() => {});
+      // نافذة التهيئة (reload + تنقّل دون اتصال) تُعامَل كمرحلة واحدة لتجاهل ضجيج Firefox عند التخلّي عن عمليات معلّقة
+      offlinePhase = true;
       await page.reload({ waitUntil: "domcontentloaded" });
       await sleep(1500);
-      offlinePhase = true;
       await ctx.setOffline(true);
       await page.goto(BASE + "/", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
       await sleep(1800);
@@ -362,6 +365,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         JSON.stringify(ph).slice(0, 180));
       const navAcc = await page.evaluate(() => !!document.querySelector("#mainNav a[href='#/account']"));
       chk("S9 nav link -> account", navAcc === true, "missing nav link");
+      // زر تثبيت PWA: يستجيب لحدث الجاهزية
+      const ib1 = await page.evaluate(() => {
+        const b = document.getElementById("installBtn");
+        if (!b) return { exists: false };
+        window.dispatchEvent(new Event("beforeinstallprompt"));
+        return { exists: true, shown: !b.classList.contains("hidden") };
+      });
+      chk("S9 install btn appears", ib1.exists && ib1.shown, JSON.stringify(ib1));
+      // ويختفي بعد التثبيت
+      const ib2 = await page.evaluate(() => {
+        const b = document.getElementById("installBtn");
+        window.dispatchEvent(new Event("appinstalled"));
+        return { hidden: !!b && b.classList.contains("hidden") };
+      });
+      chk("S9 install btn hides after install", ib2.hidden, JSON.stringify(ib2));
       const hasSchedBtn = await page.evaluate(() => !!document.getElementById("btnSchedule"));
       chk("S9 schedule button in creator result", !!hasSchedBtn, "btnSchedule missing");
       const foot = await page.evaluate(() => !!document.querySelector('a[href="#/account"]'));

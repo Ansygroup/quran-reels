@@ -673,3 +673,9 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   .qrow{flex-wrap:wrap}
   .header-cta #authBtn{display:none}
 }
+
+
+/* زر تثبيت التطبيق PWA */
+.install-btn{position:fixed;bottom:18px;inset-inline-start:18px;z-index:70;display:inline-flex;align-items:center;gap:.45em;padding:.65em 1.1em;border:0;border-radius:999px;background:linear-gradient(135deg,#e6c46a,#caa744);color:#0b1f18;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+.install-btn:hover{filter:brightness(1.06)}
+.install-btn.hidden{display:none!important}
