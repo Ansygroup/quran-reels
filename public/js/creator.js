@@ -689,3 +689,10 @@ const Creator = {
     this._abort?.abort();
   },
 };
+
+
+/* زر إيقاف الإنشاء: كان معالجًا يدويًا في HTML — نُقل هنا للتوافق مع CSP الصارم */
+const _btnCancelExp = document.getElementById("btnCancelExport");
+if (_btnCancelExp) _btnCancelExp.addEventListener("click", () => {
+  try { Creator.cancelExport(); } catch (e) { console.error(e); }
+});

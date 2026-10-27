@@ -612,6 +612,9 @@ const ReelRecorder = {
    */
   async record({ canvas, renderer, player, onProgress, onStage, signal }) {
     this._abort = false;
+    if (!window.MediaRecorder || !canvas || typeof canvas.captureStream !== "function") {
+      throw new Error("متصفحك لا يدعم تسجيل الفيديو — جرّب Chrome أو Edge أو Safari حديثًا");
+    }
     const mime = this.pickMime();
     const stream = canvas.captureStream(30);
     if (!player.silent && player.dest) {

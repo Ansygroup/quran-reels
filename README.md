@@ -140,7 +140,7 @@ SKIP_EXPORT=1 node run.js                                # بلا قسم الت�
 ```
 
 - ما تغطيه: الإقلاع + وسوم SEO وJSON-LD وrobots/sitemap + معاينة و**تصدير MP4 فعلي** + فتح الـ32 أداة بلا أخطاء + تفاعلات عميقة (مسبحة/زكاة/ختمة فردية/ختمة جماعية مع حالة السحابة/مواقيت/قبلة/أذكار/أحاديث/إذاعة/اختبار مخارج) + قائمة الجوال.
-- **النتائج الأخيرة: PROD = 86 فحصًا / 0 · LOCAL = 81 فحصًا / 0 (chromium) — Firefox = 85/80 مع `SKIP_EXPORT=1` (قيود بيئة موثّقة)** · api_test = 15/15 (يشمل: الأوفلاين عبر Service Worker، صف سحابة إنتاجي، قسم S9 للحساب/الأتمتة/عقود API — رفض الزائر401، **حارس زر جوجل**: المزوّد غير المُفعّل يعطي تنبيهًا بدل صفحة خطأ، رابط «النشر التلقائي» في القائمة، وFAQ = 15 مطابقة للـJSON-LD).
+- **النتائج الأخيرة (بناء نهائي واحد): chromium 86/81 · firefox 85/80 · webkit 85/80** — كلها /0 أخطاء (firefox/webkit مع `SKIP_EXPORT=1`: MediaRecorder مفقود/معطّل في headless لهما — قيد بيئة موثّق) · api_test = 15/15 (يشمل: الأوفلاين عبر Service Worker، صف سحابة إنتاجي، قسم S9 للحساب/الأتمتة/عقود API — رفض الزائر401، **حارس زر جوجل**: المزوّد غير المُفعّل يعطي تنبيهًا بدل صفحة خطأ، رابط «النشر التلقائي» في القائمة، وFAQ = 15 مطابقة للـJSON-LD).
 - **PWA كامل للتثبيت**: أيقونات `icon-192.png`/`icon-512.png` (+maskable) ومُشار إليها بـ`?v=2` لكسر كاش CDN، وإصدار SW = `qr-v3`.
 - **رؤوس أمنية لكل `/api/*`**: `nosniff` + Referrer-Policy + `Permissions-Policy` (geo/self — كاميرا/ميكروفون ممنوعان).
 - **محلل رموز الجلسة** `QRAuth.parseAuthHash`: يتحمل `#access_token=` و`#/…#access_token=` المزدوج و`?access_token=` (مُختبَر بثلاثة أشكال).
@@ -148,6 +148,10 @@ SKIP_EXPORT=1 node run.js                                # بلا قسم الت�
 - **مستودع git محلي** (80 ملفًا، `.gitignore` يحمي `.env*`/`.vcfg`/`.vercel`) — أول commit شامل كل شيء.
 - **أداء معاينة الشبكات**: صورة `og-cover` أعيد ضغطها 2167KB→95KB (1200×630 JPEG) ومُحدَّثة في og/twitter + JSON-LD مع `?v=2` — ومُتحقَّد أن كل مسارات SW (21) تعيد 200 وسجلات الإنتاج خالية من الأخطاء.
 - **زر تثبيت التطبيق PWA**: يظهر بحدوث `beforeinstallprompt` ويخفي بـ`appinstalled` (فحصان جديدان في S9).
+- **CSP صارم على HTML**: `script-src 'self'` (لا سكربتات داخلية/معالجات `onclick` — أُعيد توجيه زر الإنشاء إلى JS)، connect/media pin للمصادر الحقيقية (Supabase/everyayah/overpass/jsdelivr/qurango)، `frame-ancestors 'none'` + `X-Frame-Options: DENY` + Referrer-Policy — والاثنان والثمانون فحصًا تمرّ دون أي انتهاك.
+- **تكامل iOS**: `apple-touch-icon` من PNG-192 + `theme-color` موجود.
+- **`sql/schema.sql`**: نسخة مخطط كاملة (5 جداول + RLS + 14 سياسة + 6 فهارس، من الكتالوج الحي) للاستعادة — بلا أي سر.
+- **حارس توافق**: رسالة عربية واضحة إن غاب MediaRecorder بدل خطأ تقني.
 - **تدقيق أداء**: SHELL ‏= 2.8MB فقط (الترجمات الـ12MB عند الطلب)، brotli مُفعّل، 21 مسار SW كلها 200.
 - **اختبار متصفح مضاعف**: `PW_BROWSER=firefox node run.js` (chromium افتراضي) — Firefox أخضر 85/80 بـ`SKIP_EXPORT=1` لأن `MediaRecorder` يعلّق في Firefox headless (سُجّل بملء قيد بيئة في run.js؛ تصدير MP4 مُختبَر على chromium).
 

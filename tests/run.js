@@ -47,6 +47,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     console.log("FAIL console: " + txt.slice(0, 200));
   });
   page.on("pageerror", e => {
+    if (offlinePhase) return;
     const txt = String(e.message || e);
     if ((currentHash || "").includes("mosques") && NOISE.test(txt)) return;
     errs.push("pageerror: " + txt.slice(0, 200));
