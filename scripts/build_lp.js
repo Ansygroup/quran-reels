@@ -34,6 +34,7 @@ const STYLE = `
 const PAGES = [
 {
   slug: "quran-video-tiktok",
+  pair: "/en/quran-video-tiktok/",
   title: "فيديوهات قرآن لتيك توك وشورتس — ريلز قرآنية جاهزة للنشر | قرآن ريلز",
   desc: "اصنع فيديو قرآن لتيك توك ويوتيوب شورتس وإنستغرام ريلز: مقاس 9:16، آيات قصيرة مؤثرة، 47 قارئًا، خلفيات وترجمة — إنشاء فوري داخل المتصفح ومجانًا بلا حدود.",
   keywords: "فيديوهات قرآن لتيك توك, ريلز قرآنية, شورتس قرآن, فيديو قرآن انستغرام, مقاطع قرآن قصيرة",
@@ -95,6 +96,7 @@ const PAGES = [
 },
 {
   slug: "quran-video-with-translation",
+  pair: "/en/quran-video-with-translation/",
   title: "فيديو قرآن مع ترجمة 8 لغات داخل الفيديو | قرآن ريلز",
   desc: "حوّل آيات القرآن إلى فيديو مع ترجمة المعاني داخل الفيديو: إنجليزية وفرنسية وتركية وإندونيسية وأردية وإسبانية وإيطالية وعربية — مع بقاء صوت التلاوة عربيًا وتصدير MP4 فوري مجاني.",
   keywords: "فيديو قرآن مع ترجمة, ترجمة معاني الآيات, فيديو قرآن بالإنجليزية, quran video translation",
@@ -351,6 +353,9 @@ const page = p => `<!DOCTYPE html>
 <meta name="keywords" content="${p.keywords}">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="${ORIGIN}/ar/${p.slug}/">
+${p.pair ? `<link rel="alternate" hreflang="x-default" href="${ORIGIN}/">
+<link rel="alternate" hreflang="ar" href="${ORIGIN}/ar/${p.slug}/">
+<link rel="alternate" hreflang="en" href="${ORIGIN}${p.pair}">` : ""}
 <meta name="google-site-verification" content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="قرآن ريلز">
@@ -406,7 +411,7 @@ ${p.body}
 </main>
 <footer class="footer" style="margin-top:30px">
   <div class="container foot-bottom">
-    <span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/ar/prayer-times/" style="color:var(--gold-3)">المواقيت</a></span>
+    <span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/ar/prayer-times/" style="color:var(--gold-3)">المواقيت</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>
     <span>﴿ إِنَّ اللَّهَ مَعَ الصَّابِرِينَ ﴾</span>
   </div>
 </footer>

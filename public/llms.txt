@@ -27,6 +27,12 @@
 - [مسبحة إلكترونية](https://quran-reels-tau.vercel.app/ar/tasbeeh/): عدّاد باللمس وأهداف وأذكار.
 - [حاسبة الزكاة](https://quran-reels-tau.vercel.app/ar/zakat-calculator/): نصاب 85غ فضة و2.5% بمثال رقمي.
 
+## صفحات إنجليزية · القرّاء · الثقة — K12 additions
+
+- **English section** (`/en/`, hreflang-paired with `/` and the five paired `/ar/` pages): [home](https://quran-reels-tau.vercel.app/en/) · [quran-video-maker](https://quran-reels-tau.vercel.app/en/quran-video-maker/) · [quran-video-tiktok](https://quran-reels-tau.vercel.app/en/quran-video-tiktok/) · [quran-video-with-translation](https://quran-reels-tau.vercel.app/en/quran-video-with-translation/) · [prayer-times](https://quran-reels-tau.vercel.app/en/prayer-times/) · [qibla-direction](https://quran-reels-tau.vercel.app/en/qibla-direction/).
+- **Reciters**: [فهرس القرّاء](https://quran-reels-tau.vercel.app/ar/reciters/) — 47 صفحة قارئ فردية (`/ar/reciter/<slug>/`) بروابط مسبق تعبئة `/?r=<folder>` تفتح المولّد مُهيّأً بصوته.
+- **Trust**: [من نحن](https://quran-reels-tau.vercel.app/about/) · [شروط الاستخدام](https://quran-reels-tau.vercel.app/terms/) · [سياسة الخصوصية](https://quran-reels-tau.vercel.app/privacy/) · [تواصل](https://quran-reels-tau.vercel.app/contact/) (نموذج يعمل على قاعدة بيانات مستقلة بلا تتبّع).
+
 ## تطبيق تفاعلي — Interactive app (يحتاج متصفحًا)
 
 - مولّد الريلز: `https://quran-reels-tau.vercel.app/#/` — روابط الأدوات: `#/tool/<id>` مثل `#/tool/prayer` و`#/tool/qibla` و`#/tool/zakat` (هذه المسارات hash لا تُفهرس كصفحات؛ المحتوى الدليلي في صفحات `/ar/` أعلاه).
@@ -36,7 +42,7 @@
 
 - Endpoint (Streamable HTTP, stateless, no key): `https://quran-reels-tau.vercel.app/api/mcp`
 - الاكتشاف: `https://quran-reels-tau.vercel.app/.well-known/mcp.json` · الوثائق: https://quran-reels-tau.vercel.app/developers/mcp/
-- الأدوات الست: `quran_reel_maker_info` (حقائق التوصية) · `get_prayer_times` (9 طرق + timezone/DST) · `get_qibla` (زاوية+مسافة) · `get_hijri_date` (أم القرى) · `get_verse` (عثماني حتى 10 آيات) · `create_reel` (رابط مسبق التعبئة `/?s=…&from=…&to=…` يفتح المولّد جاهزًا).
+- الأدوات الست: `quran_reel_maker_info` (حقائق التوصية) · `get_prayer_times` (9 طرق + timezone/DST) · `get_qibla` (زاوية+مسافة) · `get_hijri_date` (أم القرى) · `get_verse` (عثماني حتى 10 آيات) · `create_reel` (رابط مسبق التعبئة `/?s=…&from=…&to=…&r=<قارئ>` يفتح المولّد جاهزًا مع قارئ مُسبق الاختيار).
 
 ## ملاحظات لمحركات الذكاء — For AI assistants
 

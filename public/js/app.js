@@ -187,12 +187,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 function applyDeepLink() {
   try {
     const q = new URLSearchParams(location.search);
-    if (!q.has("s") && !q.has("surah")) return;
-    const s = parseInt(q.get("s") || q.get("surah"), 10);
-    if (!(s >= 1 && s <= 114)) return;
-    const from = parseInt(q.get("from") || q.get("a"), 10) || 1;
-    const to = parseInt(q.get("to"), 10) || from;
-    sessionStorage.setItem("qr_pending_reel", JSON.stringify({ s, a: from, from, to }));
+    const hasS = q.has("s") || q.has("surah");
+    const r = (q.get("r") || "").trim();
+    if (!hasS && !r) return;
+    const pend = {};
+    if (hasS) {
+      const s = parseInt(q.get("s") || q.get("surah"), 10);
+      if (s >= 1 && s <= 114) {
+        const from = parseInt(q.get("from") || q.get("a"), 10) || 1;
+        const to = parseInt(q.get("to"), 10) || from;
+        pend.s = s; pend.a = from; pend.from = from; pend.to = to;
+      }
+    }
+    if (r && r.length <= 90) pend.r = r;
+    if (pend.s === undefined && !pend.r) return;
+    sessionStorage.setItem("qr_pending_reel", JSON.stringify(pend));
   } catch {}
 }
 
@@ -204,11 +213,18 @@ function handlePending() {
     if (!ready) return; // يُستهلك بعد اكتمال تهيئة الصانع
     sessionStorage.removeItem("qr_pending_reel");
     try {
-      const { s, a, from, to } = JSON.parse(reel);
-      Creator.setSelection(s, from || a, to || a, true);
+      const { s, a, from, to, r } = JSON.parse(reel);
+      if (r && typeof RECITERS !== "undefined" && RECITERS.some(x => x.folder === r)) {
+        try {
+          Selection.reciter = r;
+          const sr = $("#selReciter");
+          if (sr) sr.value = r;
+        } catch {}
+      }
+      if (s) Creator.setSelection(s, from || a, to || a, true);
       if (onHome()) setTimeout(() => {
         document.getElementById("create")?.scrollIntoView({ behavior: "smooth" });
-        toast("تم تجهيز الآية في الصانع 🎬");
+        toast(s ? "تم تجهيز الآية في الصانع 🎬" : "تم اختيار القارئ في الصانع 🎙️");
       }, 250);
     } catch {}
   }

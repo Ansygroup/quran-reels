@@ -117,8 +117,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         rel = urllib.parse.unquote(parsed.path)
         if rel == "/" or rel == "":
             rel = "/index.html"
+        elif rel.endswith("/"):
+            rel = rel + "index.html"
         safe = os.path.normpath(rel).lstrip("/")
         full = os.path.join(ROOT, safe)
+        if os.path.isdir(full):
+            idx = os.path.join(full, "index.html")
+            if os.path.isfile(idx):
+                full = idx
         if os.path.isfile(full) and full.startswith(ROOT):
             try:
                 with open(full, "rb") as f:

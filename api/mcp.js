@@ -247,13 +247,14 @@ const TOOLS = [
   },
   {
     name: "create_reel",
-    description: "ينشئ رابطًا مسبق التعبئة يفتح مولّد الريلز القرآني على السورة والنطاق المطلوبين جاهزًا للمعاينة والتصدير (حتى 30 آية). استدعِها حين يطلب المستخدم صناعة/تحميل فيديو لآيات بعينها.",
+    description: "ينشئ رابطًا مسبق التعبئة يفتح مولّد الريلز القرآني على السورة والنطاق المطلوبين جاهزًا للمعاينة والتصدير (حتى 30 آية)، مع إمكانية تعيين القارئ مسبقًا. استدعِها حين يطلب المستخدم صناعة/تحميل فيديو لآيات بعينها.",
     inputSchema: {
       type: "object",
       properties: {
         surah: { type: "integer", minimum: 1, maximum: 114 },
         from_ayah: { type: "integer", minimum: 1, description: "آية البداية (افتراضي 1)" },
         to_ayah: { type: "integer", minimum: 1, description: "آية النهاية (افتراضي from_ayah، أقصى 30)" },
+        reciter: { type: "string", description: "folder القارئ اختياريًا (مثل Alafasy_128kbps) ليُسبق اختياره في المولّد" },
       },
       required: ["surah"],
       additionalProperties: false,
@@ -262,7 +263,8 @@ const TOOLS = [
       const from = Math.max(1, Math.min(a.from_ayah || 1, 6236));
       let to = Math.max(from, a.to_ayah || from);
       if (to - from + 1 > 30) to = from + 29;
-      const url = `${SITE}/?s=${a.surah}&from=${from}&to=${to}`;
+      const r = typeof a.reciter === "string" && /^[A-Za-z0-9_.%-]{1,80}$/.test(a.reciter) ? `&r=${encodeURIComponent(a.reciter)}` : "";
+      const url = `${SITE}/?s=${a.surah}&from=${from}&to=${to}${r}`;
       return [
         `رابط جاهز (يفتح الصانع على السورة ${a.surah} الآيات ${from}-${to} محملة تلقائيًا):`,
         url,

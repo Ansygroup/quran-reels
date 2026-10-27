@@ -102,6 +102,8 @@ const chk = (name, cond, extra = "") => {
   chk("create_reel url", !cr.res.isError && (cr.text || "").includes("/?s=18&from=1&to=5"), cr.text);
   const crBig = await call("create_reel", { surah: 2, from_ayah: 1, to_ayah: 100 });
   chk("create_reel caps at 30", /to=30/.test(crBig.text || ""), (crBig.text || "").split("\n")[0]);
+  const crR = await call("create_reel", { surah: 1, from_ayah: 1, to_ayah: 7, reciter: "Alafasy_128kbps" });
+  chk("create_reel reciter preselect", !crR.res.isError && /r=Alafasy_128kbps/.test(crR.text || ""), (crR.text || "").split("\n")[1] || crR.text);
 
   // 6) errors
   const unk = await rpc({ jsonrpc: "2.0", id: 3, method: "does/not/exist" });
