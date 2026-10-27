@@ -61,12 +61,13 @@ function normAr(s) {
 }
 
 /* ---------- تاريخ هجري (يعتمد على Intl) ---------- */
+/* مُنسّق واحد مخزّن — إنشاؤه في كل استدعاء كان يُجمّد الحلقات (hijriToGreg ×900) */
+const _HIJRI_FMT = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", {
+  day: "numeric", month: "numeric", year: "numeric", weekday: "long",
+});
 function hijriParts(date = new Date()) {
   try {
-    const fmt = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", {
-      day: "numeric", month: "numeric", year: "numeric", weekday: "long",
-    });
-    const parts = fmt.formatToParts(date);
+    const parts = _HIJRI_FMT.formatToParts(date);
     const get = t => parts.find(p => p.type === t)?.value;
     return {
       day: +get("day"), month: +get("month"), year: +get("year"),
