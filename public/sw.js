@@ -1,5 +1,5 @@
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v2";
+const CACHE = "qr-v3";
 const SHELL = [
   "/",
   "/css/style.css",
@@ -20,7 +20,7 @@ const SHELL = [
   "/data/names.json",
   "/data/hadith-nawawi.json",
   "/data/hadith-qudsi.json",
-  "/manifest.json",
+  "/manifest.json?v=2",
   "/img/icon.svg",
 ];
 
