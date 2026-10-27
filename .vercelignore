@@ -1,0 +1,10 @@
+.vercel
+**/__pycache__
+*.pyc
+server.py
+README.md
+tests/
+.env.local
+.env*
+node_modules
+.vcfg

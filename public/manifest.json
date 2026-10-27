@@ -1,0 +1,37 @@
+{
+  "name": "قرآن ريلز — صانع ريلز قرآني",
+  "short_name": "قرآن ريلز",
+  "description": "صانع فيديو قرآن مجاني وفوري + 32 أداة إسلامية + نشر تلقائي مجدول للمنصات",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050f0c",
+  "theme_color": "#050f0c",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/img/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

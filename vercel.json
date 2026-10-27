@@ -1,0 +1,113 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/proxy",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/((?!.*\\..*).*)",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), camera=(), microphone=(), payment=(self), interest-cohort=()"
+        }
+      ]
+    },
+    {
+      "source": "/(css|js|fonts|img|data)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/(robots.txt|sitemap.xml)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=600, stale-while-revalidate=3600"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), camera=(), microphone=(), payment=(self), interest-cohort=()"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/publish",
+      "schedule": "15 4 * * *"
+    }
+  ],
+  "functions": {
+    "api/proxy.js": {
+      "maxDuration": 60
+    },
+    "api/ip.js": {
+      "maxDuration": 15
+    },
+    "api/app-config.js": {
+      "maxDuration": 10
+    },
+    "api/publish.js": {
+      "maxDuration": 60
+    },
+    "api/cron/publish.js": {
+      "maxDuration": 120
+    },
+    "api/oauth.js": {
+      "maxDuration": 30
+    },
+    "api/oauth/callback.js": {
+      "maxDuration": 30
+    }
+  }
+}

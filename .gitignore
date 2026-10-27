@@ -1,0 +1,8 @@
+node_modules/
+tests/node_modules/
+.vcfg/
+.vercel/
+.env*
+__pycache__/
+*.pyc
+.DS_Store
