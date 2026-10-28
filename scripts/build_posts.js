@@ -64,7 +64,8 @@ const HEAD_EXTRA = `<meta property="og:site_name" content="قرآن ريلز">
 <link rel="icon" href="${ICON}">
 <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="stylesheet" href="/css/style.css?v=3">
-<style>${STYLE}</style>`;
+<style>${STYLE}</style>
+<script defer src="/_vercel/insights/script.js"></script>`;
 
 const HEADER = `<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
 <header class="site-header">
@@ -255,6 +256,7 @@ function hubPage() {
 <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="stylesheet" href="/css/style.css?v=3">
 <style>${STYLE}</style>
+<script defer src="/_vercel/insights/script.js"></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"CollectionPage","name":"مكتبة مقالات قرآن ريلز","url":"${loc}","inLanguage":"ar","isPartOf":{"@type":"WebSite","name":"قرآن ريلز","url":"${ORIGIN}/"},"hasPart":[
 ${SPECS.map((s) => `{"@type":"Article","headline":${JSON.stringify(s.title)},"url":"${ORIGIN}/articles/${s.slug}/","datePublished":"${PUB_ISO}","author":{"@type":"Organization","name":"قرآن ريلز"}}`).join(",\n")}
