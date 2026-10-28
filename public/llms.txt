@@ -21,6 +21,9 @@
 - [مواقيت الصلاة](https://quran-reels-tau.vercel.app/ar/prayer-times/): 13 طريقة، مذهب العصر، توقيت صيفي تلقائي.
 - [اتجاه القبلة](https://quran-reels-tau.vercel.app/ar/qibla-direction/): زاوية دقيقة من أي إحداثيات + مسافة إلى مكة.
 - [فيديوهات قرآن لتيك توك](https://quran-reels-tau.vercel.app/ar/quran-video-tiktok/): قواعد الريلز الناجح + سور قصيرة جاهزة.
+- [ريلز إنستغرام](https://quran-reels-tau.vercel.app/ar/quran-video-instagram/): مقاس الريلز المثالي +4 خطوات تصدير.
+- [ستاتس واتساب](https://quran-reels-tau.vercel.app/ar/quran-video-whatsapp/): قيود ال30 ثانية + أفكار ستاتس جاهزة.
+- [فيديو لفيسبوك](https://quran-reels-tau.vercel.app/ar/quran-video-facebook/): الصيغ الثلاث (9:16 · 1:1 · 16:9) للصفحات والمجموعات.
 - [فيديو قرآن مع ترجمة](https://quran-reels-tau.vercel.app/ar/quran-video-with-translation/): 8 لغات داخل الفيديو مع بقاء الصوت عربيًا.
 - [أقصر آيات للفيديو](https://quran-reels-tau.vercel.app/ar/short-quran-verses-video/): قائمة السور القصيرة بعدد آياتها ورسائلها.
 - [أذكار الصباح والمساء](https://quran-reels-tau.vercel.app/ar/adhkar/): نصوص حصن المسلم مع عدّاد.

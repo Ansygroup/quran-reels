@@ -17,7 +17,7 @@ const chk = (name, cond, extra = "") => {
   // 1) خريطة الموقع كلها 200 + canonical متطابق
   const sm = await (await fetch(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
-  chk("sitemap = 79 urls", locs.length === 79, String(locs.length));
+  chk("sitemap = 82 urls", locs.length === 82, String(locs.length));
 
   let bad = [];
   for (const loc of locs) {
@@ -29,7 +29,7 @@ const chk = (name, cond, extra = "") => {
       if (can !== loc) bad.push(loc + " canonical=" + can);
     } catch (e) { bad.push(loc + " → " + e.message); }
   }
-  chk("all 70 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
+  chk("all 82 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
 
   // 2) صفحات /en/: لغة إنجليزية + ثلاث بدائل hreflang
   const enPaths = ["/en/", "/en/quran-video-maker/", "/en/quran-video-with-translation/",
@@ -79,6 +79,17 @@ const chk = (name, cond, extra = "") => {
   const gv = await fetch(BASE + "/googleb789508316de731f.html");
   const gvt = gv.ok ? await gv.text() : "";
   chk("GSC html verify file", gv.status === 200 && gvt.trim() === "google-site-verification: googleb789508316de731f.html", "status " + gv.status);
+
+  // كمل#17: صفحات المنصّات الثلاث (إنستغرام/واتساب/فيسبوك) + رابط ميّت مُزال
+  let plat = [];
+  for (const s of ["quran-video-instagram", "quran-video-whatsapp", "quran-video-facebook"]) {
+    const r = await fetch(BASE + "/ar/" + s + "/");
+    const t = r.ok ? await r.text() : "";
+    if (!(r.status === 200 && t.includes('content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo"') && t.includes('rel="canonical"') && t.includes("FAQPage"))) plat.push(s + "=" + r.status);
+  }
+  chk("platform pages 200+GSC+canonical+LD", plat.length === 0, plat.join(","));
+  const tr = await (await fetch(BASE + "/ar/quran-video-with-translation/")).text();
+  chk("dead dawah link removed", !tr.includes("quran-reels-for-dawah"));
 
   // 7) الروابط الداخلية من صفحات en لا تؤدي لـ404 (عيّنة)
   const sample = ["/", "/ar/reciters/", "/about/", "/terms/", "/privacy/", "/en/"];
