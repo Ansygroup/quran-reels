@@ -75,6 +75,10 @@ const chk = (name, cond, extra = "") => {
     .every(h => footer.includes('href="' + h + '"')));
   // كمل#15: وسم GSC بالقيمة الدقيقة على الرئيسية (و79/79 في المراقبة)
   chk("GSC token exact on home", footer.includes('content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo"'));
+  // كمل#15ب: ملف التحقق بأسلوب رفع الملف (يجب أن يبقى في الجذر)
+  const gv = await fetch(BASE + "/googleb789508316de731f.html");
+  const gvt = gv.ok ? await gv.text() : "";
+  chk("GSC html verify file", gv.status === 200 && gvt.trim() === "google-site-verification: googleb789508316de731f.html", "status " + gv.status);
 
   // 7) الروابط الداخلية من صفحات en لا تؤدي لـ404 (عيّنة)
   const sample = ["/", "/ar/reciters/", "/about/", "/terms/", "/privacy/", "/en/"];
