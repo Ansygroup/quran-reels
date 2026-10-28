@@ -45,6 +45,19 @@
   .lp-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:26px}
   .lp-links a{border:1px solid var(--line-2);border-radius:99px;padding:7px 16px;font-size:.86rem;color:var(--gold-3);text-decoration:none}
   .lp-links a:hover{background:rgba(212,175,55,.1)}
+
+  /* — كمل#19: لمسات تصميم عبر كل الصفحات المولّدة — */
+  .lp-hero{padding:58px 6% 30px;text-align:center;background:radial-gradient(700px 250px at 50% -50px, rgba(212,175,55,.13), transparent 72%),linear-gradient(180deg, rgba(255,255,255,.035), transparent 75%);border-bottom:1px solid var(--line)}
+  .lp-sec h2::after{content:'';display:block;width:56px;height:3px;border-radius:3px;background:var(--grad-gold);margin-top:8px}
+  .feat div{transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease}
+  .feat div:hover{transform:translateY(-3px);border-color:var(--line);background:var(--panel-2);box-shadow:0 14px 30px rgba(0,0,0,.35)}
+  .qa{border-inline-start:3px solid rgba(212,175,55,.55)}
+  .lp-links a{transition:background .15s,border-color .15s,transform .15s}
+  .lp-links a:hover{background:rgba(212,175,55,.15);border-color:rgba(212,175,55,.45);transform:translateY(-2px)}
+  .tbl tbody tr:hover td, .tbl tr:hover td{background:rgba(255,255,255,.03)}
+  ::selection{background:rgba(212,175,55,.35);color:#fff}
+  :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.feat div,.lp-links a{transition:none;transform:none}}
   .tbl{width:100%;border-collapse:collapse;margin:16px 0;font-size:.9rem}
   .tbl th,.tbl td{border:1px solid var(--line-2);padding:9px 12px;text-align:right;color:var(--muted)}
   .tbl th{background:rgba(212,175,55,.08);color:var(--gold-3);font-weight:800}

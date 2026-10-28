@@ -17,7 +17,7 @@ const chk = (name, cond, extra = "") => {
   // 1) خريطة الموقع كلها 200 + canonical متطابق
   const sm = await (await fetch(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
-  chk("sitemap = 103 urls", locs.length === 103, String(locs.length));
+  chk("sitemap = 154 urls", locs.length === 154, String(locs.length));
 
   let bad = [];
   for (const loc of locs) {
@@ -29,7 +29,7 @@ const chk = (name, cond, extra = "") => {
       if (can !== loc) bad.push(loc + " canonical=" + can);
     } catch (e) { bad.push(loc + " → " + e.message); }
   }
-  chk("all 103 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
+  chk("all 154 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
 
   // 2) صفحات /en/: لغة إنجليزية + ثلاث بدائل hreflang
   const enPaths = ["/en/", "/en/quran-video-maker/", "/en/quran-video-with-translation/",
@@ -95,6 +95,11 @@ const chk = (name, cond, extra = "") => {
   const wh = await (await fetch(BASE + "/ar/quran-word-highlight/")).text();
   chk("word-highlight keyword present", wh.includes("كلمة-بكلمة") && wh.includes("FAQPage"), "len=" + wh.length);
   const ram = await (await fetch(BASE + "/ar/kam-baqi/ramadan/")).text();
+  // كمل#19: صفحات الجذر وur/id — لغة صحيحة + GSC
+  const ur = await (await fetch(BASE + "/ur/quran-video-with-translation/")).text();
+  const idp = await (await fetch(BASE + "/id/video-quran-dengan-terjemahan/")).text();
+  chk("ur/id lang+GSC+LD", ur.includes('<html lang="ur"') && idp.includes('<html lang="id"') &&
+      ur.includes("IHmoe5") && idp.includes("IHmoe5") && ur.includes("FAQPage"));
   chk("ramadan countdown inline script", ram.includes('id="kbc"') && ram.includes("8 فبراير 2027") && ram.includes("setInterval"), "len=" + ram.length);
 
   // 7) الروابط الداخلية من صفحات en لا تؤدي لـ404 (عيّنة)

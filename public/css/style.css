@@ -685,3 +685,15 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 
 /* عنوان لقارئ الشاشة فقط */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ===== كمل#19 — تجديد عام عبر كل ملفات المشروع ===== */
+::selection{background:rgba(212,175,55,.35);color:#fff}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.card,.panel{transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+.card:hover{border-color:var(--line);transform:translateY(-2px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+.btn{transition:transform .12s ease,filter .15s ease,box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.nav a{transition:background .15s ease,color .15s ease,border-color .15s ease}
+.stat{transition:transform .18s ease,border-color .18s ease}
+.stat:hover{transform:translateY(-3px);border-color:var(--line)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+@media (max-width:640px){.section{padding:46px 0}.hero{padding:50px 0 22px}.hero-cta{margin-top:22px}}
