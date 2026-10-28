@@ -149,6 +149,40 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.handle_proxy(parsed, head=True)
         return super().do_HEAD()
 
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path.startswith("/api/contact"):
+            return self.handle_contact()
+        self.send_error(404, "not found")
+
+    def handle_contact(self):
+        """Mirror of api/contact.js validation (كمل#14) — no local Supabase creds."""
+        import re
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            b = json.loads(self.rfile.read(n).decode("utf-8") or "{}")
+            if not isinstance(b, dict):
+                b = {}
+        except Exception:
+            b = {}
+        ctype = "application/json; charset=utf-8"
+        if b.get("website"):
+            self._send(json.dumps({"ok": True, "msg": "وصلتنا رسالتك ✉️"}).encode("utf-8"), ctype)
+            return
+        name = str(b.get("name") or "").strip()
+        email = str(b.get("email") or "").strip()
+        message = str(b.get("message") or "").strip()
+        err = None
+        if not name or not email or not message:
+            err = "missing"
+        elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            err = "email"
+        if err:
+            self._send(json.dumps({"error": err}).encode("utf-8"), ctype, status=400)
+            return
+        # التحقق ناجح — لكن لا توجد بيانات Supabase محلية (المعمل الإنتاجي يكمل)
+        self._send(json.dumps({"error": "config"}).encode("utf-8"), ctype, status=503)
+
     def handle_config(self):
         """Public runtime config — mirror of api/app-config.js (Supabase via env)."""
         body = json.dumps({

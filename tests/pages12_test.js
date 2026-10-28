@@ -62,6 +62,12 @@ const chk = (name, cond, extra = "") => {
   // 6) صفحات الثقة: نموذج تواصل عامل + الروابط في الفوتر
   const contact = await (await fetch(BASE + "/contact/")).text();
   chk("contact form present", contact.includes('id="cForm"') && contact.includes("/rest/v1/rpc/submit_contact"));
+
+  // كمل#14: /api/contact يرفض المدخلات الخاطئة (دون أي كتابة في القاعدة)
+  const cbad = await fetch(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x", email: "not-an-email", message: "hello" }) });
+  chk("contact API 400 bad email", cbad.status === 400, "status " + cbad.status);
+  const cempty = await fetch(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+  chk("contact API 400 empty", cempty.status === 400, "status " + cempty.status);
   const about = await (await fetch(BASE + "/about/")).text();
   chk("about AboutPage LD", about.includes('"@type":"AboutPage"'));
   const footer = await (await fetch(BASE + "/")).text();

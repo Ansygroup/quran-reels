@@ -117,6 +117,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.click("#btnPlay").catch(() => {});
     await sleep(300);
 
+    // ---- كمل#14: أسلوب «كلمة-بكلمة» ----
+    await page.evaluate(() => document.querySelector('#segStyle button[data-style="word"]')?.click());
+    await sleep(700);
+    const wb = await page.evaluate(() => ({
+      active: !!document.querySelector('#segStyle button[data-style="word"]')?.classList.contains("active"),
+      style: typeof Selection !== "undefined" ? Selection.style : "",
+      canvasOK: (() => { try { const c = document.getElementById("reelCanvas"); const x = c.getContext("2d"); x.getImageData(0, 0, 4, 4); return true; } catch { return false; } })(),
+    }));
+    chk("S3 word-by-word style", wb.active && wb.style === "word" && wb.canvasOK, JSON.stringify(wb));
+    await page.evaluate(() => document.querySelector('#segStyle button[data-style="card"]')?.click());
+    await sleep(300);
+
     if (!SKIP_EXPORT) {
       await page.evaluate(() => {
         const s = document.getElementById("selSurah");

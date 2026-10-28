@@ -95,6 +95,15 @@ const AyahPlayer = {
 
   durationAt(i) { return this.estimates[i] || 3; },
   totalDuration() { return this.estimates.reduce((a, b) => a + b, 0); },
+
+  /** مدة الآية i بالثواني: من الصوت المفكّك إن وُجد، وإلا من التقدير (كمل#14) */
+  ayahDuration(i) {
+    const v = (this.ayat || [])[i];
+    if (!v) return 0;
+    const buf = this.cache.get(this.reciter + "/" + v.s + ":" + v.a);
+    if (buf && buf.duration) return buf.duration;
+    return (this.estimates || [])[i] || this.estimate(v.s, v.a);
+  },
   elapsedBefore(i) {
     let t = 0;
     for (let k = 0; k < i; k++) t += this.durationAt(k);
@@ -328,6 +337,67 @@ class ReelRenderer {
     return { lines, size: min, lh: min * 1.85 };
   }
 
+  /* ------ كلمة-بكلمة (كمل#14): تحديد مرئي للكلمة الجارية ------ */
+  /** فهرس الكلمة عند كسر الزمن frac∈[0,1] — أوزان بالحروف لاقتراب التوازي */
+  _wordIndex(words, frac) {
+    if (!words.length) return -1;
+    frac = Math.min(1, Math.max(0, frac));
+    const w = words.map(x => x.length + 1.6);
+    const tot = w.reduce((a, b) => a + b, 0);
+    let t = frac * tot, acc = 0;
+    for (let i = 0; i < w.length; i++) { acc += w[i]; if (t < acc) return i; }
+    return words.length - 1;
+  }
+
+  /**
+   * رسم الآية كلمة-بكلمة: نفس سطور `_fitAyah` (نفس الخوارزمية والانضمام) لكن
+   * برسم كل كلمة على حدة: الحالية بإبراز ذهبي على قرص، الماضية بيضاء،
+   * والمستقبلة باهتة. الإطار الساكن (ayahElapsed≥90) يعرض الآية كاملة بلا تحديد.
+   */
+  _drawWords(c, text, fit, maxW, W, startY, st, S, ACC) {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    // ربط كل كلمة بسطرها وفق تقسيم _wrap حرفيًا
+    const lineOf = [];
+    let g = 0;
+    for (let li = 0; li < fit.lines.length && g < words.length; li++) {
+      const n = fit.lines[li].split(" ").length;
+      for (let k = 0; k < n && g < words.length; k++) lineOf[g++] = li;
+    }
+    // الكلمة الحالية من زمن الآية (بدون تحديد في الإطار الثابت)
+    let cur = -1;
+    if (st.ayahElapsed != null && st.ayahElapsed < 90) {
+      const dur = (typeof AyahPlayer !== "undefined" && AyahPlayer.ayahDuration) ? AyahPlayer.ayahDuration(st.index) : 0;
+      if (dur > 0) cur = this._wordIndex(words, st.ayahElapsed / dur);
+    }
+    c.font = `${fit.size}px AmiriQuran, Amiri, serif`;
+    const spaceW = c.measureText(" ").width;
+    const byLine = fit.lines.map(() => []);
+    words.forEach((w, i) => { const li = lineOf[i]; if (li != null) byLine[li].push(i); });
+    byLine.forEach((idxs, li) => {
+      if (!idxs.length) return;
+      const y = startY + li * fit.lh;
+      const widths = idxs.map(i => c.measureText(words[i]).width);
+      const total = widths.reduce((a, b) => a + b, 0) + spaceW * (idxs.length - 1);
+      let right = W / 2 + total / 2;   // الاتجاه من اليمين لليسار
+      idxs.forEach((gi, k) => {
+        const w = widths[k];
+        const cx = right - w / 2;
+        right -= w + (k < idxs.length - 1 ? spaceW : 0);
+        if (gi === cur) {
+          const padX = 16 * S, ph = fit.lh * 0.96;
+          this._roundRect(c, cx - w / 2 - padX, y - ph / 2, w + padX * 2, ph, ph / 2);
+          c.fillStyle = "rgba(247,230,176,0.15)"; c.fill();
+          c.strokeStyle = ACC.a + "cc"; c.lineWidth = 2.2 * S; c.stroke();
+          c.fillStyle = "#f7e6b0";
+        } else {
+          c.fillStyle = (cur === -1 || gi < cur) ? "#fdf8ec" : "rgba(253,248,236,0.42)";
+        }
+        c.fillText(words[gi], cx, y);
+      });
+    });
+  }
+
   /* ------ الرسم الرئيسي ------ */
   draw(now = performance.now()) {
     const c = this.ctx, cv = this.cv;
@@ -433,7 +503,7 @@ class ReelRenderer {
       c.fillStyle = bg2;
       c.fillRect(0, bandY, W, bandH);
     }
-    if (st.style === "card") {
+    if (st.style === "card" || st.style === "word") {
       this._roundRect(c, cardX, cardY, cardW, cardH, 34 * S);
       const cg = c.createLinearGradient(0, cardY, 0, cardY + cardH);
       cg.addColorStop(0, "rgba(3,12,9,0.78)");
@@ -460,22 +530,23 @@ class ReelRenderer {
     /* نص الآية */
     c.globalAlpha = ease;
     c.textAlign = "center"; c.textBaseline = "middle";
-    if (st.style !== "card") {
+    if (st.style !== "card" && st.style !== "word") {
       c.shadowColor = "rgba(0,0,0,0.85)"; c.shadowBlur = 22 * S; c.shadowOffsetY = 3 * S;
     } else {
       c.shadowColor = "rgba(0,0,0,0.5)"; c.shadowBlur = 10 * S;
     }
     const startY = cardY + 75 * S + fit.lh / 2;
     c.font = `${fit.size}px AmiriQuran, Amiri, serif`;
-    const gradText = st.style === "glow";
-    fit.lines.forEach((ln, i) => {
-      const y = startY + i * fit.lh;
-      if (i === fit.lines.length - 1) {
-        // تدرّج خفيف على آخر سطر؟ — نبقي اللون موحّدًا لوضوح الرسم
-      }
-      c.fillStyle = st.style === "glow" ? "#fffdf4" : "#fdf8ec";
-      c.fillText(ln, W / 2, y);
-    });
+    if (st.style === "word") {
+      // كلمة-بكلمة (كمل#14): إبراز الكلمة الحالية داخل الآية متزامنًا مع التلاوة
+      this._drawWords(c, text, fit, maxTextW, W, startY, st, S, ACC);
+    } else {
+      fit.lines.forEach((ln, i) => {
+        const y = startY + i * fit.lh;
+        c.fillStyle = st.style === "glow" ? "#fffdf4" : "#fdf8ec";
+        c.fillText(ln, W / 2, y);
+      });
+    }
     c.shadowColor = "transparent"; c.shadowBlur = 0; c.shadowOffsetY = 0;
 
     /* رقم الآية المедالية */

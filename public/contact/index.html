@@ -144,16 +144,29 @@
     if (Date.now() - t0 < 2500) { msg.textContent = "ثوانٍ قليلة فقط…"; return; }
     msg.textContent = "جارٍ الإرسال…";
     try {
-      const cfg = await (await fetch("/api/app-config")).json();
-      const s = cfg && cfg.supabase;
-      if (!s || !s.url || !s.anon) throw new Error("config");
-      const r = await fetch(s.url + "/rest/v1/rpc/submit_contact", {
-        method: "POST",
-        headers: { apikey: s.anon, Authorization: "Bearer " + s.anon, "Content-Type": "application/json" },
-        body: JSON.stringify({ p_name: name, p_email: email, p_message: message, p_user_agent: (navigator.userAgent || "").slice(0, 300) })
-      });
-      const j = r.ok ? await r.json() : null;
-      if (!r.ok || !j || !j.ok) throw new Error(r.status);
+      // كمل#14: المسار الأول عبر الخادم (يرسل تأكيدًا بالبريد إن فُعِّل SMTP)
+      let done = false;
+      try {
+        const rc = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, message, userAgent: (navigator.userAgent || "").slice(0, 300) })
+        });
+        if (rc.ok) { const jc = await rc.json(); done = !!(jc && jc.ok); }
+      } catch {}
+      if (!done) {
+        // احتياطي: مباشرة إلى Supabase كما قبل كمل#14
+        const cfg = await (await fetch("/api/app-config")).json();
+        const s = cfg && cfg.supabase;
+        if (!s || !s.url || !s.anon) throw new Error("config");
+        const r = await fetch(s.url + "/rest/v1/rpc/submit_contact", {
+          method: "POST",
+          headers: { apikey: s.anon, Authorization: "Bearer " + s.anon, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_name: name, p_email: email, p_message: message, p_user_agent: (navigator.userAgent || "").slice(0, 300) })
+        });
+        const j = r.ok ? await r.json() : null;
+        if (!r.ok || !j || !j.ok) throw new Error(r.status);
+      }
       f.reset(); msg.textContent = "وصلتنا رسالتك — شكرًا لك! ✉️";
     } catch { msg.textContent = "تعذّر الإرسال الآن؛ جرّب بعد قليل من فضلك."; }
   });

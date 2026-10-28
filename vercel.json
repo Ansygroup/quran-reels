@@ -167,6 +167,10 @@
     {
       "path": "/api/cron/publish",
       "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/monitor",
+      "schedule": "30 6 * * 1"
     }
   ],
   "functions": {
@@ -183,6 +187,9 @@
       "maxDuration": 60
     },
     "api/cron/publish.js": {
+      "maxDuration": 120
+    },
+    "api/cron/monitor.js": {
       "maxDuration": 120
     },
     "api/oauth.js": {
