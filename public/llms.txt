@@ -43,6 +43,11 @@
 - [٧ أخطاء في المقاطع القصيرة](https://quran-reels-tau.vercel.app/blog/mistakes-quran-shorts/) · [دليل الجدولة والأتمتة](https://quran-reels-tau.vercel.app/blog/schedule-quran-reels/) · [خطة رمضان 1448 (1 رمضان ≈ 8 فبراير 2027)](https://quran-reels-tau.vercel.app/blog/ramadan-content-plan/)
 - [محتوى الجمعة وآياتها](https://quran-reels-tau.vercel.app/blog/friday-content/) · [أول فيديو قرآن في5 دقائق (للمبتدئين)](https://quran-reels-tau.vercel.app/blog/first-quran-video-tutorial/)
 
+## مكتبة المقالات — Article library (100 دليلًا · K20)
+
+- الفهرس: https://quran-reels-tau.vercel.app/articles/ — 100 دليلًا عمليًّا في 8 عناقيد (صناعة المقاطع القرآنية · القرّاء · الصلاة · الحفظ والتجويد · الأذكار · المواسم · الأسرة · النشر والوصول)، كل مقال بأسئلة شائعة وروابط داخلية وصورة عند التوفر.
+- أمثلة: [دليل الصانع الكامل](https://quran-reels-tau.vercel.app/articles/quran-video-maker-guide/) · [دقة مواقيت الصلاة](https://quran-reels-tau.vercel.app/articles/prayer-times-accuracy/) · [خطة الختمة](https://quran-reels-tau.vercel.app/articles/quran-khatma-plan/) · [أذكار الصباح](https://quran-reels-tau.vercel.app/articles/adhkar-sabah-guide/) · [خطة ريلز رمضان](https://quran-reels-tau.vercel.app/articles/ramadan-reels-plan/) · [الخطوط الحمراء للمحتوى القرآني](https://quran-reels-tau.vercel.app/articles/ethical-quran-content/)
+
 ## تطبيق تفاعلي — Interactive app (يحتاج متصفحًا)
 
 - مولّد الريلز: `https://quran-reels-tau.vercel.app/#/` — روابط الأدوات: `#/tool/<id>` مثل `#/tool/prayer` و`#/tool/qibla` و`#/tool/zakat` (هذه المسارات hash لا تُفهرس كصفحات؛ المحتوى الدليلي في صفحات `/ar/` أعلاه).

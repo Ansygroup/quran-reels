@@ -56,7 +56,7 @@ const STYLE = `
   .callout b{color:var(--gold-3)}
 `;
 
-const FOOT = `<span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>`;
+const FOOT = `<span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/articles/" style="color:var(--gold-3)">المكتبة</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>`;
 
 function articlePage(a) {
   const loc = ORIGIN + "/blog/" + a.slug + "/";

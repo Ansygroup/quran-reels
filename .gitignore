@@ -1,6 +1,7 @@
 node_modules/
 tests/node_modules/
 .vcfg/
+.vc/
 .vercel/
 .env*
 __pycache__/

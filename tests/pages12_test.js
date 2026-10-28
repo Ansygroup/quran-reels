@@ -17,7 +17,7 @@ const chk = (name, cond, extra = "") => {
   // 1) خريطة الموقع كلها 200 + canonical متطابق
   const sm = await (await fetch(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
-  chk("sitemap = 154 urls", locs.length === 154, String(locs.length));
+  chk("sitemap = 255 urls", locs.length === 255, String(locs.length));
 
   let bad = [];
   for (const loc of locs) {
@@ -29,7 +29,7 @@ const chk = (name, cond, extra = "") => {
       if (can !== loc) bad.push(loc + " canonical=" + can);
     } catch (e) { bad.push(loc + " → " + e.message); }
   }
-  chk("all 154 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
+  chk("all 255 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
 
   // 2) صفحات /en/: لغة إنجليزية + ثلاث بدائل hreflang
   const enPaths = ["/en/", "/en/quran-video-maker/", "/en/quran-video-with-translation/",
