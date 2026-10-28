@@ -46,6 +46,10 @@
 ## تطبيق تفاعلي — Interactive app (يحتاج متصفحًا)
 
 - مولّد الريلز: `https://quran-reels-tau.vercel.app/#/` — روابط الأدوات: `#/tool/<id>` مثل `#/tool/prayer` و`#/tool/qibla` و`#/tool/zakat` (هذه المسارات hash لا تُفهرس كصفحات؛ المحتوى الدليلي في صفحات `/ar/` أعلاه).
+- عدّادات «كم باقي»: `https://quran-reels-tau.vercel.app/ar/kam-baqi/` + ابناؤه: رمضان 2027 (8 فبراير) وعيد الفطر (9 مارس) وعيد الأضحى (16 مايو) وعرفة (15 مايو) ورجب (10 ديسمبر 2026) وشعبان (9 يناير) والجمعة (عدّاد أسبوعي حيّ) — تواريخ أم القرى «قد يختلف يومًا بالرؤية».
+- فيديوهات التهنئة بالاسم: `https://quran-reels-tau.vercel.app/ar/greeting-video/` (+ ابناؤه عيد الفطر/الأضحى/جمعة) و`…/ar/ramadan-greeting-video/` — إهداء باسمك أسفل الفيديو، MP4 1080×1920 بلا علامة مائية.
+- ميزة كلمة-بكلمة: `https://quran-reels-tau.vercel.app/ar/quran-word-highlight/` — تمييز الكلمة الجارية إبرازًا ذهبيًا متزامنًا مع التلاوة داخل الفيديو المصدَّر.
+- فئات الأدوات السبع: `…/ar/islamic-tools/prayer-and-place/` و`quran-discovery/` و`quran-learning/` و`dhikr/` و`hadith-and-learning/` و`calculators-and-tracking/` و`family-and-life/` — كل أدوات الفئة مجمّعة ومرتبطة بصفحاتها المجانية.
 - خرائط الروابط: [robots.txt](https://quran-reels-tau.vercel.app/robots.txt) · [sitemap.xml](https://quran-reels-tau.vercel.app/sitemap.xml).
 
 ## خادم MCP — API للمساعدات الذكية (AI-callable)
