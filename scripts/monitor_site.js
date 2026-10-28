@@ -41,7 +41,7 @@ async function main() {
   }
   if (!own.robots.ok || !own.robots.hasSitemap) fails.push("robots.txt ناقص أو غير متاح");
   if (!own.llms.ok || !own.llms.hasBlog || !own.llms.hasEn) fails.push("llms.txt ناقص (قسم المدونة/الإنجليزية)");
-  if (!own.home.ok || !own.home.verification) fails.push("علامة google-site-verification غير موجودة في الرئيسية");
+  if (!own.home.ok || !own.home.verification) fails.push("وسم GSC في الرئيسية غير موجود أو ليس بالقيمة المتوقعة");
   if (!own.home.ok || !own.home.blogFooter) fails.push("رابط تذييل /blog/ غير موجود في الرئيسية");
 
   /* 2) المنافسون + diff */

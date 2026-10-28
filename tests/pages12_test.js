@@ -73,6 +73,8 @@ const chk = (name, cond, extra = "") => {
   const footer = await (await fetch(BASE + "/")).text();
   chk("root footer → trust links", ["/about/", "/terms/", "/privacy/", "/contact/", "/ar/reciters/"]
     .every(h => footer.includes('href="' + h + '"')));
+  // كمل#15: وسم GSC بالقيمة الدقيقة على الرئيسية (و79/79 في المراقبة)
+  chk("GSC token exact on home", footer.includes('content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo"'));
 
   // 7) الروابط الداخلية من صفحات en لا تؤدي لـ404 (عيّنة)
   const sample = ["/", "/ar/reciters/", "/about/", "/terms/", "/privacy/", "/en/"];
