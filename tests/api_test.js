@@ -1,6 +1,5 @@
 const proxy = require('/home/user/quran-reels/api/proxy.js');
 const ip = require('/home/user/quran-reels/api/ip.js');
-const cfg = require('/home/user/quran-reels/api/app-config.js');
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -67,7 +66,7 @@ async function call(handler, url, method = 'GET', headers = {}) {
   chk('ip -> 200 parseable json', r.statusCode === 200 && j && typeof j.latitude === 'number' && j.country_name, r.statusCode + ' ' + (r.body && r.body.toString().slice(0, 160)));
   chk('ip no s-maxage (per-visitor)', !String(r.headers['cache-control']).includes('s-maxage'), r.headers['cache-control']);
 
-  r = await call(cfg, '/api/app-config');
+  r = await call(ip, '/api/ip?mode=config');
   let c = null; try { c = JSON.parse(r.body.toString()); } catch {}
   chk('config -> 200 object with supabase', r.statusCode === 200 && c && c.supabase && typeof c.supabase.url === 'string', r.body && r.body.toString());
 

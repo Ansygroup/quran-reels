@@ -184,7 +184,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self._send(json.dumps({"error": "config"}).encode("utf-8"), ctype, status=503)
 
     def handle_config(self):
-        """Public runtime config — mirror of api/app-config.js (Supabase via env)."""
+        """Public runtime config — mirror of Vercel /api/app-config (Supabase via env)."""
         body = json.dumps({
             "supabase": {
                 "url": os.environ.get("SUPABASE_URL", ""),

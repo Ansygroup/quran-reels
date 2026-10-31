@@ -16,7 +16,7 @@ const QRPublish = (() => {
     tiktok: { env: "TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET", where: "developers.tiktok.com → تسجيل تطبيق", redirect: "/api/oauth/callback" },
     x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
   };
-  let conns = [], queue = [], schedBlob = null, schedPath = "";
+  let conns = [], queue = [], schedBlob = null, schedPath = "", accountErrors = [];
 
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
@@ -89,23 +89,24 @@ const QRPublish = (() => {
     try {
       const t = await QRAuth.token(); if (!t) { conns = []; return; }
       const r = await fetch("/api/social?op=list", { headers: { Authorization: "Bearer " + t } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
-      conns = j.connections || [];
-    } catch { conns = []; }
+      conns = Array.isArray(j.connections) ? j.connections : [];
+    } catch { conns = []; accountErrors.push("تعذّر تحميل القنوات المرتبطة."); }
   }
   async function loadQueue() {
     try {
       const u = QRAuth.user(); if (!u) { queue = []; return; }
-      queue = await sb(`/rest/v1/publish_queue?user_id=eq.${u.id}&order=publish_at.desc&limit=50`);
+      queue = await sb(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(u.id)}&order=publish_at.desc&limit=50`);
       if (!Array.isArray(queue)) queue = [];
-    } catch { queue = []; }
+    } catch { queue = []; accountErrors.push("تعذّر تحميل جدول النشر."); }
   }
   async function loadAuto() {
     try {
       const u = QRAuth.user(); if (!u) return null;
-      const rows = await sb(`/rest/v1/autopilot?user_id=eq.${u.id}`);
+      const rows = await sb(`/rest/v1/autopilot?user_id=eq.${encodeURIComponent(u.id)}`);
       return Array.isArray(rows) && rows[0] ? rows[0] : null;
-    } catch { return null; }
+    } catch { accountErrors.push("تعذّر تحميل إعدادات الأتمتة."); return null; }
   }
   async function saveAuto(obj) {
     const u = QRAuth.user();
@@ -122,7 +123,7 @@ const QRPublish = (() => {
       scheduled: ["🕐 مجدولة", "sch"], publishing: ["⏳ تُنشر…", "sch"],
       published: ["✅ منشورة", "ok"], failed: ["⚠️ فشلت", "err"], draft: ["✏️ مسودة", "sch"],
     };
-    const [txt, cls] = map[r.status] || [r.status, "sch"];
+    const [txt, cls] = map[r.status] || [esc(r.status || "غير معروف"), "sch"];
     return `<span class="qbadge ${cls}">${txt}</span>`;
   }
 
@@ -163,68 +164,131 @@ const QRPublish = (() => {
 
   function renderQueue() {
     const wrap = $id("acctQueue"); if (!wrap) return;
-    if (!queue.length) { wrap.innerHTML = `<div class="hint">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
+    if (!QRAuth.user()) {
+      wrap.innerHTML = `<div class="acct-empty"><span>🔒</span><div><b>جدولك محفوظ في حسابك</b><p>سجّل الدخول لعرض المهام المجدولة وإدارة النشر.</p></div><button class="btn btn-em btn-sm" id="queueLogin">دخول آمن</button></div>`;
+      $id("queueLogin")?.addEventListener("click", openLogin, { once: true });
+      return;
+    }
+    if (!queue.length) {
+      wrap.innerHTML = `<div class="acct-empty"><span>🗓️</span><div><b>لا توجد مهام بعد</b><p>ارفع فيديو من هنا أو أنشئ ريلًا ثم اختر «جدولة للنشر».</p></div><a class="btn btn-ghost btn-sm" href="#/">إنشاء ريل ←</a></div>`;
+      return;
+    }
     wrap.innerHTML = queue.map(r => {
-      const p = PLATFORMS[r.platform] || { name: r.platform, icon: "•" };
+      const p = PLATFORMS[r.platform] || { name: esc(r.platform || "منصة"), icon: "•" };
       const d = new Date(r.publish_at);
-      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+      const when = isNaN(d) ? "وقت غير محدد" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
       const canAct = r.status === "scheduled" || r.status === "failed";
+      const external = /^https?:\/\//i.test(String(r.external_url || ""))
+        ? ` · <a href="${esc(r.external_url)}" target="_blank" rel="noopener noreferrer">فتح ↗</a>` : "";
       return `<div class="qrow">
-        <span class="qic">${p.icon}</span>
+        <span class="qic" aria-hidden="true">${p.icon}</span>
         <div class="qinfo">
           <b>${esc(r.title || "ريلز")}</b>
-          <small>${p.name} · ${when}${r.error ? ` · <i class="qerr">${esc(r.error.slice(0, 90))}</i>` : ""}${r.external_url ? ` · <a href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</small>
+          <small>${esc(p.name)} · ${esc(when)}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${external}</small>
         </div>
         ${statusBadge(r)}
         <div class="qacts">
-          ${canAct ? `<button class="btn btn-gold btn-sm" data-pub="${r.id}">انشر الآن</button>` : ""}
-          <button class="btn btn-ghost btn-sm" data-del="${r.id}">حذف</button>
+          ${canAct ? `<button class="btn btn-gold btn-sm" data-pub="${esc(r.id)}">انشر الآن</button>` : ""}
+          <button class="btn btn-ghost btn-sm" data-del="${esc(r.id)}">حذف</button>
         </div>
       </div>`;
     }).join("");
     wrap.querySelectorAll("[data-pub]").forEach(b => b.onclick = () => publishNow(b.dataset.pub, b));
     wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+      if (!window.confirm("حذف هذه المهمة من جدول النشر؟ لا يمكن التراجع عن الحذف.")) return;
       const u = QRAuth.user();
-      await sb(`/rest/v1/publish_queue?id=eq.${b.dataset.del}&user_id=eq.${u.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
-      toast("حُذفت المهمة");
-      refreshAccount();
+      try {
+        await sb(`/rest/v1/publish_queue?id=eq.${encodeURIComponent(b.dataset.del)}&user_id=eq.${encodeURIComponent(u.id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        toast("حُذفت المهمة");
+        await refreshAccount();
+      } catch (e) { toast(String(e.message || "تعذّر حذف المهمة"), "err"); }
     });
   }
 
   async function publishNow(id, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = "…"; }
+    const item = queue.find(x => String(x.id) === String(id));
+    if (!item) return toast("لم نعثر على هذه المهمة — حدّث الجدول", "err");
+    const platform = PLATFORMS[item.platform]?.name || item.platform || "المنصة";
+    if (!window.confirm(`سيُنشر «${item.title || "ريلز"}» الآن علنًا على ${platform}. هل تريد المتابعة؟`)) return;
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ النشر…"; }
     try {
       const t = await QRAuth.token();
       const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
       const j = await r.json().catch(() => ({}));
-      if (j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
+      if (r.ok && j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
     } catch (e) { toast(String(e.message || e), "err"); }
-    refreshAccount();
+    await refreshAccount();
+  }
+
+  function renderStats() {
+    const wrap = $id("acctStats"); if (!wrap) return;
+    if (!QRAuth.user()) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+    const scheduled = queue.filter(x => ["scheduled", "publishing"].includes(x.status)).length;
+    const published = queue.filter(x => x.status === "published").length;
+    const failed = queue.filter(x => x.status === "failed").length;
+    const linked = conns.length;
+    const cards = [
+      ["قنوات مرتبطة", linked, "🔗", "acct-metric-link"],
+      ["في الجدول", scheduled, "🗓️", ""],
+      ["نُشرت", published, "✅", ""],
+      ["تحتاج مراجعة", failed, "⚠️", failed ? "acct-metric-warn" : ""],
+    ];
+    wrap.innerHTML = cards.map(([label, value, icon, cls]) => `<div class="acct-metric ${cls}"><span aria-hidden="true">${icon}</span><div><b>${value}</b><small>${label}</small></div></div>`).join("");
+    wrap.hidden = false;
+  }
+
+  function renderQuickActions() {
+    const wrap = $id("acctQuickActions"); if (!wrap) return;
+    if (!QRAuth.user()) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+    wrap.innerHTML = `<div class="acct-quick-label"><span class="acct-kicker">اختصارات</span><b>ماذا تريد أن تفعل؟</b></div>
+      <a class="btn btn-gold" href="#/">＋ إنشاء ريل</a>
+      <button class="btn btn-em" id="quickUpload" type="button">⬆ رفع وجدولة فيديو</button>
+      <button class="btn btn-ghost" id="quickRefresh" type="button">↻ تحديث البيانات</button>`;
+    wrap.hidden = false;
+    $id("quickUpload")?.addEventListener("click", () => $id("schedFile")?.click());
+    $id("quickRefresh")?.addEventListener("click", async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "جارٍ التحديث…";
+      await refreshAccount();
+      toast("تم تحديث الحساب");
+    }, { once: true });
   }
 
   async function renderAuto() {
     const wrap = $id("acctAuto"); if (!wrap) return;
-    const a = await loadAuto() || { enabled: false, at_utc: "04:15:00", platforms: ["youtube"] };
+    if (!QRAuth.user()) {
+      wrap.innerHTML = `<div class="acct-section-head"><div><span class="acct-kicker">اختياري بالكامل</span><h2>الأتمتة اليومية</h2></div><span class="acct-lock">🔒 تتطلب تسجيل الدخول</span></div>
+        <p class="hint">يبقى النشر التلقائي متوقفًا افتراضيًا. سجّل الدخول أولًا لإدارة الإعدادات؛ لن يتم تفعيل النشر دون حفظ اختيارك.</p>
+        <button class="btn btn-em btn-sm" id="autoLogin" type="button">دخول لإدارة الأتمتة</button>`;
+      $id("autoLogin")?.addEventListener("click", openLogin, { once: true });
+      return;
+    }
+    const stored = await loadAuto();
+    const a = stored || { enabled: false, at_utc: "04:15:00", platforms: ["youtube"] };
     const plats = Array.isArray(a.platforms) ? a.platforms : ["youtube"];
-    const hhmm = (a.at_utc || "04:15:00").slice(0, 5);
     wrap.innerHTML = `
-      <div class="auto-head">
-        <h3>🤖 الأتمتة — النشر التلقائي اليومي</h3>
-        <label class="switch"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""}><i></i></label>
+      <div class="acct-section-head"><div><span class="acct-kicker">متوقفة افتراضيًا</span><h2>إعدادات الأتمتة</h2></div>
+        <label class="switch" aria-label="تفعيل النشر اليومي"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""}><i></i></label>
       </div>
-      <p class="hint">مهام «المستحقة» تُنشر آليًا يوميًا الساعة <b>06:15 بتوقيت القاهرة</b> (ويمكنك النشر الفوري دائمًا). اضبط وقت المهام عند الجدولة حسب ذلك.</p>
-      <div class="auto-row">
-        <label>المنصات المفعّلة:</label>
+      <p class="hint">عند التفعيل، تُراجع المهام المؤهلة يوميًا قرابة <b>04:15 UTC</b> (06:15 شتاءً / 07:15 صيفًا بتوقيت القاهرة). قد يتأخر تشغيل Vercel حتى 59 دقيقة؛ ويمكنك إيقاف الأتمتة من هنا في أي وقت.</p>
+      <div class="auto-row"><b class="acct-plat-label">المنصات المسموح بها:</b>
         ${Object.entries(PLATFORMS).map(([k, p]) => `<label class="chk"><input type="checkbox" class="autoPlat" value="${k}" ${plats.includes(k) ? "checked" : ""}> ${p.icon} ${p.name}</label>`).join("")}
       </div>
-      <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>`;
+      <div class="acct-auto-footer"><span class="hint">الحالة الحالية: <b class="${a.enabled ? "acct-state-on" : "acct-state-off"}">${a.enabled ? "مفعّلة" : "متوقفة"}</b></span><button class="btn btn-gold" id="autoSave" type="button">حفظ الإعدادات</button></div>`;
     $id("autoSave").onclick = async () => {
       const enabled = $id("autoOn").checked;
       const platforms = [...document.querySelectorAll(".autoPlat:checked")].map(x => x.value);
+      if (enabled && !platforms.length) return toast("اختر منصة واحدة على الأقل قبل التفعيل", "err");
+      if (enabled && !a.enabled && !window.confirm("تفعيل الأتمتة يسمح بنشر المهام المؤهلة علنًا وبشكل آلي. هل تؤكد التفعيل؟")) {
+        $id("autoOn").checked = false;
+        return;
+      }
+      const b = $id("autoSave"); b.disabled = true; b.textContent = "جارٍ الحفظ…";
       try {
         await saveAuto({ enabled, platforms, at_utc: (a.at_utc || "04:15:00") });
-        toast(enabled ? "الأتمتة مفعّلة 🤖" : "تم حفظ الإعدادات");
-      } catch (e) { toast("تعذّر الحفظ", "err"); }
+        toast(enabled ? "تم تفعيل الأتمتة حسب اختيارك 🤖" : "تم إيقاف الأتمتة وحفظ الإعدادات");
+        a.enabled = enabled; a.platforms = platforms;
+        await renderAuto();
+      } catch (e) { b.disabled = false; b.textContent = "حفظ الإعدادات"; toast(String(e.message || "تعذّر حفظ الإعدادات"), "err"); }
     };
   }
 
@@ -233,11 +297,10 @@ const QRPublish = (() => {
     const u = QRAuth.user();
     if (u) {
       wrap.innerHTML = `<div class="card acct-user">
-        <div class="avatar">${esc((u.name || u.email || "?").charAt(0).toUpperCase())}</div>
-        <div><b>${esc(u.name || u.email || "حسابي")}</b><br><small class="hint">${esc(u.email || "")}</small></div>
-        <div style="margin-inline-start:auto;display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" id="acctLogout">خروج</button>
-        </div>
+        <div class="avatar" aria-hidden="true">${esc((u.name || u.email || "?").charAt(0).toUpperCase())}</div>
+        <div class="acct-user-meta"><b>${esc(u.name || u.email || "حسابي")}</b><small class="hint">${esc(u.email || "")}</small></div>
+        <span class="acct-session"><i></i> جلسة نشطة</span>
+        <button class="btn btn-ghost btn-sm" id="acctLogout" type="button">تسجيل الخروج</button>
       </div>`;
       $id("acctLogout").onclick = () => { QRAuth.signOut().then(() => { toast("تم تسجيل الخروج"); refreshAccount(); }); };
     } else {
@@ -245,17 +308,19 @@ const QRPublish = (() => {
         <h3>🔑 سجّل لتبدأ الأتمتة</h3>
         <p class="hint">حساب واحد يفتح: حفظ الفيديوهات، الربط بالمنصات، جدولة النشر، والأتمتة اليومية. الموقع يبقى يعمل للجميع بلا تسجيل.</p>
         <div class="login-row">
-          <input type="email" id="acctEmail" placeholder="بريدك الإلكتروني" dir="ltr">
-          <button class="btn btn-gold" id="acctMagic">أرسل رابط الدخول</button>
+          <input type="email" id="acctEmail" placeholder="name@example.com" autocomplete="email" inputmode="email" required dir="ltr" aria-label="البريد الإلكتروني">
+          <button class="btn btn-gold" id="acctMagic" type="button">أرسل رابط الدخول</button>
         </div>
-        <button class="btn btn-em w100" id="acctGoogle">G المتابعة بجوجل</button>
+        <button class="btn btn-em w100" id="acctGoogle" type="button">G المتابعة بجوجل</button>
         <p class="hint center" style="margin-top:8px">لا كلمات مرور — يصلك رابط سحري لبريدك أو الدخول بحساب جوجل.</p>
       </div>`;
       $id("acctMagic").onclick = async () => {
         const em = ($id("acctEmail").value || "").trim();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return toast("أدخل بريدًا صحيحًا", "err");
+        const b = $id("acctMagic"); b.disabled = true; b.textContent = "جارٍ الإرسال…";
         try { await QRAuth.magicLink(em); toast("✓ أرسلنا رابط الدخول — تفقد بريدك"); }
         catch (e) { toast(e.message, "err"); }
+        finally { b.disabled = false; b.textContent = "أرسل رابط الدخول"; }
       };
       $id("acctGoogle").onclick = () => QRAuth.google();
     }
@@ -285,15 +350,35 @@ const QRPublish = (() => {
     } else wrap.hidden = true;
   }
 
+  function renderDataNotice() {
+    const wrap = $id("acctDataNotice"); if (!wrap) return;
+    const messages = [...new Set(accountErrors)];
+    if (!messages.length) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+    wrap.hidden = false;
+    wrap.innerHTML = `<div class="acct-error-line"><span aria-hidden="true">⚠️</span><div><b>بعض بيانات الحساب لم تُحمّل</b><p>${messages.map(esc).join(" ")}</p></div><button class="btn btn-ghost btn-sm" id="acctDataRetry" type="button">إعادة المحاولة</button></div>`;
+    $id("acctDataRetry")?.addEventListener("click", async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "جارٍ التحديث…";
+      await refreshAccount();
+    }, { once: true });
+  }
+
   async function refreshAccount() {
+    accountErrors = [];
     renderNotice();
     renderAuthCard();
     const u = QRAuth.user();
-    if (u) { await loadConnections(); await loadQueue(); }
-    renderChannels(); renderQueue(); renderAuto();
-    // بطاقة المهمة الجديدة
+    const howto = $id("acctHowTo"); if (howto) howto.hidden = !!u;
+    if (u) await Promise.all([loadConnections(), loadQueue()]);
+    else { conns = []; queue = []; }
+    renderStats(); renderQuickActions();
+    renderChannels(); renderQueue();
+    await renderAuto();
+    renderDataNotice();
     const ns = $id("btnNewSched");
-    if (ns) ns.onclick = () => $id("schedFile").click();
+    if (ns) ns.onclick = () => {
+      if (!QRAuth.user()) { openLogin(); return; }
+      $id("schedFile")?.click();
+    };
   }
 
   /* ---------- نافذة الجدولة ---------- */
