@@ -260,7 +260,10 @@
       "maxDuration": 60
     },
     "api/cron/publish.js": {
-      "maxDuration": 120
+      "maxDuration": 300,
+      "includeFiles": [
+        "node_modules/@sparticuz/chromium/bin/**"
+      ]
     },
     "api/cron/monitor.js": {
       "maxDuration": 120
@@ -270,6 +273,12 @@
     },
     "api/oauth/callback.js": {
       "maxDuration": 30
+    },
+    "api/autopilot.js": {
+      "maxDuration": 300,
+      "includeFiles": [
+        "node_modules/@sparticuz/chromium/bin/**"
+      ]
     }
   }
 }

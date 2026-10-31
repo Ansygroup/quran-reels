@@ -345,7 +345,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         hasQR: typeof QRAuth !== "undefined" && typeof QRPublish !== "undefined",
         login: !!document.getElementById("acctMagic"),
         chans: document.querySelectorAll(".chan-card").length,
-        auto: !!document.getElementById("autoOn"),
+        auto: /سجّل الدخول/.test(document.getElementById("acctAuto")?.textContent || ""),
         plans: document.querySelectorAll(".plan-card").length,
         qlen: (document.getElementById("acctQueue")?.textContent || "").trim().length,
       }));
@@ -353,7 +353,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       chk("S9 auth+publish modules", a1.hasQR, "modules missing");
       chk("S9 login card (logged out)", !!a1.login && a1.plans === 3, JSON.stringify(a1));
       chk("S9 channel cards x5", a1.chans === 5, String(a1.chans));
-      chk("S9 autopilot card", !!a1.auto, "no autoOn");
+      chk("S9 autopilot dashboard login prompt", !!a1.auto, "missing sign-in prompt");
       chk("S9 queue empty state", a1.qlen > 5, String(a1.qlen));
       await page.click("#authBtn");
       await sleep(400);

@@ -16,7 +16,7 @@ const QRPublish = (() => {
     tiktok: { env: "TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET", where: "developers.tiktok.com → تسجيل تطبيق", redirect: "/api/oauth/callback" },
     x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
   };
-  let conns = [], queue = [], schedBlob = null, schedPath = "";
+  let conns = [], queue = [], schedBlob = null, schedPath = "", autoData = null;
 
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
@@ -102,19 +102,32 @@ const QRPublish = (() => {
   }
   async function loadAuto() {
     try {
-      const u = QRAuth.user(); if (!u) return null;
-      const rows = await sb(`/rest/v1/autopilot?user_id=eq.${u.id}`);
-      return Array.isArray(rows) && rows[0] ? rows[0] : null;
-    } catch { return null; }
+      const t = await QRAuth.token(); if (!t) return null;
+      const r = await fetch("/api/autopilot", { headers: { Authorization: "Bearer " + t } });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "تعذّر تحميل لوحة الأتمتة");
+      autoData = j;
+      return j;
+    } catch { autoData = null; return null; }
   }
   async function saveAuto(obj) {
-    const u = QRAuth.user();
-    await sb(`/rest/v1/autopilot?on_conflict=user_id`, {
+    const t = await QRAuth.token(); if (!t) throw new Error("سجّل الدخول أولًا");
+    const r = await fetch("/api/autopilot", {
       method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal", "Content-Type": "application/json" },
-      body: JSON.stringify({ ...obj, user_id: u.id, updated_at: new Date().toISOString() }),
+      headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", ...obj }),
     });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "تعذّر حفظ الإعدادات");
+    if (autoData) autoData.config = j.config;
+    return j.config;
   }
+  function cairoClockLabel() {
+    const now = new Date();
+    const cairo = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 4, 15)));
+    return `${cairo} بتوقيت القاهرة`;
+  }
+
 
   /* ---------- الرسم ---------- */
   function statusBadge(r) {
@@ -204,29 +217,67 @@ const QRPublish = (() => {
 
   async function renderAuto() {
     const wrap = $id("acctAuto"); if (!wrap) return;
-    const a = await loadAuto() || { enabled: false, at_utc: "04:15:00", platforms: ["youtube"] };
-    const plats = Array.isArray(a.platforms) ? a.platforms : ["youtube"];
-    const hhmm = (a.at_utc || "04:15:00").slice(0, 5);
+    if (!QRAuth.user()) { wrap.innerHTML = `<h2>🤖 لوحة الأتمتة</h2><p class="hint">سجّل الدخول، ثم اربط قناة YouTube لإدارة الإنشاء والنشر التلقائي.</p>`; return; }
+    const data = await loadAuto();
+    const a = data?.config || { enabled: false, template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate" } };
+    const t = a.template && typeof a.template === "object" ? a.template : {};
+    const connected = !!data?.connected || conns.some(x => x.platform === "youtube");
+    const runs = Array.isArray(data?.runs) ? data.runs : [];
+    const modes = { mix: "تنويع كل المقاطع", famous: "آيات وسور مشهورة", sequential: "التدرّج حسب ترتيب السور" };
+    const backgrounds = {
+      rotate: "خلفية مختلفة بالتناوب", "bg-mosque-night": "مسجد ليلاً", "bg-starry-desert": "سماء النجوم",
+      "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية",
+      "bg-mountains-dawn": "جبال الفجر", "bg-mosque-silhouette": "ظلال مسجد", "bg-arabesque-dark": "أرابيسك داكن",
+      "bg-heavenly-clouds": "غيوم نورانية", "grad-emerald": "زمردي", "grad-gold": "ذهبي", "grad-dawn": "فجر وردي", "grad-night": "ليل أزرق",
+    };
+    const runStatus = { rendering: ["🎬 يُنشأ", "sch"], queued: ["🕐 جاهز للنشر", "sch"], published: ["✅ نُشر", "ok"], failed: ["⚠️ تعذّر", "err"] };
+    const runRows = runs.length ? runs.map(r => {
+      const [label, cls] = runStatus[r.status] || [esc(r.status || "—"), "sch"];
+      const date = r.created_at ? new Date(r.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" }) : "";
+      return `<div class="auto-run"><div><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small></div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
+    }).join("") : `<p class="hint">لا توجد عمليات إنشاء بعد.</p>`;
+
     wrap.innerHTML = `
-      <div class="auto-head">
-        <h3>🤖 الأتمتة — النشر التلقائي اليومي</h3>
-        <label class="switch"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""}><i></i></label>
+      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد ثم رفعه علنًا إلى قناتك على YouTube.</p></div>
+        <label class="switch" title="تشغيل أو إيقاف النشر اليومي"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""} ${connected ? "" : "disabled"}><i></i></label>
       </div>
-      <p class="hint">مهام «المستحقة» تُنشر آليًا يوميًا الساعة <b>06:15 بتوقيت القاهرة</b> (ويمكنك النشر الفوري دائمًا). اضبط وقت المهام عند الجدولة حسب ذلك.</p>
-      <div class="auto-row">
-        <label>المنصات المفعّلة:</label>
-        ${Object.entries(PLATFORMS).map(([k, p]) => `<label class="chk"><input type="checkbox" class="autoPlat" value="${k}" ${plats.includes(k) ? "checked" : ""}> ${p.icon} ${p.name}</label>`).join("")}
+      ${!connected ? `<div class="auto-warning">اربط قناة YouTube من بطاقة «ربط المنصات» أولًا، ثم فعّل الأتمتة.</div>` : `<div class="auto-health"><span class="auto-dot ${a.enabled ? "on" : ""}"></span><b>${a.enabled ? "الأتمتة مفعّلة" : "الأتمتة متوقفة"}</b><span>· ${esc(data?.channel || "قناة YouTube المرتبطة")}</span></div>`}
+      <div class="auto-grid">
+        <div class="f-group"><label for="autoContent">محتوى المقاطع</label><select id="autoContent" style="width:100%">${Object.entries(modes).map(([k,v]) => `<option value="${k}" ${t.content_mode === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="f-group"><label>القارئ</label><div class="auto-static">التناوب بين القراء المتاحين</div></div>
+        <div class="f-group"><label for="autoBg">الخلفية</label><select id="autoBg" style="width:100%">${Object.entries(backgrounds).map(([k,v]) => `<option value="${k}" ${(t.background || "rotate") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="f-group"><label>قناة النشر</label><div class="auto-static">🎬 YouTube · عام تلقائيًا</div></div>
       </div>
-      <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>`;
-    $id("autoSave").onclick = async () => {
-      const enabled = $id("autoOn").checked;
-      const platforms = [...document.querySelectorAll(".autoPlat:checked")].map(x => x.value);
+      <div class="auto-schedule"><b>🗓️ الموعد:</b> يوميًا، الهدف ${cairoClockLabel()}. <span>قد يتفاوت التنفيذ حتى نحو ساعة على خطة الاستضافة الحالية، ويتغير التوقيت المحلي مع التوقيت الصيفي.</span></div>
+      <div class="auto-actions"><button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button><button class="btn btn-ghost" id="autoRun" ${connected ? "" : "disabled"}>أنشئ وانشر الآن</button></div>
+      <p class="hint auto-note">سيُنشأ الفيديو تلقائيًا بخلفية عمودية 9:16 وصيغة WebM/MP4 بحسب دعم محرّك الموقع، مع التناوب بين القراء، ثم يُرفع علنًا دون مراجعة. استخدم الإيقاف لإيقاف الدورات القادمة. تحقّق من أذونات إعادة نشر ملفات التلاوة قبل تفعيل النشر العام.</p>
+      <div class="auto-history-head"><b>سجل الإنشاء والنشر</b><small>${runs.length} من آخر العمليات</small></div><div class="auto-runs">${runRows}</div>`;
+
+    const save = $id("autoSave");
+    save.onclick = async () => {
+      save.disabled = true;
       try {
-        await saveAuto({ enabled, platforms, at_utc: (a.at_utc || "04:15:00") });
-        toast(enabled ? "الأتمتة مفعّلة 🤖" : "تم حفظ الإعدادات");
-      } catch (e) { toast("تعذّر الحفظ", "err"); }
+        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
+        toast($id("autoOn").checked ? "تم حفظ لوحة الأتمتة وتفعيل النشر اليومي 🤖" : "تم حفظ الإعدادات وإيقاف النشر اليومي");
+        await refreshAccount();
+      } catch (e) { toast(e.message || "تعذّر الحفظ", "err"); save.disabled = false; }
+    };
+    const run = $id("autoRun");
+    run.onclick = async () => {
+      if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على قناة YouTube المرتبطة. هل تريد المتابعة؟")) return;
+      run.disabled = true; run.textContent = "جارٍ إنشاء الفيديو ورفعه…";
+      try {
+        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
+        const token = await QRAuth.token();
+        const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "run" }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر إنشاء الفيديو أو نشره");
+        toast("تم إنشاء الفيديو ونشره ✓");
+      } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
+      await refreshAccount();
     };
   }
+
 
   function renderAuthCard() {
     const wrap = $id("acctAuth"); if (!wrap) return;

@@ -657,6 +657,25 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 .qacts{display:flex;gap:6px}
 .auto-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .auto-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:12px 0}
+.auto-health{display:flex;align-items:center;gap:8px;margin:12px 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.035);color:var(--muted);font-size:.88rem}
+.auto-health b{color:var(--txt)}
+.auto-dot{width:9px;height:9px;border-radius:50%;background:#84908a;box-shadow:0 0 0 4px rgba(132,144,138,.12)}
+.auto-dot.on{background:#7ee0a2;box-shadow:0 0 0 4px rgba(126,224,162,.14)}
+.auto-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.auto-grid .f-group{margin:0}
+.auto-static{padding:9px 12px;border:1px solid var(--line-2);border-radius:10px;background:rgba(0,0,0,.18);min-height:42px}
+.auto-schedule{padding:11px 13px;border:1px solid rgba(212,175,55,.27);border-radius:12px;background:rgba(212,175,55,.07);font-size:.9rem;line-height:1.8;margin:12px 0}
+.auto-schedule span{color:var(--muted)}
+.auto-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.auto-note{margin-top:10px;line-height:1.8}
+.auto-warning{padding:11px 13px;border:1px solid rgba(255,190,75,.35);border-radius:12px;background:rgba(255,190,75,.07);margin:12px 0;color:#f5d28b}
+.auto-history-head{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:12px;border-top:1px solid var(--line-2)}
+.auto-history-head small{color:var(--muted)}
+.auto-runs{display:flex;flex-direction:column;gap:7px;margin-top:9px}
+.auto-run{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line-2);border-radius:11px;background:var(--panel);min-width:0}
+.auto-run>div{flex:1;min-width:0}
+.auto-run b,.auto-run small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.auto-run small{color:var(--muted);font-size:.75rem;margin-top:2px}
 .chk{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);cursor:pointer}
 .notice-card{border-color:rgba(212,175,55,.5);background:rgba(212,175,55,.07);margin-top:16px;line-height:1.9}
 .setup-list{margin:8px 0 0;padding-inline-start:20px}
@@ -671,6 +690,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 @media (max-width:640px){
   .acct-login .login-row{flex-direction:column}
   .qrow{flex-wrap:wrap}
+  .auto-run{flex-wrap:wrap}
   .header-cta #authBtn{display:none}
 }
 

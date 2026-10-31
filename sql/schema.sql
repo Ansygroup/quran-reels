@@ -19,6 +19,32 @@ create table if not exists public.autopilot (
 );
 alter table public.autopilot enable row level security;
 
+-- Private history for generated/published autopilot videos.
+create table if not exists public.autopilot_runs (
+  id uuid default gen_random_uuid() not null,
+  user_id uuid not null,
+  run_key text not null,
+  run_type text not null,
+  run_date date not null,
+  status text default 'rendering'::text not null,
+  recipe_key text,
+  reciter text,
+  title text,
+  video_path text,
+  publish_queue_id uuid,
+  external_url text,
+  error text,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint autopilot_runs_pkey primary key (id),
+  constraint autopilot_runs_run_key_key unique (run_key),
+  constraint autopilot_runs_run_type_check check (run_type = ANY (ARRAY['daily'::text, 'manual'::text])),
+  constraint autopilot_runs_status_check check (status = ANY (ARRAY['rendering'::text, 'queued'::text, 'published'::text, 'failed'::text]))
+);
+alter table public.autopilot_runs enable row level security;
+
 create table if not exists public.khatma_plans (
   plan_id text not null,
   plan jsonb not null,
@@ -82,6 +108,7 @@ alter table public.social_connections enable row level security;
 
 -- ---------- الفهارس ----------
 CREATE UNIQUE INDEX autopilot_pkey ON public.autopilot USING btree (user_id);
+CREATE INDEX autopilot_runs_user_created_idx ON public.autopilot_runs USING btree (user_id, created_at DESC);
 CREATE UNIQUE INDEX khatma_plans_pkey ON public.khatma_plans USING btree (plan_id);
 CREATE UNIQUE INDEX khatma_progress_pkey ON public.khatma_progress USING btree (plan_id, member);
 CREATE UNIQUE INDEX publish_queue_pkey ON public.publish_queue USING btree (id);
@@ -120,6 +147,8 @@ $function$;
 
 -- ---------- السياسات (RLS) ----------
 create policy "ap own" on public.autopilot for ALL to authenticated using ((user_id = auth.uid())) with check ((user_id = auth.uid()));
+grant select on public.autopilot_runs to authenticated;
+create policy "autopilot runs own read" on public.autopilot_runs for SELECT to authenticated using ((user_id = auth.uid()));
 -- contact_messages is writable only through the SECURITY DEFINER submit_contact RPC,
 -- which validates fields and enforces per-email daily limits; no direct anon INSERT policy.
 create policy "anon read plans" on public.khatma_plans for SELECT to public using (true);
