@@ -55,6 +55,10 @@
   "outputDirectory": "public",
   "rewrites": [
     {
+      "source": "/api/app-config",
+      "destination": "/api/ip?mode=config"
+    },
+    {
       "source": "/proxy",
       "destination": "/api/proxy"
     }
@@ -252,9 +256,6 @@
     },
     "api/ip.js": {
       "maxDuration": 15
-    },
-    "api/app-config.js": {
-      "maxDuration": 10
     },
     "api/publish.js": {
       "maxDuration": 60

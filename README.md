@@ -88,7 +88,7 @@ npx vercel -Q "$PWD/.vcfg" deploy --prod --yes --scope ansygroups-projects
 
 - الإعدادات في `vercel.json`: مجلد الخرج = `public`، و`/proxy` يُعاد توجيهه إلى `api/proxy`، وصفحات بدون امتداد تفتح التطبيق، وكاش CDN يوم للملفات الثابتة و6 ساعات للـproxy، ورؤوس `nosniff`/`Referrer-Policy`.
 - متغيرات البيئة في المشروع (production + preview):
-  - `SUPABASE_URL` · `SUPABASE_ANON_KEY` — تقرأها `api/app-config.js` ويستهلكها المتصفح.
+  - `SUPABASE_URL` · `SUPABASE_ANON_KEY` — يقدّمها مسار `/api/app-config` عبر دالة `api/ip.js` ويستهلكها المتصفح.
 - نطاق مخصص لاحقًا: أضِفه من لوحة Vercel ثم حدّث وسوم SEO إليه.
 
 **تحصينات مطبَّقة (2026-10-27):**

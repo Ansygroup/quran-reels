@@ -12,6 +12,22 @@ function sendJson(res, body) {
 }
 
 module.exports = async (req, res) => {
+  // Keep the public runtime-config URL while sharing this serverless function
+  // with geolocation (Hobby allows at most 12 serverless functions/deployment).
+  let mode = '';
+  try { mode = new URL(req.url || '/', 'https://quran-reels.invalid').searchParams.get('mode') || ''; } catch {}
+  if (mode === 'config') {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+    res.end(JSON.stringify({ supabase: {
+      url: process.env.SUPABASE_URL || "",
+      anon: process.env.SUPABASE_ANON_KEY || "",
+    }}));
+    return;
+  }
+
   const fallback = '{"country_name":"Egypt","city":"","latitude":30.0444,"longitude":31.2357}';
 
   // 1) Vercel geo headers (present on requests terminated by Vercel's edge)
