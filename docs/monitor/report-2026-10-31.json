@@ -52,5 +52,18 @@
    "removed": 0
   }
  ],
- "probes": []
+ "probes": [
+  {
+   "query": "site:quran-reels-tau.vercel.app",
+   "available": true,
+   "count": 10,
+   "ours": false
+  },
+  {
+   "query": "قرآن ريلز صانع فيديو",
+   "available": true,
+   "count": 10,
+   "ours": false
+  }
+ ]
 }
