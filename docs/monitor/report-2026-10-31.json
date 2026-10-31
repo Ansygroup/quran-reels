@@ -1,0 +1,69 @@
+{
+ "day": "2026-10-31",
+ "base": "https://quran-reels-tau.vercel.app",
+ "fails": [],
+ "notes": [],
+ "own": {
+  "sitemap": {
+   "ok": true,
+   "status": 200,
+   "count": 154
+  },
+  "urls": {
+   "total": 154,
+   "bad": []
+  },
+  "robots": {
+   "ok": true,
+   "status": 200,
+   "hasSitemap": true,
+   "hasAIBots": true
+  },
+  "llms": {
+   "ok": true,
+   "status": 200,
+   "hasBlog": true,
+   "hasEn": true
+  },
+  "home": {
+   "ok": true,
+   "status": 200,
+   "verification": true,
+   "blogFooter": true
+  }
+ },
+ "competitors": [
+  {
+   "host": "quranreels.tech",
+   "count": 122,
+   "added": 0,
+   "removed": 0
+  },
+  {
+   "host": "tashghil.pro",
+   "count": 794,
+   "added": 0,
+   "removed": 0
+  },
+  {
+   "host": "quranvideomaker.com",
+   "count": 3,
+   "added": 0,
+   "removed": 0
+  }
+ ],
+ "probes": [
+  {
+   "query": "site:quran-reels-tau.vercel.app",
+   "available": true,
+   "count": 10,
+   "ours": false
+  },
+  {
+   "query": "قرآن ريلز صانع فيديو",
+   "available": true,
+   "count": 10,
+   "ours": false
+  }
+ ]
+}

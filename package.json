@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "pg": "^8.13.1",
+    "playwright": "^1.64.1",
     "@sparticuz/chromium": "153.0.0",
     "playwright-core": "1.64.1"
   },

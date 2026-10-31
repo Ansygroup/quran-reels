@@ -3101,6 +3101,9 @@ ${p.pair ? `<link rel="alternate" hreflang="x-default" href="${ORIGIN}/">
 ${p.faq.map(([q, a]) => `{"@type":"Question","name":${JSON.stringify(q)},"acceptedAnswer":{"@type":"Answer","text":${JSON.stringify(a)}}}`).join(",\n")}
 ]}
 </script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"الرئيسية","item":"${ORIGIN}/"},{"@type":"ListItem","position":2,"name":${JSON.stringify(p.h1)},"item":"${ORIGIN}${PUB}"}]}
+</script>
 </head>
 <body>
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
