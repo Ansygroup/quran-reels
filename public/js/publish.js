@@ -16,7 +16,7 @@ const QRPublish = (() => {
     tiktok: { env: "TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET", where: "developers.tiktok.com → تسجيل تطبيق", redirect: "/api/oauth/callback" },
     x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
   };
-  let conns = [], queue = [], schedBlob = null, schedPath = "", accountErrors = [];
+  let conns = [], queue = [], autopilotRuns = [], autopilotChannel = "", schedBlob = null, schedPath = "", accountErrors = [];
 
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
@@ -107,6 +107,17 @@ const QRPublish = (() => {
       const rows = await sb(`/rest/v1/autopilot?user_id=eq.${encodeURIComponent(u.id)}`);
       return Array.isArray(rows) && rows[0] ? rows[0] : null;
     } catch { accountErrors.push("تعذّر تحميل إعدادات الأتمتة."); return null; }
+  }
+  async function loadAutoHistory() {
+    autopilotRuns = []; autopilotChannel = "";
+    try {
+      const t = await QRAuth.token(); if (!t) return;
+      const r = await fetch("/api/autopilot", { headers: { Authorization: "Bearer " + t }, cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      autopilotRuns = Array.isArray(data.runs) ? data.runs : [];
+      autopilotChannel = String(data.channel || "");
+    } catch { accountErrors.push("تعذّر تحميل سجل الفيديوهات المنشورة."); }
   }
   async function saveAuto(obj) {
     const u = QRAuth.user();
@@ -203,6 +214,64 @@ const QRPublish = (() => {
         await refreshAccount();
       } catch (e) { toast(String(e.message || "تعذّر حذف المهمة"), "err"); }
     });
+  }
+
+  function youtubeVideoId(value) {
+    try {
+      const u = new URL(String(value || ""));
+      if (u.protocol !== "https:" || !["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"].includes(u.hostname.toLowerCase())) return "";
+      let id = "";
+      if (u.hostname.toLowerCase() === "youtu.be") id = u.pathname.split("/").filter(Boolean)[0] || "";
+      else id = u.pathname.match(/\/(?:shorts|embed|live)\/([\w-]{11})(?:\/|$)/)?.[1] || u.searchParams.get("v") || "";
+      return /^[\w-]{11}$/.test(id) ? id : "";
+    } catch { return ""; }
+  }
+
+  function renderAutoRuns() {
+    const wrap = $id("acctRunList"); if (!wrap) return;
+    const channel = $id("acctRunChannel");
+    if (channel) {
+      channel.textContent = autopilotChannel ? `قناة YouTube: ${autopilotChannel}` : "سجل النشر التلقائي";
+      channel.hidden = !autopilotChannel;
+    }
+    if (!QRAuth.user()) {
+      wrap.innerHTML = `<div class="acct-empty"><span>🔒</span><div><b>سجل الفيديوهات خاص بحسابك</b><p>سجّل الدخول لعرض الفيديوهات المنشورة وتفاصيلها.</p></div><button class="btn btn-em btn-sm" id="runsLogin" type="button">تسجيل الدخول</button></div>`;
+      $id("runsLogin")?.addEventListener("click", openLogin, { once: true });
+      return;
+    }
+    if (!autopilotRuns.length) {
+      const linked = conns.some(x => x.platform === "youtube");
+      wrap.innerHTML = `<div class="acct-empty"><span>${linked ? "🎬" : "🔗"}</span><div><b>${linked ? "لم يُنشر فيديو تلقائي بعد" : "اربط قناة YouTube أولًا"}</b><p>${linked ? "سيظهر أول فيديو هنا بعد تشغيل الموعد اليومي، مع معاينة وعنوان ووصف وهاشتاقات ورابط المشاهدة." : "بعد ربط القناة، ستظهر هنا معاينات الفيديوهات المنشورة وتفاصيلها."}</p></div></div>`;
+      return;
+    }
+    const labels = {
+      rendering: ["⏳ جارٍ إنشاء الفيديو", "sch"],
+      queued: ["🕐 بانتظار النشر", "sch"],
+      published: ["✅ منشور", "ok"],
+      failed: ["⚠️ تعذّر النشر", "err"],
+    };
+    wrap.innerHTML = autopilotRuns.map(run => {
+      const [statusText, statusClass] = labels[run.status] || [esc(run.status || "حالة غير معروفة"), "sch"];
+      const id = youtubeVideoId(run.external_url);
+      const date = new Date(run.completed_at || run.created_at || run.run_date);
+      const when = isNaN(date) ? esc(run.run_date || "") : esc(date.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }));
+      const tags = String(run.hashtags || "").split(",").map(x => x.trim().replace(/^#+/, "")).filter(Boolean).slice(0, 20);
+      const tagHtml = tags.length ? tags.map(t => `<span class="acct-run-tag">#${esc(t)}</span>`).join("") : `<span class="hint">لا توجد هاشتاقات محفوظة لهذا التشغيل.</span>`;
+      const video = id ? `<div class="acct-run-video"><iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0" title="${esc(run.title || "فيديو قرآن منشور على YouTube")}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe></div>` : `<div class="acct-run-video acct-run-placeholder"><span aria-hidden="true">${run.status === "rendering" ? "⏳" : "🎬"}</span><b>${run.status === "rendering" ? "جارٍ تجهيز الفيديو" : "لا تتوفر معاينة بعد"}</b></div>`;
+      const watch = id ? `<a class="btn btn-gold btn-sm" href="https://www.youtube.com/shorts/${id}" target="_blank" rel="noopener noreferrer">▶ مشاهدة على القناة</a>` : "";
+      const caption = String(run.caption || "").trim();
+      const details = caption || tags.length ? `<details class="acct-run-details"><summary>العنوان والوصف والهاشتاقات</summary>${caption ? `<p>${esc(caption)}</p>` : ""}<div class="acct-run-tags">${tagHtml}</div></details>` : "";
+      return `<article class="acct-run-card"><div class="acct-run-content"><div class="acct-run-top"><span class="qbadge ${statusClass}">${statusText}</span><small>${when}</small></div><h3>${esc(run.title || "ريلز قرآن")}</h3><p class="acct-run-meta">${run.reciter ? `🎙️ ${esc(run.reciter)} · ` : ""}${run.recipe_key ? `الآيات ${esc(run.recipe_key)}` : "تشغيل تلقائي"}</p>${details}<div class="acct-run-actions">${watch}</div>${run.status === "failed" && run.error ? `<p class="acct-run-error">${esc(String(run.error).slice(0, 240))}</p>` : ""}</div>${video}</article>`;
+    }).join("");
+  }
+
+  async function refreshAutoRuns() {
+    const button = $id("acctRunsRefresh");
+    if (button) { button.disabled = true; button.textContent = "جارٍ التحديث…"; }
+    await loadAutoHistory();
+    renderAutoRuns(); renderDataNotice();
+    if (button) { button.disabled = false; button.textContent = "↻ تحديث السجل"; }
+    if (!accountErrors.length) toast("تم تحديث سجل الفيديوهات");
   }
 
   async function publishNow(id, btn) {
@@ -368,12 +437,14 @@ const QRPublish = (() => {
     renderAuthCard();
     const u = QRAuth.user();
     const howto = $id("acctHowTo"); if (howto) howto.hidden = !!u;
-    if (u) await Promise.all([loadConnections(), loadQueue()]);
-    else { conns = []; queue = []; }
+    if (u) await Promise.all([loadConnections(), loadQueue(), loadAutoHistory()]);
+    else { conns = []; queue = []; autopilotRuns = []; autopilotChannel = ""; }
     renderStats(); renderQuickActions();
-    renderChannels(); renderQueue();
+    renderChannels(); renderQueue(); renderAutoRuns();
     await renderAuto();
     renderDataNotice();
+    const runsRefresh = $id("acctRunsRefresh");
+    if (runsRefresh) runsRefresh.onclick = refreshAutoRuns;
     const ns = $id("btnNewSched");
     if (ns) ns.onclick = () => {
       if (!QRAuth.user()) { openLogin(); return; }

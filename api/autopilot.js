@@ -16,11 +16,33 @@ async function readBody(req) {
 }
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-  const runs = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&select=id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at&order=created_at.desc&limit=12`);
+  const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=50`);
+  const runs = Array.isArray(rawRuns) ? rawRuns : [];
+  const queueIds = [...new Set(runs.map(r => r.publish_queue_id).filter(Boolean))];
+  let queuedMedia = [];
+  if (queueIds.length) {
+    const params = new URLSearchParams({
+      user_id: `eq.${uid}`,
+      id: `in.(${queueIds.join(",")})`,
+      select: "id,caption,hashtags,video_name,external_url,status",
+    });
+    try { queuedMedia = await rest(`/rest/v1/publish_queue?${params.toString()}`); } catch {}
+  }
+  const mediaById = new Map((Array.isArray(queuedMedia) ? queuedMedia : []).map(r => [String(r.id), r]));
   const connection = await q1(`select account_name from social_connections where user_id=$1 and platform='youtube' limit 1`, [uid]);
   return {
     config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
-    runs: Array.isArray(runs) ? runs : [],
+    runs: runs.map(run => {
+      const media = mediaById.get(String(run.publish_queue_id)) || {};
+      return {
+        ...run,
+        caption: media.caption || "",
+        hashtags: media.hashtags || "",
+        video_name: media.video_name || "",
+        queue_status: media.status || "",
+        external_url: run.external_url || media.external_url || null,
+      };
+    }),
     connected: !!connection,
     channel: connection?.account_name || "",
     reciters: RECITERS,
