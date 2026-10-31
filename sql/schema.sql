@@ -15,6 +15,8 @@ create table if not exists public.autopilot (
   at_utc time without time zone default '04:15:00'::time without time zone not null,
   platforms text[] default '{youtube}'::text[] not null,
   template jsonb default '{}'::jsonb not null,
+  daily_count smallint default 1 not null check (daily_count between 1 and 3),
+  youtube_connection_ids uuid[] default '{}'::uuid[] not null,
   updated_at timestamp with time zone default now() not null
 );
 alter table public.autopilot enable row level security;
@@ -32,6 +34,11 @@ create table if not exists public.autopilot_runs (
   title text,
   video_path text,
   publish_queue_id uuid,
+  youtube_connection_id uuid,
+  channel_name text default ''::text not null,
+  daily_index smallint default 1 not null check (daily_index between 1 and 3),
+  daily_total smallint default 1 not null check (daily_total between 1 and 3),
+  step text default 'rendering'::text not null check (step = ANY (ARRAY['preparing'::text, 'rendering'::text, 'storing'::text, 'publishing'::text, 'published'::text, 'failed'::text])),
   external_url text,
   error text,
   started_at timestamp with time zone,
@@ -81,6 +88,7 @@ create table if not exists public.publish_queue (
   title text default ''::text not null,
   caption text default ''::text not null,
   hashtags text default ''::text not null,
+  social_connection_id uuid,
   status text default 'scheduled'::text not null,
   publish_at timestamp with time zone default now() not null,
   external_url text,
@@ -109,9 +117,11 @@ alter table public.social_connections enable row level security;
 -- ---------- الفهارس ----------
 CREATE UNIQUE INDEX autopilot_pkey ON public.autopilot USING btree (user_id);
 CREATE INDEX autopilot_runs_user_created_idx ON public.autopilot_runs USING btree (user_id, created_at DESC);
+CREATE INDEX autopilot_runs_user_date_idx ON public.autopilot_runs USING btree (user_id, run_date DESC, daily_index);
 CREATE UNIQUE INDEX khatma_plans_pkey ON public.khatma_plans USING btree (plan_id);
 CREATE UNIQUE INDEX khatma_progress_pkey ON public.khatma_progress USING btree (plan_id, member);
 CREATE UNIQUE INDEX publish_queue_pkey ON public.publish_queue USING btree (id);
+CREATE INDEX publish_queue_social_connection_id_idx ON public.publish_queue USING btree (social_connection_id);
 CREATE UNIQUE INDEX social_connections_pkey ON public.social_connections USING btree (id);
 CREATE UNIQUE INDEX social_connections_user_id_platform_account_id_key ON public.social_connections USING btree (user_id, platform, account_id);
 

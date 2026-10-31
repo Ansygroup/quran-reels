@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { RECIPES, RECITERS, CONTENT_MODES, parseTemplate, chooseRecipe, cairoDate } = require("../lib/autopilot");
+const { RECIPES, RECITERS, CONTENT_MODES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, cairoDate } = require("../lib/autopilot");
 const autopilotApi = require("../api/autopilot");
 const quran = require("../public/data/quran-uthmani.json");
 
@@ -18,6 +18,14 @@ assert.equal(parseTemplate({ content_mode: "famous", background: "bogus" }).back
 assert.equal(parseTemplate({ content_mode: "sequential" }).reciter_mode, "rotate");
 assert.equal(chooseRecipe(parseTemplate({ content_mode: "sequential" }), 0).s, 1);
 assert.ok(chooseRecipe(parseTemplate({ content_mode: "famous" }), 0));
+assert.equal(DAILY_COUNT_MAX, 3);
+assert.equal(normalizeDailyCount(2), 2);
+assert.equal(normalizeDailyCount(4), 1);
+const channelRows = [{ id: "a", account_name: "قناة أ" }, { id: "b", account_name: "قناة ب" }];
+assert.deepEqual(chooseYoutubeConnections(channelRows, { youtube_connection_ids: ["b"] }), [channelRows[1]]);
+assert.deepEqual(chooseYoutubeConnections(channelRows, { youtube_connection_ids: [] }), channelRows, "an empty selection preserves the legacy all-linked default");
+assert.equal(chooseYoutubeTarget(channelRows, {}, "daily", "2026-01-01", 0, 1).id, "a");
+assert.equal(chooseYoutubeTarget(channelRows, {}, "daily", "2026-01-02", 0, 1).id, "b", "daily posting rotates to the next connected channel");
 assert.equal(cairoDate(new Date("2026-10-30T04:15:00.000Z")), "2026-10-30");
 
 (async () => {

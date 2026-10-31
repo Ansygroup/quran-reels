@@ -31,8 +31,8 @@
   <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.json?v=2">
 <link rel="preconnect" href="/">
-<link rel="preload" as="style" href="css/style.css?v=7">
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="preload" as="style" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=8">
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 <script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>
@@ -507,7 +507,7 @@
         <div><span class="acct-kicker">سجل القناة</span><h2 id="acctRunsTitle">الفيديوهات المنشورة تلقائيًا</h2></div>
         <div class="acct-run-tools"><span id="acctRunChannel" class="acct-secure-badge"></span><button class="btn btn-ghost btn-sm" id="acctRunsRefresh" type="button">↻ تحديث السجل</button></div>
       </div>
-      <p class="hint">ستظهر هنا أحدث فيديوهات النشر اليومي، مع الحالة والمعاينة والعنوان والوصف والهاشتاقات ورابط المشاهدة على YouTube.</p>
+      <p class="hint">ستظهر هنا فيديوهات كل يوم بالترتيب، مع القناة المستهدفة وخطوات الإنشاء والنشر والمعاينة والوصف والهاشتاقات ورابط المشاهدة.</p>
       <div id="acctRunList" class="acct-runs" aria-live="polite"><div class="acct-empty"><span>📡</span><div><b>جارٍ تحميل السجل</b><p>لحظة واحدة…</p></div></div></div>
     </section>
 
@@ -517,10 +517,10 @@
         <a class="btn btn-ghost btn-sm" href="#/">إنشاء فيديو ←</a>
       </div>
       <div class="howto-steps">
-        <div class="howto-step"><span class="howto-num">١</span><div><b>أنشئ ريلك</b><p>اختر الآيات والقارئ، ثم صدّر الفيديو من الصانع.</p></div></div>
-        <div class="howto-step"><span class="howto-num">٢</span><div><b>اربط منصة</b><p>وافق على صلاحيات المنصة الرسمية مرة واحدة؛ لا نطلب كلمة مرورها.</p></div></div>
-        <div class="howto-step"><span class="howto-num">٣</span><div><b>جدول النشر</b><p>اختر وقتًا وعنوانًا ووصفًا، أو ارفع فيديو موجودًا.</p></div></div>
-        <div class="howto-step"><span class="howto-num">٤</span><div><b>تحكّم بالأتمتة</b><p>فعّل النشر اليومي فقط إن رغبت؛ يبقى متوقفًا حتى تحفظ اختيارك.</p></div></div>
+        <div class="howto-step"><span class="howto-num">١</span><div><b>سجّل الدخول</b><p>الدخول يحفظ قنواتك وإعداداتك وسجلّ النشر داخل حسابك.</p></div></div>
+        <div class="howto-step"><span class="howto-num">٢</span><div><b>اربط قناة أو أكثر</b><p>من «قنوات النشر» اضغط «إضافة قناة»، واختر حساب Google ووافق على صلاحيات YouTube الرسمية. ستظهر كل القنوات المتاحة لتختار منها.</p></div></div>
+        <div class="howto-step"><span class="howto-num">٣</span><div><b>حدّد العدد والقنوات</b><p>من «إعدادات الأتمتة» اختر ١–٣ فيديوهات يوميًا وحدد القنوات المستهدفة؛ يوزّعها النظام بالتناوب بينها.</p></div></div>
+        <div class="howto-step"><span class="howto-num">٤</span><div><b>فعّل وتابع الخطوات</b><p>احفظ اختيارك وأكّد النشر العام. سيعرض سجل الأتمتة تجهيز القناة، إنشاء الفيديو، حفظه، ثم نشره ونتيجته.</p></div></div>
       </div>
       <p class="acct-privacy-note">🔒 ملفاتك وبيانات حسابك لا تظهر للآخرين، ويمكنك فك ربط المنصات أو تسجيل الخروج في أي وقت.</p>
     </div>
@@ -530,7 +530,7 @@
         <div><span class="acct-kicker">خطوة واحدة للربط</span><h2 id="acctChannelsTitle">قنوات النشر</h2></div>
         <span class="acct-secure-badge">🔐 اتصال رسمي وآمن</span>
       </div>
-      <p class="hint">اختر «اربط» للموافقة عبر المنصة نفسها. لن نطلب كلمة مرورك، ويمكنك إلغاء الربط متى شئت.</p>
+      <p class="hint">اربط قناة YouTube واحدة أو أكثر؛ عند إضافة قناة جديدة ستختار حساب Google، وتظهر القنوات المرتبطة هنا لتحديد ما تريد استخدامه. لن نطلب كلمة مرورك، ويمكنك فك ربط كل قناة على حدة.</p>
       <div class="chan-grid" id="acctChannels"></div>
     </section>
 
@@ -698,7 +698,7 @@
 <script src="js/creator.js?v=3" defer></script>
 <script src="js/tools.js?v=3" defer></script>
   <script src="js/auth.js?v=3" defer></script>
-  <script src="js/publish.js?v=11" defer></script>
+  <script src="js/publish.js?v=15" defer></script>
   <script src="js/app.js?v=3" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "قرآن ريلز", "alternateName": "Quran Reels", "url": "https://quran-reels-tau.vercel.app/", "applicationCategory": "MultimediaApplication", "operatingSystem": "Any (web browser)", "browserRequirements": "Requires JavaScript", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EGP"}, "description": "صانع فيديو قرآن مجاني فوري: اختر الآيات والقارئ والخلفية والترجمة، شاهد معاينة حية، وصدّر MP4 عمودي 1080×1920 مباشرة داخل المتصفح — بدون طابور انتظار وبدون حدود. مع 32 أداة إسلامية.", "inLanguage": "ar", "featureList": "47 قارئًا، 114 سورة، ترجمة بـ8 لغات، 14 خلفية، معاينة حية، تصدير MP4/WebM فوري، 32 أداة إسلامية، حساب اختياري مع نشر تلقائي وجدولة للمنصات", "screenshot": "https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "هل الموقع مجاني تمامًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الإنشاء والتحميل مجاني 100% — لا اشتراك ولا بطاقة ائتمان ولا حدود يومية. كل شيء يعمل من متصفحك مباشرة."}}, {"@type": "Question", "name": "هل أحتاج تسجيل حساب أو تثبيت برنامج؟", "acceptedAnswer": {"@type": "Answer", "text": "لا — كل الأدوات والإنشاء تعمل فورًا دون تسجيل. التسجيل اختياري فقط لو أردت ميزة النشر التلقائي: تحفظ فيديوهاتك وترتبط بقنواتك وتجدول النشر من صفحة حسابي."}}, {"@type": "Question", "name": "ما صيغة وأبعاد الفيديو الناتج؟", "acceptedAnswer": {"@type": "Answer", "text": "فيديو عمودي 1080×1920 (أو 720×1280 اقتصادي) بصيغة WebM/MP4 حسب متصفحك — مناسب لتيك توك وإنستغرام ريلز ويوتيوب شورتس وحالات واتساب."}}, {"@type": "Question", "name": "هل توجد فترة انتظار أو حد يومي؟", "acceptedAnswer": {"@type": "Answer", "text": "لا. على عكس المواقع الأخرى لا توجد قوائم انتظار ولا حد لعدد الفيديوهات — أنشئ ما شئت في اللحظة نفسها."}}, {"@type": "Question", "name": "كيف يعمل إنشاء الفيديو بدون خادم؟", "acceptedAnswer": {"@type": "Answer", "text": "يُسجَّل الفيديو لحظيًا داخل متصفحك عبر Canvas + MediaRecorder مع صوت التلاوة، لذلك الخصوصية مضمونة ولا تُرفع ملفاتك إلى أي خادم."}}, {"@type": "Question", "name": "هل يمكنني استخدام صورة خلفية من جهازي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، ارفع أي صورة من جهازك وستبقى محلية 100% لا تُرسل لأي مكان."}}, {"@type": "Question", "name": "هل الترجمة متاحة بعدة لغات؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — الإنجليزية والفرنسية والتركية والإندونيسية والأردية والإسبانية والإيطالية بالإضافة للعربية."}}, {"@type": "Question", "name": "على أي منصات أنشر الفيديو؟", "acceptedAnswer": {"@type": "Answer", "text": "تيك توك، إنستغرام ريلز، يوتيوب شورتس، فيسبوك، حالات واتساب، تيليجرام — وكل منصات التواصل."}}, {"@type": "Question", "name": "هل النص القرآني مضبوط بالرسم الإملائي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، يُعرض النص بالرسم العثماني المضبوط مع علامات الوقف والأرقام بالشكل الصحيح."}}, {"@type": "Question", "name": "ما المدة المثالية للريلز؟", "acceptedAnswer": {"@type": "Answer", "text": "من 15 إلى 60 ثانية هو الأنسب للتفاعل، ويُسمح بالفيديو حتى 5 دقائق لمن أراد."}}, {"@type": "Question", "name": "هل تعمل الخدمة من خارج مصر والخليج؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الموقع يعمل من أي مكان في العالم والمواقيت والأدوات تدعم الدول حسب موقعك."}}, {"@type": "Question", "name": "هل بياناتي محفوظة عندكم؟", "acceptedAnswer": {"@type": "Answer", "text": "الإنشاء والأدوات بلا حساب — ملفاتك تبقى في متصفحك. أما إن سجّلت للنشر التلقائي فيُحفظ بريدك وفيديوهاتك المجدولة في قاعدة بيانات محمية بصلاحيات، وتوكنات المنصات مشفّرة وتُحذف بضغطة «فك الربط»."}}, {"@type": "Question", "name": "هل يمكن للموقع أن ينشر فيديوهاتي تلقائيًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم. سجّل دخولك، واربط قناتك، ثم جدولة فيديو أو فعّل «الأتمتة» اختياريًا. التشغيل اليومي مضبوط قرابة 04:15 UTC (06:15 شتاءً / 07:15 صيفًا بالقاهرة)، وقد يتأخر حتى 59 دقيقة؛ ولا يبدأ النشر الآلي قبل تفعيلك له."}}, {"@type": "Question", "name": "كيف أربط قناتي بيوتيوب أو المنصات؟", "acceptedAnswer": {"@type": "Answer", "text": "من صفحة «حسابي والنشر التلقائي» اضغط «اربط» أمام المنصة، توافق مرة واحدة على الصلاحيات، ويظهر الحساب مرتبطًا بعدها. يمكنك فك الربط في أي لحظة بضغطة."}}, {"@type": "Question", "name": "هل ربط حساباتي آمن؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — ربط رسمي عبر OAuth من المنصات نفسها (لا نرى كلمة مرورك أبدًا)، والتوكنات تُخزَّن مشفّرة AES-256 على الخادم فقط، ولا تظهر في أي استجابة، وتُحذف فورًا عند فك الربط."}}]}</script>

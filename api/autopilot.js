@@ -1,10 +1,11 @@
 /* Account dashboard API: safe settings, private run history, and manual generation. */
 const { getUserId } = require("../lib/sess");
-const { q1, rest } = require("../lib/db");
+const { q, q1, rest } = require("../lib/db");
 const { json } = require("../lib/oauth");
 const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = require("../lib/autopilot");
 
-const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" } };
+const DAILY_COUNT_MAX = 3;
+const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" } };
 
 async function readBody(req) {
   let text = "";
@@ -16,7 +17,7 @@ async function readBody(req) {
 }
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-  const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=50`);
+  const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,step,daily_index,daily_total,channel_name,youtube_connection_id,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=50`);
   const runs = Array.isArray(rawRuns) ? rawRuns : [];
   const queueIds = [...new Set(runs.map(r => r.publish_queue_id).filter(Boolean))];
   let queuedMedia = [];
@@ -29,9 +30,10 @@ async function accountData(uid) {
     try { queuedMedia = await rest(`/rest/v1/publish_queue?${params.toString()}`); } catch {}
   }
   const mediaById = new Map((Array.isArray(queuedMedia) ? queuedMedia : []).map(r => [String(r.id), r]));
-  const connection = await q1(`select account_name from social_connections where user_id=$1 and platform='youtube' limit 1`, [uid]);
+  const channels = await q(`select id, account_id, account_name from social_connections where user_id=$1 and platform='youtube' order by account_name, created_at`, [uid]);
   return {
     config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
+    channels: Array.isArray(channels) ? channels : [],
     runs: runs.map(run => {
       const media = mediaById.get(String(run.publish_queue_id)) || {};
       return {
@@ -43,8 +45,8 @@ async function accountData(uid) {
         external_url: run.external_url || media.external_url || null,
       };
     }),
-    connected: !!connection,
-    channel: connection?.account_name || "",
+    connected: Array.isArray(channels) && channels.length > 0,
+    channel: Array.isArray(channels) && channels.length === 1 ? channels[0].account_name : (Array.isArray(channels) && channels.length ? `${channels.length} قنوات مرتبطة` : ""),
     reciters: RECITERS,
   };
 }
@@ -62,15 +64,25 @@ module.exports = async (req, res) => {
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
       const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
       const enabled = body.enabled === true;
-      if (enabled) {
-        const connected = await q1(`select id from social_connections where user_id=$1 and platform='youtube' limit 1`, [uid]);
-        if (!connected) return json(res, 409, { error: "اربط قناة YouTube أولًا قبل تفعيل النشر الآلي" });
+      const daily_count = Number(body.daily_count ?? 1);
+      if (!Number.isInteger(daily_count) || daily_count < 1 || daily_count > DAILY_COUNT_MAX) {
+        return json(res, 400, { error: `عدد الفيديوهات اليومي يجب أن يكون بين 1 و${DAILY_COUNT_MAX}` });
       }
+      const connected = await q(`select id from social_connections where user_id=$1 and platform='youtube'`, [uid]);
+      const validIds = new Set((Array.isArray(connected) ? connected : []).map(x => String(x.id)));
+      const requestedIds = Array.isArray(body.youtube_connection_ids)
+        ? [...new Set(body.youtube_connection_ids.map(String))]
+        : [...validIds];
+      if (requestedIds.some(id => !validIds.has(id))) return json(res, 400, { error: "اختيار قناة غير صالح؛ حدّث القائمة وحاول مرة أخرى" });
+      if (enabled && !requestedIds.length) return json(res, 409, { error: "اربط واختر قناة YouTube واحدة على الأقل قبل تفعيل النشر الآلي" });
       const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify({ user_id: uid, enabled, at_utc: "04:15:00", platforms: ["youtube"], template, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({
+          user_id: uid, enabled, at_utc: "04:15:00", platforms: ["youtube"],
+          daily_count, youtube_connection_ids: requestedIds, template, updated_at: new Date().toISOString(),
+        }),
       });
       const config = Array.isArray(saved) ? saved[0] : saved;
       return json(res, 200, { ok: true, config: { ...config, template: parseTemplate(config?.template) } });
