@@ -13,12 +13,12 @@
     },
     {
       "source": "/ar/quran-reels",
-      "destination": "/ar/quran-reels-ai/",
+      "destination": "/ar/quran-video-maker/",
       "permanent": true
     },
     {
       "source": "/ar/quran-reels/",
-      "destination": "/ar/quran-reels-ai/",
+      "destination": "/ar/quran-video-maker/",
       "permanent": true
     },
     {
