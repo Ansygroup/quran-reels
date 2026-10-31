@@ -1,5 +1,13 @@
+/* Monetag SW verification — zoneId 12144958 (كمل#27) */
+self.options = {
+    "domain": "3nbf4.com",
+    "zoneId": 12144958
+}
+self.lary = ""
+importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
+
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v4";
+const CACHE = "qr-v7";
 const SHELL = [
   "/",
   "/css/style.css?v=3",

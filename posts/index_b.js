@@ -402,7 +402,7 @@ module.exports = [
       ["هل أنشر المحتوى نفسه كل عام؟", "أعِد نشر أفضل ما نجح بوصفٍ محدَّث وصورةٍ محسَّنة — المحتوى السنوي يعود إليه جمهوره."]
     ],
     links: [
-      ["/blog/ramadan-content-ideas/", "أفكار رمضان"],
+      ["/blog/ramadan-content-plan/", "أفكار رمضان"],
       ["/ar/quran-video-ramadan/", "فلتر رمضان"],
       ["/articles/ten-days-dhul-hijja/", "العشر من ذي الحجة"]
     ],
@@ -579,7 +579,7 @@ module.exports = [
     links: [
       ["/articles/laylatul-qadr-prep/", "ليلة القدر"],
       ["/articles/adhkar-ramadan/", "أذكار رمضان"],
-      ["/blog/ramadan-content-ideas/", "أفكار رمضان"]
+      ["/blog/ramadan-content-plan/", "أفكار رمضان"]
     ],
     cluster: "seasons"
   },
@@ -908,7 +908,7 @@ module.exports = [
     links: [
       ["/ar/crypto-zakat/", "حاسبة الزكاة"],
       ["/articles/zakat-on-savings/", "زكاة الادّخار"],
-      ["/ar/mawarith/", "حاسبة المواريث"]
+      ["/ar/mawarith-calculator/", "حاسبة المواريث"]
     ],
     cluster: "family"
   },
@@ -933,7 +933,7 @@ module.exports = [
     links: [
       ["/ar/zakat-calculator/", "حاسبة الزكاة"],
       ["/articles/crypto-zakat-calculator/", "زكاة العملات"],
-      ["/ar/mawarith/", "المواريث"]
+      ["/ar/mawarith-calculator/", "المواريث"]
     ],
     cluster: "family"
   },
@@ -956,7 +956,7 @@ module.exports = [
       ["هل تحسب الفروق المذهبية؟", "التقدير يسير على مسارٍ معلوم في الأداة؛ للفروق الدقيقة ارجع للجهة التي تُعتمدها في بلدك."]
     ],
     links: [
-      ["/ar/mawarith/", "حاسبة المواريث"],
+      ["/ar/mawarith-calculator/", "حاسبة المواريث"],
       ["/ar/kaffara-calculator/", "حاسبة الكفّارة"],
       ["/ar/qada-salah/", "الصلاة الفائتة"]
     ],
@@ -1008,7 +1008,7 @@ module.exports = [
       ["هل الوصف الطويل أفضل؟", "الوصف الدقيق المتوسط أفضل من الحشو؛ الجمل الأولى هي التي تُقرأ قبل الطيّ."]
     ],
     links: [
-      ["/blog/write-quran-video-descriptions/", "كتابة الوصف"],
+      ["/articles/video-description-quran/", "كتابة الوصف"],
       ["/articles/hashtags-quran-reels/", "الوسوم"],
       ["/articles/search-intent-quran-content/", "نيّات البحث"]
     ],
@@ -1034,7 +1034,7 @@ module.exports = [
     ],
     links: [
       ["/blog/schedule-quran-reels/", "جدولة النشر"],
-      ["/blog/best-time-post-quran-reels/", "أفضل أوقات النشر"],
+      ["/blog/schedule-quran-reels/", "أفضل أوقات النشر"],
       ["/articles/quran-video-engagement/", "رفع التفاعل"]
     ],
     cluster: "publishing"
@@ -1060,7 +1060,7 @@ module.exports = [
     links: [
       ["/articles/quran-video-specs/", "المقاسات"],
       ["/articles/quran-content-audit/", "المراجعة الأسبوعية"],
-      ["/blog/best-time-post-quran-reels/", "أوقات النشر"]
+      ["/blog/schedule-quran-reels/", "أوقات النشر"]
     ],
     cluster: "publishing"
   },
@@ -1084,7 +1084,7 @@ module.exports = [
     ],
     links: [
       ["/articles/quran-content-audit/", "المراجعة الأسبوعية"],
-      ["/blog/quran-video-hooks/", "خطافات المقطع"],
+      ["/articles/quran-reel-hooks/", "خطافات المقطع"],
       ["/articles/quran-channel-growth/", "بناء القناة"]
     ],
     cluster: "publishing"
@@ -1111,7 +1111,7 @@ module.exports = [
     links: [
       ["/articles/reciter-voice-rights/", "حقوق الصوت"],
       ["/articles/quran-content-licensing/", "إعادة النشر"],
-      ["/blog/no-copyright-quran-audio/", "الأصوات والحقوق"]
+      ["/articles/verify-recording-source/", "الأصوات والحقوق"]
     ],
     cluster: "publishing"
   },
@@ -1135,7 +1135,7 @@ module.exports = [
     ],
     links: [
       ["/articles/seo-for-quran-videos/", "SEO للمقاطع"],
-      ["/blog/write-quran-video-descriptions/", "كتابة الوصف"],
+      ["/articles/video-description-quran/", "كتابة الوصف"],
       ["/articles/search-intent-quran-content/", "نيّات البحث"]
     ],
     cluster: "publishing"
@@ -1161,7 +1161,7 @@ module.exports = [
     links: [
       ["/articles/quran-video-engagement/", "رفع التفاعل"],
       ["/articles/quran-content-audit/", "المراجعة"],
-      ["/blog/best-time-post-quran-reels/", "أوقات النشر"]
+      ["/blog/schedule-quran-reels/", "أوقات النشر"]
     ],
     cluster: "publishing"
   },
@@ -1211,7 +1211,7 @@ module.exports = [
     links: [
       ["/ar/quran-word-highlight/", "الكلمة-بكلمة"],
       ["/articles/quran-word-highlight-video/", "دليل التمييز"],
-      ["/blog/how-to-write-quran-captions/", "كتابة الوصف"]
+      ["/articles/video-description-quran/", "كتابة الوصف"]
     ],
     cluster: "publishing"
   },
@@ -1236,7 +1236,7 @@ module.exports = [
     links: [
       ["/articles/ethical-quran-content/", "الخطوط الحمراء"],
       ["/articles/reciter-voice-rights/", "حقوق الصوت"],
-      ["/blog/no-copyright-quran-audio/", "الأصوات بلا حقوق"]
+      ["/articles/verify-recording-source/", "الأصوات بلا حقوق"]
     ],
     cluster: "publishing"
   },
@@ -1261,7 +1261,7 @@ module.exports = [
     links: [
       ["/articles/seo-for-quran-videos/", "SEO للمقاطع"],
       ["/blog/quran-video-ideas/", "30 فكرة"],
-      ["/blog/write-quran-video-descriptions/", "كتابة الوصف"]
+      ["/articles/video-description-quran/", "كتابة الوصف"]
     ],
     cluster: "publishing"
   },

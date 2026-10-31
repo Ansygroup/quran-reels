@@ -2,9 +2,7 @@
   "name": "quran-reels",
   "version": "1.0.0",
   "private": true,
-  "dependencies": {
-    "pg": "^8.13.1"
-  },
+  "dependencies": {},
   "scripts": {
     "test": "node tests/run.js",
     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
@@ -14,6 +12,7 @@
     "test:correct": "node tests/correctness_test.js",
     "monitor": "node scripts/monitor_site.js",
     "test:firefox": "SKIP_EXPORT=1 PW_BROWSER=firefox node tests/run.js",
-    "test:webkit": "SKIP_EXPORT=1 PW_BROWSER=webkit node tests/run.js"
+    "test:webkit": "SKIP_EXPORT=1 PW_BROWSER=webkit node tests/run.js",
+    "build:content": "node scripts/gen_engine.js && node scripts/build_posts.js && node scripts/build_posts_en.js && node scripts/inject_monetag.js && node scripts/fix_internal_links.js && node scripts/build_sitemap.js && node scripts/gen_llms_full.js"
   }
 }

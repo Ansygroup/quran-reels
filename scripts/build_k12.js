@@ -1,6 +1,7 @@
 /* كمل#12 — دفعة «كلهم»: صفحات /en/ الإنجليزية + صفحات الثقة + فهرس وصفحات القرّاء الـ47.
  * الاستخدام: node scripts/build_k12.js
  * يكتب: public/en/<slug>/ · public/{about,terms,privacy,contact}/ · public/ar/reciters/ + public/ar/reciter/<slug>/ */
+const { hdrNav } = require("./site_nav.js");
 const fs = require("fs");
 const path = require("path");
 
@@ -115,7 +116,7 @@ function page(o) {
     : `100% free · no watermarks · no daily limits · a voluntary project`;
   const foot = L === "ar"
     ? `<span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>`
-    : `<span>© 2026 Quran Reels — <a href="/" style="color:var(--gold-3)">App</a> · <a href="/en/quran-video-maker/" style="color:var(--gold-3)">Video maker</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">Reciters</a> · <a href="/blog/" style="color:var(--gold-3)">Blog</a> · <a href="/about/" style="color:var(--gold-3)">About</a> · <a href="/privacy/" style="color:var(--gold-3)">Privacy</a> · <a href="/contact/" style="color:var(--gold-3)">Contact</a></span>`;
+    : `<span>© 2026 Quran Reels — <a href="/" style="color:var(--gold-3)">App</a> · <a href="/en/quran-video-maker/" style="color:var(--gold-3)">Video maker</a> · <a href=\"/en/tools/\" style=\"color:var(--gold-3)\">Tools</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">Reciters</a> · <a href="/blog/" style="color:var(--gold-3)">Blog</a> · <a href="/about/" style="color:var(--gold-3)">About</a> · <a href="/privacy/" style="color:var(--gold-3)">Privacy</a> · <a href="/contact/" style="color:var(--gold-3)">Contact</a></span>`;
   const ogsite = L === "ar" ? "قرآن ريلز" : "Quran Reels";
   return `<!DOCTYPE html>
 <html lang="${L}" dir="${dir}">
@@ -161,6 +162,7 @@ ${o.faq.map(([q, a]) => `{"@type":"Question","name":${JSON.stringify(q)},"accept
       <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
       ${brand}
     </a>
+    ${hdrNav(L)}
     <a class="btn btn-em" href="${o.cta[0].h}">${o.cta[0].t}</a>
   </div>
 </header>
@@ -274,10 +276,10 @@ const EN = [
 {
   path: "/en/quran-video-maker/",
   pair: { ar: "/ar/quran-video-maker/", en: "/en/quran-video-maker/" },
-  title: "Quran Video Maker — Vertical 9:16 Ayah Videos, Free & Online | Quran Reels",
-  desc: "Free online Quran video maker: turn any ayah into a 1080×1920 vertical video with Uthmani text, 47 reciters, backgrounds and translation. Live preview, instant MP4 export, no watermark.",
-  keywords: "quran video maker, quran ayah video, vertical quran video, quran video editor online free",
-  h1: "Quran Video Maker — From Any Ayah to a Vertical Video",
+  title: "Quran Reels Maker & Video Maker — Free 9:16 Ayah Videos Online | Quran Reels",
+  desc: "Free online Quran reels maker & video maker: turn any ayah into a 1080×1920 vertical video with Uthmani text, 47 reciters, backgrounds and translation. Live preview, instant MP4 export, no watermark.",
+  keywords: "quran video maker, quran reels maker, quran reels app, quran ayah video, vertical quran video, quran video editor online free",
+  h1: "Quran Reels Maker — Turn Any Ayah into a Vertical Video",
   lead: "A dedicated Quran video maker, not a general editor: the Uthmani text is typeset for 9:16, the recitation is synced per ayah, and the export is a clean 1080×1920 MP4 — all in your browser, all free.",
   cta: [{ t: "🎬 Open the maker", h: "/#/" }, { t: "💡 Short-verse ideas", h: "/en/quran-video-tiktok/" }],
   badges: ["9:16 vertical", "1080×1920 MP4", "Live preview", "No watermark"],

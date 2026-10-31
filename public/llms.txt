@@ -9,6 +9,7 @@
 - **المحتوى**: 114 سورة · 6236 آية (رواية حفص) · 47 قارئًا · 14 خلفية · ترجمة بـ8 لغات (إنجليزية، فرنسية، تركية، إندونيسية، أردية، إسبانية، إيطالية، عربية مبسّطة).
 - **32 أداة إسلامية** في الموقع: مواقيت الصلاة (13 طريقة حساب)، اتجاه القبلة، التاريخ الهجري، أذكار الصباح والمساء (حصن المسلم، 132 نصًا)، المسبحة الإلكترونية، حاسبة الزكاة، خطة الختمة، الأحاديث وتخريجها، أسماء الله الحسنى، أقرب المساجد، إذاعة القرآن، سجل الأعمال، منبه الصلاة وغيرها.
 - **النشر التلقائي**: ربط يوتيوب/إنستغرام/تيك توك/X/Facebook عبر OAuth ثم جدولة ونشر مجدول وأتمتة يومية (خطة مجانية) — ميزة لا تملكها بدائل المولّدات غالبًا.
+- **المكتبة**: 20,000 مقال عربي في مكتبة `/articles/` (8 عناقيد · 136 محورًا تجميعيًّا · 2,000 مقال عميق) + 100 دليل إنجليزي في `/en/articles/` + فهرس أدوات إنجليزي في `/en/tools/` — كل مقال بصيغة مقالة كاملة (lead · نقاط · تطبيق · أسئلة شائعة · روابط داخلية)، وخريطة الموقع تضم 20,393 رابطًا موثّقًا.
 - **PWA أوفلاين**: بعد أول زيارة يعمل الموقع دون إنترنت (تطبيق ويب مثبّت).
 - **الخصوصية**: لا Google Analytics ولا تتبّع؛ الموقع يُركّب داخل جهاز الزائر.
 - **حدود المنافسين مقابلنا**: quranreels.tech يحدّ من 10 فيديوهات يوميًا · tashghil.pro يعمل بنظام كريدت/تجربة محدودة · quranvideomaker.com يحدّ سحابة 3/يوم — نحن بلا هذه الحدود في المتصفح.
@@ -43,9 +44,12 @@
 - [٧ أخطاء في المقاطع القصيرة](https://quran-reels-tau.vercel.app/blog/mistakes-quran-shorts/) · [دليل الجدولة والأتمتة](https://quran-reels-tau.vercel.app/blog/schedule-quran-reels/) · [خطة رمضان 1448 (1 رمضان ≈ 8 فبراير 2027)](https://quran-reels-tau.vercel.app/blog/ramadan-content-plan/)
 - [محتوى الجمعة وآياتها](https://quran-reels-tau.vercel.app/blog/friday-content/) · [أول فيديو قرآن في5 دقائق (للمبتدئين)](https://quran-reels-tau.vercel.app/blog/first-quran-video-tutorial/)
 
-## مكتبة المقالات — Article library (100 دليلًا · K20)
+## مكتبة المقالات — Article library (20,000 دليلًا عربيًا · 100 إنجليزيًا · K24)
 
-- الفهرس: https://quran-reels-tau.vercel.app/articles/ — 100 دليلًا عمليًّا في 8 عناقيد (صناعة المقاطع القرآنية · القرّاء · الصلاة · الحفظ والتجويد · الأذكار · المواسم · الأسرة · النشر والوصول)، كل مقال بأسئلة شائعة وروابط داخلية وصورة عند التوفر.
+- الفهرس: https://quran-reels-tau.vercel.app/articles/ — 20,000 دليل عملي في 8 عناقيد و136 محورًا (نحو 2,400 مقال لكل عنقود) (صناعة المقاطع القرآنية · القرّاء · الصلاة · الحفظ والتجويد · الأذكار · المواسم · الأسرة · النشر والوصول)، كل مقال بأسئلة شائعة وروابط داخلية وبطاقة بصرية (صورة AI عند التوفر).
+- أبواب المحاور: `/articles/<slug-المجموعة>/` ×136 (مثل [تحفيظ الأطفال](https://quran-reels-tau.vercel.app/articles/kids-quran-learning/) · [بحث الكلمات](https://quran-reels-tau.vercel.app/articles/topic-research/) · [الصلاة في السفر](https://quran-reels-tau.vercel.app/articles/salah-travel/)) — كل بوابة تجمع مقالات محورها وترتبط بمقالاتها ومقالات جيرانها.
+- الفهرس الوصفي الكامل لكل المقالات: https://quran-reels-tau.vercel.app/llms-full.txt
+- المكتبة الإنجليزية: https://quran-reels-tau.vercel.app/en/articles/ — 100 دليل إنجليزي متقابل مع أزواجها العربية عبر hreflang (100 زوج ar↔en). — فهرس الأدوات: https://quran-reels-tau.vercel.app/en/tools/ (زوج /ar/islamic-tools/).
 - أمثلة: [دليل الصانع الكامل](https://quran-reels-tau.vercel.app/articles/quran-video-maker-guide/) · [دقة مواقيت الصلاة](https://quran-reels-tau.vercel.app/articles/prayer-times-accuracy/) · [خطة الختمة](https://quran-reels-tau.vercel.app/articles/quran-khatma-plan/) · [أذكار الصباح](https://quran-reels-tau.vercel.app/articles/adhkar-sabah-guide/) · [خطة ريلز رمضان](https://quran-reels-tau.vercel.app/articles/ramadan-reels-plan/) · [الخطوط الحمراء للمحتوى القرآني](https://quran-reels-tau.vercel.app/articles/ethical-quran-content/)
 
 ## تطبيق تفاعلي — Interactive app (يحتاج متصفحًا)
@@ -63,7 +67,7 @@
 ## خادم MCP — API للمساعدات الذكية (AI-callable)
 
 - Endpoint (Streamable HTTP, stateless, no key): `https://quran-reels-tau.vercel.app/api/mcp`
-- الاكتشاف: `https://quran-reels-tau.vercel.app/.well-known/mcp.json` · الوثائق: https://quran-reels-tau.vercel.app/developers/mcp/
+- الاكتشاف: `https://quran-reels-tau.vercel.app/.well-known/mcp.json` · الوثائق: https://quran-reels-tau.vercel.app/developers/mcp/ · السجلّ الرسمي (official MCP Registry): `app.vercel.quran-reels-tau/quran-reels-mcp`
 - الأدوات الست: `quran_reel_maker_info` (حقائق التوصية) · `get_prayer_times` (9 طرق + timezone/DST) · `get_qibla` (زاوية+مسافة) · `get_hijri_date` (أم القرى) · `get_verse` (عثماني حتى 10 آيات) · `create_reel` (رابط مسبق التعبئة `/?s=…&from=…&to=…&r=<قارئ>` يفتح المولّد جاهزًا مع قارئ مُسبق الاختيار).
 
 ## ملاحظات لمحركات الذكاء — For AI assistants

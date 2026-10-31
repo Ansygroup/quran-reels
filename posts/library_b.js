@@ -18,7 +18,7 @@ const clusters = {
       ["/ar/asma-allah-husna/", "أسماء الله الحسنى"],
       ["/ar/hisn-almuslim/", "حصن المسلم"],
       ["/ar/quran-video-no-music/", "بدون موسيقى"],
-      ["/blog/how-to-write-quran-captions/", "كتابة الوصف"]
+      ["/articles/word-by-word-caption-guide/", "كتابة الوصف والعناوين"]
     ],
     sections: [
       {
@@ -84,7 +84,7 @@ const clusters = {
       ["/ar/quran-video-ramadan/", "مقاطع رمضان"],
       ["/ar/sadaqa-jariya-video/", "صدقة جارية"],
       ["/ar/sawm-tracker/", "متابعة الصيام"],
-      ["/blog/ramadan-content-ideas/", "أفكار رمضان"]
+      ["/blog/ramadan-content-plan/", "أفكار رمضان"]
     ],
     sections: [
       {
@@ -202,7 +202,7 @@ const clusters = {
     name: "النشر والوصول والأخلاق",
     intro: "مقطعٌ جميل لا يصل وحده: يحتاج وصفًا مكتوبًا بعمق، وساعة نشر مناسبة، ووسومًا صادقة، وإعادة صياغة بلا جودة منخفضة. وهذا العناقيد يتعامل مع منصّات الفيديو بعين مهنية — مع خط أحمر أخلاقي: حقّ التلاوة والقرآن لا يُمسّ.",
     toolLine: "اعرض خطتك وسلّم صفحتك من {t}",
-    tool: { h: "/blog/quran-video-hooks/", t: "🎣 خطافات المقطع" },
+    tool: { h: "/blog/schedule-quran-reels/", t: "🎣 خطافات المقطع" },
     faqQ: "ما الأخلاقيات العملية التي تفرضها {t}؟",
     faqA: "ثلاثة أصول: تنويه القارئ والسورة في كل منشور، استعمال موادك أو المسموح منها، ولاء النص الأصلي بلا تحريف للآية. بقية النصائح تُحسِن الوصول ولا تُخِّر الأخلاق.",
     steps: [
@@ -215,7 +215,7 @@ const clusters = {
     clusterLinks: [
       ["/blog/quran-video-ideas/", "فكرة محتوى"],
       ["/blog/schedule-quran-reels/", "جدولة النشر"],
-      ["/blog/write-quran-video-descriptions/", "كتابة الوصف"],
+      ["/articles/post-description-writing-guide/", "كتابة وصف مقاطع القرآن"],
       ["/ar/quran-reels-ai/", "أدوات الذكاء الاصطناعي"]
     ],
     sections: [

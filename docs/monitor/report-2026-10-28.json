@@ -7,10 +7,10 @@
   "sitemap": {
    "ok": true,
    "status": 200,
-   "count": 255
+   "count": 757
   },
   "urls": {
-   "total": 255,
+   "total": 757,
    "bad": []
   },
   "robots": {
@@ -62,7 +62,7 @@
   {
    "query": "قرآن ريلز صانع فيديو",
    "available": true,
-   "count": 11,
+   "count": 10,
    "ours": false
   }
  ]

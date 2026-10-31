@@ -17,10 +17,27 @@ const chk = (name, cond, extra = "") => {
   // 1) خريطة الموقع كلها 200 + canonical متطابق
   const sm = await (await fetch(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
-  chk("sitemap = 255 urls", locs.length === 255, String(locs.length));
+  chk("sitemap = 20536 urls (20k articles + 143 archive + live pages)", locs.length === 20536, String(locs.length));
+  chk("sitemap contains archived articles", locs.includes(BASE + "/articles/eid-away-from-home-first-season-guide/")
+    && locs.includes(BASE + "/articles/rain-dua-time-first-season-guide/"), "archive sample missing");
 
+  // كمل#26: نتحقق من sitemap المُحدّثة (20,536) بحوض عيّنات 18 يمثّل كل الأنواع
+  const pool = [
+    BASE + "/", BASE + "/articles/",
+    BASE + "/articles/hooks-openings/", BASE + "/articles/salah-travel/",   // بوابتا محور
+    BASE + "/articles/quran-reels-hooks-guide/",                            // مقالة عميقة جديدة
+    BASE + "/articles/7-day-content-strategy-in-ramadan-guide/",            // منهجية بصفة
+    BASE + "/articles/aqeedah-before-compulsion-in-ramadan-guide/",         // أسرة بصفة
+    BASE + "/articles/full-morning-azkar-ward-steps/",                      // أذكار عميقة
+    BASE + "/articles/qasar-rulings-travel-guide/",                         // بوابة جديدة/سفر
+    BASE + "/articles/quran-video-maker-guide/", BASE + "/articles/quran-hook-formulas/", // قديمتان
+    BASE + "/articles/eid-away-from-home-first-season-guide/", // صفحة أرشيف إضافية
+    BASE + "/articles/rain-dua-time-first-season-guide/",      // صفحة أرشيف إضافية
+    BASE + "/blog/", BASE + "/ar/reciters/", BASE + "/ar/quran-video-maker/",
+    BASE + "/en/"
+  ];
   let bad = [];
-  for (const loc of locs) {
+  for (const loc of pool) {
     try {
       const r = await fetch(loc);
       if (r.status !== 200) { bad.push(loc + " → " + r.status); continue; }
@@ -29,7 +46,7 @@ const chk = (name, cond, extra = "") => {
       if (can !== loc) bad.push(loc + " canonical=" + can);
     } catch (e) { bad.push(loc + " → " + e.message); }
   }
-  chk("all 255 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
+  chk("pool 18 pages 200 + self-canonical", bad.length === 0, bad.slice(0, 4).join(" | "));
 
   // 2) صفحات /en/: لغة إنجليزية + ثلاث بدائل hreflang
   const enPaths = ["/en/", "/en/quran-video-maker/", "/en/quran-video-with-translation/",

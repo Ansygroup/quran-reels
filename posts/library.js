@@ -1,4 +1,4 @@
-/* بنوك محتوى العناقيد — كمل#20 (الجزء1) */
+/* بنوك محتوى العناقيد — كمل#20 (الجزء1) + أقسام كمل#21 (library_c) */
 const clusters = {
   video: {
     name: "صناعة المقاطع القرآنية",
@@ -265,4 +265,13 @@ const clusters = {
   }
 };
 
-module.exports = { clusters: Object.assign(clusters, require("./library_b.js").clusters) };
+const _all = Object.assign(clusters, require("./library_b.js").clusters);
+const _extra = require("./library_c.js").extra;
+for (const _k of Object.keys(_extra)) {
+  if (_all[_k]) _all[_k].sections.push(..._extra[_k]);
+}
+const _extraD = require("./library_d.js").extra;
+for (const _k of Object.keys(_extraD)) {
+  if (_all[_k]) _all[_k].sections.push(..._extraD[_k]);
+}
+module.exports = { clusters: _all };

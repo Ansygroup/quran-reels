@@ -46,7 +46,7 @@ const A = [
     links: [
       ["/ar/quran-khatma/", "خطة الختمة"],
       ["/articles/quran-video-maker-guide/", "دليل الصانع الكامل"],
-      ["/blog/how-to-write-quran-captions/", "كتابة الوصف"]
+      ["/articles/video-description-quran/", "كتابة الوصف"]
     ],
     cluster: "video"
   },
@@ -70,7 +70,7 @@ const A = [
     ],
     links: [
       ["/ar/quran-radio/", "الإذاعة القرآنية"],
-      ["/blog/no-copyright-quran-audio/", "صور وأصوات بلا حقوق"],
+      ["/articles/verify-recording-source/", "مصدر التسجيل"],
       ["/articles/khushoo-quran-video/", "خشوع المقطع"]
     ],
     cluster: "video"
@@ -94,7 +94,7 @@ const A = [
     ],
     links: [
       ["/articles/quran-video-maker-guide/", "دليل الصانع الكامل"],
-      ["/blog/write-quran-video-descriptions/", "كتابة الوصف"],
+      ["/articles/video-description-quran/", "كتابة الوصف"],
       ["/articles/quran-content-licensing/", "إعادة النشر والحقوق"]
     ],
     cluster: "video"
@@ -214,7 +214,7 @@ const A = [
     ],
     links: [
       ["/ar/quran-reels-ai/", "أدوات الذكاء الاصطناعي"],
-      ["/blog/quran-reels-prompts/", "أفضل مطالبات الذكاء"],
+      ["/ar/quran-reels-ai/", "الصانع بالذكاء الاصطناعي"],
       ["/articles/ethical-quran-content/", "الخطوط الحمراء"]
     ],
     cluster: "video"
@@ -238,7 +238,7 @@ const A = [
       ["هل أنشر في السحور فعلًا؟", "نعم إن كان جمهورك موقظًا: نافذة السحور شديدة الفعالية للمقاطع القصيرة، ومعها نافذة ما بعد الإفطار — ابدأ بهما الاثنتين."]
     ],
     links: [
-      ["/blog/ramadan-content-ideas/", "أفكار رمضان"],
+      ["/blog/ramadan-content-plan/", "أفكار رمضان"],
       ["/ar/quran-video-ramadan/", "فلتر رمضان"],
       ["/articles/ramadan-reels-plan/", "خطة الريلز الرمضانية"]
     ],
@@ -563,7 +563,7 @@ const A = [
       ["هل التنويه يكفي للفيديو الذي أصنعه؟", "التنويه واجب ونافع، لكنه لا يُلغي شرط المصدر عند النص المكتوب المرفق — اقرأ الشرطين معًا."]
     ],
     links: [
-      ["/blog/no-copyright-quran-audio/", "أصوات بلا حقوق"],
+      ["/articles/verify-recording-source/", "مصدر التسجيل"],
       ["/articles/quran-content-licensing/", "إعادة النشر"],
       ["/articles/ethical-quran-content/", "الخطوط الحمراء"]
     ],
@@ -1227,4 +1227,4 @@ const A = [
   }
 ];
 
-module.exports = A.concat(require("./index_b.js"));
+module.exports = A.concat(require("./index_b.js"), require("./index_c.js"), require("./index_d.js"), require("./index_e.js"), require("./index_f.js"), require("./index_g.js"), require("./index_h.js"), require("./index_i.js"), require("./index_j.js"));

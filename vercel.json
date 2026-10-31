@@ -1,18 +1,62 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
-    { "source": "/privacy-policy", "destination": "/privacy/", "permanent": true },
-    { "source": "/privacy-policy/", "destination": "/privacy/", "permanent": true }
+    {
+      "source": "/privacy-policy",
+      "destination": "/privacy/",
+      "permanent": true
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/privacy/",
+      "permanent": true
+    },
+    {
+      "source": "/ar/quran-reels",
+      "destination": "/ar/quran-reels-ai/",
+      "permanent": true
+    },
+    {
+      "source": "/ar/quran-reels/",
+      "destination": "/ar/quran-reels-ai/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/ramadan-content-ideas",
+      "destination": "/blog/ramadan-content-plan/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/ramadan-content-ideas/",
+      "destination": "/blog/ramadan-content-plan/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/how-to-write-quran-captions",
+      "destination": "/articles/word-by-word-caption-guide/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/how-to-write-quran-captions/",
+      "destination": "/articles/word-by-word-caption-guide/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/write-quran-video-descriptions",
+      "destination": "/articles/post-description-writing-guide/",
+      "permanent": true
+    },
+    {
+      "source": "/blog/write-quran-video-descriptions/",
+      "destination": "/articles/post-description-writing-guide/",
+      "permanent": true
+    }
   ],
   "outputDirectory": "public",
   "rewrites": [
     {
       "source": "/proxy",
       "destination": "/api/proxy"
-    },
-    {
-      "source": "/((?!.*\\..*).*)",
-      "destination": "/"
     }
   ],
   "headers": [
@@ -129,7 +173,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self'; manifest-src 'self'; frame-src https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://6opo.com https://*.6opo.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         },
         {
           "key": "X-Frame-Options",
@@ -158,7 +202,32 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self'; manifest-src 'self'; frame-src https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://6opo.com https://*.6opo.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), camera=(), microphone=(), payment=(self), interest-cohort=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://6opo.com https://*.6opo.com https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self'; manifest-src 'self'; frame-src https://quge5.com https://*.quge5.com https://3nbf4.com https://*.3nbf4.com https://6opo.com https://*.6opo.com https://auqot.com https://*.auqot.com https://ekhay.com https://*.ekhay.com https://b3mny.com https://*.b3mny.com https://my.rtmark.net https://*.my.rtmark.net https://rtmark.net https://*.rtmark.net https://094kk.com https://*.094kk.com https://jmosl.com https://*.jmosl.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         },
         {
           "key": "X-Frame-Options",

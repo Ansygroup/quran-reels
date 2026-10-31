@@ -1,5 +1,6 @@
 /* كمل#13 — المدونة والموسمية: /blog/ (فهرس) + 8 مقالات على كلمات المنافسين الحقيقية.
  * الاستخدام: node scripts/build_blog.js   → public/blog/<slug>/index.html */
+const { hdrNav } = require("./site_nav.js");
 const fs = require("fs");
 const path = require("path");
 
@@ -109,6 +110,7 @@ ${a.faq.map(([q, x]) => `{"@type":"Question","name":${JSON.stringify(q)},"accept
       <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
       <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
     </a>
+    ${hdrNav("ar")}
     <a class="btn btn-em" href="/#/">🎬 ابدأ الآن</a>
   </div>
 </header>
@@ -184,6 +186,7 @@ ${articles.map(a => `{"@type":"BlogPosting","headline":${JSON.stringify(a.title)
       <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
       <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
     </a>
+    ${hdrNav("ar")}
     <a class="btn btn-em" href="/#/">🎬 ابدأ الآن</a>
   </div>
 </header>
