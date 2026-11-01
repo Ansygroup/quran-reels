@@ -16,8 +16,8 @@ const QRPublish = (() => {
     tiktok: { env: "TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET", where: "developers.tiktok.com → تسجيل تطبيق", redirect: "/api/oauth/callback" },
     x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
   };
-  let conns = [], queue = [], schedBlob = null, schedPath = "", schedName = "";
-  let dashboard = { config: null, channels: [], runs: [], reciters: [] }, dashboardError = "", refreshSequence = 0, dashboardOwner = "", historyPollTimer = null;
+  let conns = [], queue = [], connectionsError = "", queueError = "", connectionsLoading = false, queueLoading = false, schedBlob = null, schedPath = "", schedName = "";
+  let dashboard = { config: null, channels: [], runs: [], reciters: [] }, dashboardError = "", dashboardLoading = false, refreshSequence = 0, dashboardOwner = "", historyPollTimer = null;
 
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
@@ -90,20 +90,21 @@ const QRPublish = (() => {
     const owner = QRAuth.user()?.id || "";
     try {
       const token = await QRAuth.token();
-      if (!token || QRAuth.user()?.id !== owner) return;
+      if (QRAuth.user()?.id !== owner) return;
+      if (!token) { conns = []; connectionsError = "انتهت جلسة الدخول؛ سجّل الدخول مجددًا."; return; }
       const response = await fetch("/api/social?op=list", { headers: { Authorization: "Bearer " + token } });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "تعذّر تحميل القنوات");
-      if (QRAuth.user()?.id === owner) conns = Array.isArray(result.connections) ? result.connections : [];
-    } catch { if (QRAuth.user()?.id === owner) conns = []; }
+      if (QRAuth.user()?.id === owner) { conns = Array.isArray(result.connections) ? result.connections : []; connectionsError = ""; }
+    } catch (error) { if (QRAuth.user()?.id === owner) { conns = []; connectionsError = String(error.message || error); } }
   }
   async function loadQueue() {
     const owner = QRAuth.user()?.id || "";
     try {
-      if (!owner) { queue = []; return; }
+      if (!owner) { queue = []; queueError = ""; return; }
       const rows = await sb(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(owner)}&order=publish_at.desc&limit=100`);
-      if (QRAuth.user()?.id === owner) queue = Array.isArray(rows) ? rows : [];
-    } catch { if (QRAuth.user()?.id === owner) queue = []; }
+      if (QRAuth.user()?.id === owner) { queue = Array.isArray(rows) ? rows : []; queueError = ""; }
+    } catch (error) { if (QRAuth.user()?.id === owner) { queue = []; queueError = String(error.message || error); } }
   }
   async function accountApi(action = "", body = null) {
     const token = await QRAuth.token();
@@ -137,7 +138,8 @@ const QRPublish = (() => {
     } catch (error) {
       if (QRAuth.user()?.id !== owner) return dashboard;
       dashboardError = String(error.message || error);
-      dashboard = { config: { enabled: false, daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", background: "rotate" } }, channels: [], runs: [], reciters: [] };
+      // Unknown is not the same as disabled: never render editable defaults after a failed read.
+      dashboard = { config: null, channels: [], runs: [], reciters: [] };
     }
     return dashboard;
   }
@@ -183,14 +185,15 @@ const QRPublish = (() => {
   function renderChannels() {
     const wrap = $id("acctChannels"); if (!wrap) return;
     const youtube = conns.filter(x => x.platform === "youtube");
+    const controlsDisabled = connectionsError || connectionsLoading ? "disabled" : "";
     const cards = [];
     const ytRows = youtube.length ? youtube.map(c => `
       <div class="chan-account-row">
         <span class="chan-avatar">▶</span><div class="chan-info"><b>${esc(c.account_name || "قناة YouTube")}</b><small class="ok">مرتبطة عبر Google · YouTube</small></div>
-        <button class="btn btn-ghost btn-sm" type="button" data-disc="${esc(c.id)}" aria-label="فك ربط ${esc(c.account_name || "القناة")}">فك الربط</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-disc="${esc(c.id)}" aria-label="فك ربط ${esc(c.account_name || "القناة")}" ${controlsDisabled}>فك الربط</button>
       </div>`).join("") : `<div class="acct-empty compact"><span>🔗</span><div><b>لا توجد قناة مرتبطة بعد</b><p>اربط قناة YouTube للجدولة أو الأتمتة.</p></div></div>`;
     cards.push(`<article class="chan-card youtube-card ${youtube.length ? "on" : ""}">
-      <div class="chan-card-head"><div class="chan-ic">🎬</div><div class="chan-info"><b>YouTube</b><small class="${youtube.length ? "ok" : ""}">${youtube.length ? `${youtube.length} قناة مرتبطة` : "غير مرتبط"}</small></div><button class="btn btn-em btn-sm" type="button" data-conn="youtube">${youtube.length ? "＋ إضافة قناة" : "اربط قناة"}</button></div>
+      <div class="chan-card-head"><div class="chan-ic">🎬</div><div class="chan-info"><b>YouTube</b><small class="${youtube.length ? "ok" : ""}">${youtube.length ? `${youtube.length} قناة مرتبطة` : "غير مرتبط"}</small></div><button class="btn btn-em btn-sm" type="button" data-conn="youtube" ${controlsDisabled}>${youtube.length ? "＋ إضافة قناة" : "اربط قناة"}</button></div>
       <div class="chan-account-list">${ytRows}</div>
       <p class="chan-help">يمكن ربط أكثر من قناة Google؛ لن نعرض رموز الوصول أو كلمات المرور.</p>
     </article>`);
@@ -202,11 +205,16 @@ const QRPublish = (() => {
       const label = key === "facebook" ? "فيسبوك" : platform.name;
       cards.push(`<article class="chan-card ${first ? "on" : ""}">
         <div class="chan-card-head"><div class="chan-ic">${platform.icon}</div><div class="chan-info"><b>${label}</b><small class="${first ? "ok" : ""}">${first ? `✓ ${esc(first.account_name || "مرتبطة")}` : (igAttached ? "متاح عبر ربط فيسبوك" : "غير مرتبطة")}</small></div>
-        ${first ? `<button class="btn btn-ghost btn-sm" type="button" data-disc="${esc(first.id)}">فك الربط</button>` : `<button class="btn btn-em btn-sm" type="button" data-conn="${key}">اربط</button>`}</div>
+        ${first ? `<button class="btn btn-ghost btn-sm" type="button" data-disc="${esc(first.id)}" ${controlsDisabled}>فك الربط</button>` : `<button class="btn btn-em btn-sm" type="button" data-conn="${key}" ${controlsDisabled}>اربط</button>`}</div>
       </article>`);
     }
-    wrap.innerHTML = cards.join("");
+    const connectionNotice = connectionsLoading
+      ? `<div class="acct-data-alert" role="status">جارٍ التحقق من القنوات قبل إتاحة الربط أو فكّه…</div>`
+      : (connectionsError ? `<div class="acct-data-alert" role="alert">تعذّر تحميل حالة القنوات: ${esc(connectionsError)}. أوقفنا الربط/الفك مؤقتًا حتى لا نعرض حالة قديمة أو ننشئ ربطًا مكررًا. <button class="btn btn-ghost btn-sm" type="button" id="acctConnectionsRetry">إعادة المحاولة</button></div>` : "");
+    wrap.innerHTML = connectionNotice + cards.join("");
+    $id("acctConnectionsRetry")?.addEventListener("click", () => refreshAccount());
     wrap.querySelectorAll("[data-conn]").forEach(button => button.onclick = async () => {
+      if (connectionsError) return;
       const key = button.dataset.conn;
       const token = await QRAuth.token();
       if (!token) { openLogin(); return; }
@@ -214,6 +222,7 @@ const QRPublish = (() => {
       location.href = `/api/oauth?op=start&p=${platform}&t=${encodeURIComponent(token)}`;
     });
     wrap.querySelectorAll("[data-disc]").forEach(button => button.onclick = async () => {
+      if (connectionsError) return;
       if (!window.confirm("سيُفك ربط هذه القناة، وقد يتوقف النشر المجدول إليها. هل تريد المتابعة؟")) return;
       const token = await QRAuth.token();
       try {
@@ -230,6 +239,15 @@ const QRPublish = (() => {
     if (!QRAuth.user()) {
       wrap.innerHTML = `<div class="acct-empty"><span>🔒</span><div><b>جدولك خاص بك</b><p>سجّل الدخول لعرض مهام النشر أو إضافة فيديو جديد.</p><button class="btn btn-em btn-sm" type="button" id="acctQueueLogin">تسجيل الدخول</button></div></div>`;
       $id("acctQueueLogin")?.addEventListener("click", openLogin);
+      return;
+    }
+    if (queueLoading) {
+      wrap.innerHTML = `<div class="acct-empty compact" role="status"><span>📡</span><div><b>جارٍ تحميل مهامك</b><p>نتحقق من جدول النشر قبل عرضه.</p></div></div>`;
+      return;
+    }
+    if (queueError) {
+      wrap.innerHTML = `<div class="acct-empty error"><span>⚠️</span><div><b>تعذّر تحميل مهام الجدولة</b><p>${esc(queueError)} — لا نفترض أن جدولك فارغًا.</p><button class="btn btn-ghost btn-sm" type="button" id="acctQueueRetry">إعادة المحاولة</button></div></div>`;
+      $id("acctQueueRetry")?.addEventListener("click", () => refreshAccount());
       return;
     }
     if (!queue.length) { wrap.innerHTML = `<div class="acct-empty compact"><span>🗓️</span><div><b>لا توجد مهام مجدولة بعد</b><p>أنشئ فيديو أو ارفع ملفًا، ثم اختر القناة ووقت النشر.</p><a class="btn btn-ghost btn-sm" href="#/" style="margin-top:8px">ابدأ بإنشاء فيديو</a></div></div>`; return; }
@@ -278,6 +296,11 @@ const QRPublish = (() => {
 
   function renderAccountStats() {
     const wrap = $id("acctStats"); if (!wrap) return;
+    if (dashboardError) {
+      wrap.hidden = false;
+      wrap.innerHTML = `<div class="acct-data-alert" role="alert">تعذّر تحميل سجل الحساب؛ لا نعرض أرقامًا توحي بأن سجلّك فارغ.</div>`;
+      return;
+    }
     const runs = Array.isArray(dashboard.runs) ? dashboard.runs : [];
     const published = runs.filter(x => x.status === "published").length;
     const failed = runs.filter(x => x.status === "failed").length;
@@ -321,13 +344,69 @@ const QRPublish = (() => {
     return "queued";
   }
 
+  function renderUpcomingSchedule() {
+    const wrap = $id("acctUpcoming"); if (!wrap) return;
+    if (!QRAuth.user()) {
+      wrap.innerHTML = `<div class="acct-upcoming-empty">سجّل الدخول لعرض معاينة جدول الأتمتة والموعد القادم.</div>`;
+      return;
+    }
+    if (dashboardLoading) {
+      wrap.innerHTML = `<div class="acct-upcoming-empty" role="status">جارٍ تحميل موعد النشر والمقاطع المتوقعة من إعدادات حسابك…</div>`;
+      return;
+    }
+    if (dashboardError) {
+      wrap.innerHTML = `<div class="acct-upcoming-empty" role="alert">تعذّر حساب المعاينة الآن؛ أعد تحميل لوحة الحساب قبل الاعتماد على المواعيد.</div>`;
+      return;
+    }
+    if (dashboard.config?.enabled !== true) {
+      wrap.innerHTML = `<div class="acct-upcoming-head"><div><span class="acct-kicker">الموعد القادم</span><h3 id="acctUpcomingTitle">معاينة فيديوهات الأتمتة</h3><p>الأتمتة متوقفة حاليًا؛ لن يُنشأ أو يُنشر فيديو تلقائيًا.</p></div></div>`;
+      return;
+    }
+    if (dashboard.upcomingError) {
+      wrap.innerHTML = `<div class="acct-upcoming-empty" role="alert">${esc(dashboard.upcomingError)}</div>`;
+      return;
+    }
+    const upcoming = Array.isArray(dashboard.upcoming) ? dashboard.upcoming : [];
+    if (!upcoming.length) {
+      wrap.innerHTML = `<div class="acct-upcoming-head"><div><span class="acct-kicker">الموعد القادم</span><h3 id="acctUpcomingTitle">لا توجد فيديوهات مهيأة للدفعة القادمة</h3><p>تحقّق من القنوات المختارة وحالة ربطها في إعدادات الأتمتة.</p></div></div>`;
+      return;
+    }
+    const slot = new Date(upcoming[0].publish_at);
+    const cairoTime = Number.isNaN(slot.getTime()) ? "04:15 UTC" : slot.toLocaleString("ar-EG", { timeZone: "Africa/Cairo", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const utcTime = Number.isNaN(slot.getTime()) ? "04:15" : slot.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: false });
+    const styles = { card: "بطاقة آيات", word: "كلمة بكلمة", rotate: "تدوير الأشكال" };
+    const backgrounds = { rotate: "خلفية متناوبة", "bg-mosque-night": "مسجد ليلي", "bg-starry-desert": "صحراء ليلية", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية", "bg-mountains-dawn": "فجر وجبال", "bg-mosque-silhouette": "ظلال مسجد", "bg-garden-tulips": "حديقة", "bg-arabesque-dark": "أرابيسك داكن", "bg-heavenly-clouds": "غيوم هادئة", "grad-emerald": "زمردي", "grad-gold": "ذهبي", "grad-dawn": "الفجر", "grad-night": "ليلي" };
+    const purposes = { general: "عام", gift: "إهداء", sadaqah: "صدقة جارية", reminder: "تذكير", dua: "دعاء" };
+    wrap.innerHTML = `
+      <div class="acct-upcoming-head">
+        <div><span class="acct-kicker">الدفعة القادمة · ${upcoming.length} ${upcoming.length === 1 ? "فيديو" : "فيديوهات"}</span><h3 id="acctUpcomingTitle">ماذا سيُنشر ومتى؟</h3><p>الوقت المتوقع لبدء إنشاء ونشر الدفعة بالتوقيت المحلي في القاهرة.</p></div>
+        <div class="acct-upcoming-time"><small>موعد بدء الدفعة</small><b>${esc(cairoTime)}</b><small>${esc(utcTime)} UTC</small></div>
+      </div>
+      <div class="acct-upcoming-list">${upcoming.map(item => `<article class="acct-upcoming-card">
+        <span>الفيديو ${Number(item.daily_index) || 1} من ${Number(item.daily_total) || upcoming.length}</span>
+        <h4>${esc(item.title || "فيديو قرآني متوقع")}</h4>
+        <p>📖 السورة ${esc(item.surah_number)} · الآيات ${esc(item.from_ayah)}–${esc(item.to_ayah)}</p>
+        <p>🎙️ ${esc(item.reciter || "قارئ متناوب")} · 📺 ${esc(item.channel_name || "القناة المختارة")}</p>
+        <p>🎨 ${esc(styles[item.video_style] || item.video_style || "شكل تلقائي")} · 🖼️ ${esc(backgrounds[item.background] || item.background || "خلفية تلقائية")}</p>
+        <p>النية: ${esc(purposes[item.purpose] || item.purpose || "عام")}</p>
+      </article>`).join("")}</div>
+      <p class="acct-upcoming-note">هذه معاينة محسوبة من الإعدادات المحفوظة وليست فيديوهات جاهزة أو محجوزة؛ تُنشأ الفيديوهات عند تشغيل المجدول وقد تتغير المعاينة إذا عُدّلت الإعدادات قبل الموعد. يبدأ النظام الدفعة عند الموعد ثم يُنشئ الفيديوهات وينشرها بالتتابع، لذلك لا يوجد وقت انتهاء منفصل مضمون لكل فيديو.</p>`;
+  }
+
   function renderDashboard() {
+    renderUpcomingSchedule();
     const stats = $id("acctDashStats"), board = $id("acctKanban");
     if (!stats || !board) return;
     if (!QRAuth.user()) {
       stats.innerHTML = "";
       board.innerHTML = `<div class="acct-empty"><span>🔒</span><div><b>لوحتك خاصة بحسابك</b><p>سجّل الدخول لتشاهد المقاطع المجدولة والآلية وحالات نشرها.</p><button class="btn btn-em btn-sm" type="button" id="acctBoardLogin">تسجيل الدخول</button></div></div>`;
       $id("acctBoardLogin")?.addEventListener("click", openLogin);
+      return;
+    }
+    if (dashboardError) {
+      stats.innerHTML = `<div class="acct-data-alert" role="alert">تعذّر تحميل حالة الأتمتة؛ لا نعرض أرقامًا أو حالة قد تكون غير صحيحة.</div>`;
+      board.innerHTML = `<div class="acct-empty error"><span>⚠️</span><div><b>لم نتمكن من تحميل لوحة النشر</b><p>${esc(dashboardError)}</p><button class="btn btn-ghost btn-sm" type="button" id="acctBoardRetry">إعادة المحاولة</button></div></div>`;
+      $id("acctBoardRetry")?.addEventListener("click", () => refreshAccount());
       return;
     }
     const items = dashboardItems();
@@ -345,7 +424,7 @@ const QRPublish = (() => {
     const columns = [
       ["working", "قيد الإنشاء", "⚙️"], ["queued", "بانتظار النشر", "🗓️"], ["published", "منشور", "✅"], ["failed", "تعذّر / يحتاج متابعة", "⚠️"],
     ];
-    const errorBanner = dashboardError ? `<div class="acct-data-alert" role="status">تعذّر تحديث بيانات الأتمتة: ${esc(dashboardError)}</div>` : "";
+    const errorBanner = queueError ? `<div class="acct-data-alert" role="status">تعذّر تحميل مهام الجدولة؛ قد تكون بعض البطاقات غير ظاهرة. ${esc(queueError)}</div>` : "";
     board.innerHTML = errorBanner + columns.map(([key, label, icon]) => {
       const cards = items.filter(item => dashboardColumn(item) === key).sort((a, b) => new Date(b.publish_at || b.created_at || 0) - new Date(a.publish_at || a.created_at || 0));
       return `<section class="kanban-column kanban-${key}" aria-label="${label}">
@@ -463,6 +542,7 @@ const QRPublish = (() => {
     try {
       await Promise.all([loadQueue(), loadAutoHistory()]);
       renderAccountStats();
+      renderQueue();
       renderAutoRuns();
       renderDashboard();
       syncHistoryPolling();
@@ -477,6 +557,15 @@ const QRPublish = (() => {
     if (!QRAuth.user()) {
       wrap.innerHTML = `<div class="acct-section-head"><div><span class="acct-kicker">تحكّم واضح وآمن</span><h2>إعدادات الأتمتة</h2></div><span class="acct-secure-badge">متوقفة افتراضيًا</span></div><p class="hint">سجّل الدخول لربط قنواتك واختيار عدد الفيديوهات ونمط المحتوى. لن يبدأ النشر الآلي دون تفعيلك.</p><button class="btn btn-em btn-sm" type="button" id="acctAutoLogin">تسجيل الدخول لإعداد الأتمتة</button>`;
       $id("acctAutoLogin")?.addEventListener("click", openLogin);
+      return;
+    }
+    if (dashboardLoading) {
+      wrap.innerHTML = `<div class="acct-section-head"><div><span class="acct-kicker">إعدادات الأتمتة</span><h2>جارٍ تحميل إعداداتك</h2></div><span class="acct-secure-badge">لحظة واحدة</span></div><div class="acct-empty compact" role="status"><span>📡</span><div><b>نقرأ الحالة الحالية قبل إتاحة التعديل</b><p>لن يُحفَظ أي تغيير حتى يكتمل تحميل إعدادات حسابك.</p></div></div>`;
+      return;
+    }
+    if (dashboardError) {
+      wrap.innerHTML = `<div class="acct-section-head"><div><span class="acct-kicker">إعدادات الأتمتة</span><h2>تعذّر تحميل إعداداتك</h2></div><span class="acct-secure-badge">الحالة غير معروفة</span></div><div class="acct-empty error"><span>🔒</span><div><b>لم نُجرِ أي تغيير على إعداداتك</b><p>${esc(dashboardError)} — أعد المحاولة قبل الحفظ لتفادي الكتابة فوق إعداداتك الحالية.</p><button class="btn btn-ghost btn-sm" type="button" id="acctAutoRetry">إعادة تحميل الإعدادات</button></div></div>`;
+      $id("acctAutoRetry")?.addEventListener("click", () => refreshAccount());
       return;
     }
     const config = dashboard.config || { enabled: false, daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", background: "rotate" } };
@@ -635,8 +724,9 @@ const QRPublish = (() => {
     const user = QRAuth.user();
     const dataNotice = $id("acctDataNotice");
     if (!user) {
+      dashboardLoading = false; connectionsLoading = false; queueLoading = false;
       dashboardOwner = "";
-      conns = []; queue = [];
+      conns = []; queue = []; connectionsError = ""; queueError = "";
       dashboard = { config: null, channels: [], runs: [], reciters: [] };
       dashboardError = "";
       if (dataNotice) { dataNotice.hidden = true; dataNotice.textContent = ""; }
@@ -645,14 +735,18 @@ const QRPublish = (() => {
       const howTo = $id("acctHowTo"); if (howTo) howTo.hidden = false;
       return;
     }
+    dashboardLoading = true; connectionsLoading = true; queueLoading = true;
     if (dashboardOwner !== String(user.id)) {
       dashboardOwner = String(user.id);
-      conns = []; queue = [];
+      conns = []; queue = []; connectionsError = ""; queueError = "";
       dashboard = { config: { enabled: false, daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", background: "rotate" } }, channels: [], runs: [], reciters: [] };
       dashboardError = "";
       const stats = $id("acctStats"); if (stats) { stats.hidden = true; stats.innerHTML = ""; }
       renderChannels(); renderQueue(); renderAuto(); renderDashboard();
     }
+    renderChannels(); renderQueue(); renderAuto(); renderUpcomingSchedule();
+    const dashStats = $id("acctDashStats");
+    if (dashStats) dashStats.innerHTML = `<div class="acct-data-alert" role="status">جارٍ تحميل حالة الأتمتة والمهام…</div>`;
     if (dataNotice) { dataNotice.hidden = true; dataNotice.textContent = ""; }
     const runList = $id("acctRunList");
     if (runList) runList.innerHTML = `<div class="acct-empty"><span>📡</span><div><b>جارٍ تحديث حسابك</b><p>نحمّل بياناتك الخاصة بأمان…</p></div></div>`;
@@ -660,6 +754,7 @@ const QRPublish = (() => {
     if (kanban) kanban.innerHTML = `<div class="acct-empty compact"><span>📊</span><div><b>جارٍ تحميل لوحة النشر</b><p>نجمع الفيديوهات المجدولة والآلية…</p></div></div>`;
     await Promise.all([loadConnections(), loadQueue(), loadAutoHistory()]);
     if (sequence !== refreshSequence) return;
+    dashboardLoading = false; connectionsLoading = false; queueLoading = false;
     renderAccountStats();
     renderDashboard();
     renderQuickActions();

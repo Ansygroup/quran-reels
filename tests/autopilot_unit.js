@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { RECIPES, RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, reciterFor, metadata, cairoDate } = require("../lib/autopilot");
+const { RECIPES, RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, reciterFor, metadata, cairoDate, nextDailySlot, buildUpcomingSchedule } = require("../lib/autopilot");
 const autopilotApi = require("../api/autopilot");
 const quran = require("../public/data/quran-uthmani.json");
 
@@ -51,6 +51,17 @@ assert.deepEqual(chooseYoutubeConnections(channelRows, { youtube_connection_ids:
 assert.equal(chooseYoutubeTarget(channelRows, {}, "daily", "2026-01-01", 0, 1).id, "a");
 assert.equal(chooseYoutubeTarget(channelRows, {}, "daily", "2026-01-02", 0, 1).id, "b", "daily posting rotates to the next connected channel");
 assert.equal(cairoDate(new Date("2026-10-30T04:15:00.000Z")), "2026-10-30");
+assert.equal(nextDailySlot(new Date("2026-11-01T04:14:59.000Z")).toISOString(), "2026-11-01T04:15:00.000Z");
+assert.equal(nextDailySlot(new Date("2026-11-01T04:15:00.000Z")).toISOString(), "2026-11-02T04:15:00.000Z");
+const previewConfig = { enabled: true, daily_count: 2, youtube_connection_ids: ["a", "b"], template: { content_mode: "sequential", reciter_mode: "fixed", reciter: fixedReciter.id, video_style: "word", background: "grad-gold", purpose: "reminder" } };
+const previewAt = new Date("2026-11-01T04:15:00.000Z");
+const upcoming = buildUpcomingSchedule(previewConfig, channelRows, previewAt, "2026-10-30");
+assert.equal(upcoming.length, 2, "preview should show every daily video in the next batch");
+assert.ok(upcoming.every(item => item.publish_at === previewAt.toISOString() && item.run_date === "2026-11-01"));
+assert.ok(upcoming.every(item => item.is_preview && item.reciter === fixedReciter.name && item.video_style === "word" && item.background === "grad-gold"));
+assert.ok(upcoming.every(item => ["قناة أ", "قناة ب"].includes(item.channel_name)));
+assert.equal(upcoming[0].recipe_key, `${chooseRecipe(parseTemplate(previewConfig.template), 4).s}:${chooseRecipe(parseTemplate(previewConfig.template), 4).from}-${chooseRecipe(parseTemplate(previewConfig.template), 4).to}`);
+assert.equal(buildUpcomingSchedule({ ...previewConfig, enabled: false }, channelRows, previewAt).length, 0);
 
 (async () => {
   const res = { statusCode: 0, headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(value) { this.body = value; } };

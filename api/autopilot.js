@@ -16,7 +16,7 @@ async function readBody(req) {
   try { return JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
 }
 async function accountData(uid) {
-  const { RECITERS, parseTemplate } = autopilotLib();
+  const { RECITERS, parseTemplate, previewDailySchedule } = autopilotLib();
   const config = await q1(`select enabled, at_utc, platforms, template, daily_count, youtube_connection_ids, updated_at from autopilot where user_id=$1 limit 1`, [uid]);
   const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,step,daily_index,daily_total,channel_name,youtube_connection_id,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=100`);
   const runs = Array.isArray(rawRuns) ? rawRuns : [];
@@ -31,10 +31,16 @@ async function accountData(uid) {
     try { queuedMedia = await rest(`/rest/v1/publish_queue?${params.toString()}`); } catch {}
   }
   const mediaById = new Map((Array.isArray(queuedMedia) ? queuedMedia : []).map(r => [String(r.id), r]));
-  const channels = await q(`select id, account_name from social_connections where user_id=$1 and platform='youtube' order by account_name, created_at`, [uid]);
+  const channels = await q(`select id, account_name from social_connections where user_id=$1 and platform='youtube' order by account_name, id`, [uid]);
+  const safeChannels = Array.isArray(channels) ? channels : [];
+  let upcoming = [], upcomingError = "";
+  try { upcoming = await previewDailySchedule(uid, config || DEFAULTS, safeChannels); }
+  catch { upcomingError = "تعذّر حساب معاينة الموعد القادم؛ حدّث اللوحة وحاول مرة أخرى."; }
   return {
     config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
-    channels: Array.isArray(channels) ? channels : [],
+    channels: safeChannels,
+    upcoming,
+    upcomingError,
     runs: runs.map(run => {
       const media = mediaById.get(String(run.publish_queue_id)) || {};
       return {
