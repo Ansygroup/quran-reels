@@ -363,29 +363,46 @@ const QRPublish = (() => {
       wrap.innerHTML = `<div class="acct-upcoming-empty" role="alert">تعذّر حساب المعاينة الآن؛ أعد تحميل لوحة الحساب قبل الاعتماد على المواعيد.</div>`;
       return;
     }
-    if (dashboard.config?.enabled !== true) {
-      wrap.innerHTML = `<div class="acct-upcoming-head"><div><span class="acct-kicker">الموعد القادم</span><h3 id="acctUpcomingTitle">معاينة فيديوهات الأتمتة</h3><p>الأتمتة متوقفة حاليًا؛ لن يُنشأ أو يُنشر فيديو تلقائيًا.</p></div></div>`;
+    const previewStatus = dashboard.scheduleStatus || (dashboard.config?.enabled === true ? "ready" : "paused");
+    const previewSlot = dashboard.nextRunAt || (Array.isArray(dashboard.upcoming) ? dashboard.upcoming[0]?.publish_at : "");
+    const slot = new Date(previewSlot || "");
+    const hasSlot = !Number.isNaN(slot.getTime());
+    const cairoTime = hasSlot ? slot.toLocaleString("ar-EG", { timeZone: "Africa/Cairo", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }) : "غير متاح";
+    const utcTime = hasSlot ? slot.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+    const explainState = (title, message, note = "") => {
+      wrap.innerHTML = `<div class="acct-upcoming-head"><div><span class="acct-kicker">حالة الموعد القادم</span><h3 id="acctUpcomingTitle">${esc(title)}</h3><p>${esc(message)}</p></div>${hasSlot ? `<div class="acct-upcoming-time"><small>${previewStatus === "paused" ? "موعد افتراضي عند التفعيل" : "موعد فحص المجدول"}</small><b>${esc(cairoTime)}</b><small>${esc(utcTime)} UTC</small></div>` : ""}</div>${note ? `<p class="acct-upcoming-note">${esc(note)}</p>` : ""}`;
+    };
+    if (dashboard.upcomingError || previewStatus === "error") {
+      explainState("تعذّر حساب المعاينة", dashboard.upcomingError || "حدّث لوحة الحساب وحاول مرة أخرى.", "لا نعتمد موعدًا غير مؤكد، ولا تعني هذه الرسالة أن الدفعة نُشرت.");
       return;
     }
-    if (dashboard.upcomingError) {
-      wrap.innerHTML = `<div class="acct-upcoming-empty" role="alert">${esc(dashboard.upcomingError)}</div>`;
+    if (previewStatus === "paused" || dashboard.config?.enabled !== true) {
+      explainState("الأتمتة متوقفة", "لن يُنشأ أو يُنشر فيديو تلقائيًا الآن.", "الوقت المعروض افتراضي للموعد اليومي إذا فعّلت الأتمتة؛ ليس موعد نشر فعليًا، ولا توجد فيديوهات جاهزة أو محجوزة.");
+      return;
+    }
+    if (previewStatus === "no_channels" || !(dashboard.channels || []).length) {
+      explainState("لا توجد قناة YouTube مرتبطة", "الأتمتة مفعّلة، لكن لا توجد قناة مؤهلة لتنفيذ الدفعة.", "اربط قناة YouTube واحفظ اختيارها. وقت المجدول لا يعني أن فيديو سيُنشر ما دامت القناة غير متاحة.");
+      return;
+    }
+    if (previewStatus === "no_selected_channels") {
+      explainState("لم تُحدّد قناة للدفعة", "توجد قنوات مرتبطة، لكن لا توجد قناة مختارة ضمن إعدادات الأتمتة المحفوظة.", "اختر قناة متصلة واحفظ الإعدادات حتى يمكن تكوين معاينة للدفعة.");
       return;
     }
     const upcoming = Array.isArray(dashboard.upcoming) ? dashboard.upcoming : [];
     if (!upcoming.length) {
-      wrap.innerHTML = `<div class="acct-upcoming-head"><div><span class="acct-kicker">الموعد القادم</span><h3 id="acctUpcomingTitle">لا توجد فيديوهات مهيأة للدفعة القادمة</h3><p>تحقّق من القنوات المختارة وحالة ربطها في إعدادات الأتمتة.</p></div></div>`;
+      explainState("لا توجد عناصر في معاينة الدفعة", "لم تُنتج الإعدادات الحالية قائمة فيديوهات متوقعة.", "تحقّق من القنوات المختارة ثم حدّث الحساب. لا نعرض موعدًا على أنه نشر مؤكد.");
       return;
     }
-    const slot = new Date(upcoming[0].publish_at);
-    const cairoTime = Number.isNaN(slot.getTime()) ? "04:15 UTC" : slot.toLocaleString("ar-EG", { timeZone: "Africa/Cairo", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
-    const utcTime = Number.isNaN(slot.getTime()) ? "04:15" : slot.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: false });
+    const batchSlot = new Date(upcoming[0].publish_at);
+    const batchCairoTime = Number.isNaN(batchSlot.getTime()) ? cairoTime : batchSlot.toLocaleString("ar-EG", { timeZone: "Africa/Cairo", weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const batchUtcTime = Number.isNaN(batchSlot.getTime()) ? utcTime : batchSlot.toLocaleTimeString("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hour12: false });
     const styles = { card: "بطاقة آيات", word: "كلمة بكلمة", rotate: "تدوير الأشكال" };
     const backgrounds = { rotate: "خلفية متناوبة", "bg-mosque-night": "مسجد ليلي", "bg-starry-desert": "صحراء ليلية", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية", "bg-mountains-dawn": "فجر وجبال", "bg-mosque-silhouette": "ظلال مسجد", "bg-garden-tulips": "حديقة", "bg-arabesque-dark": "أرابيسك داكن", "bg-heavenly-clouds": "غيوم هادئة", "grad-emerald": "زمردي", "grad-gold": "ذهبي", "grad-dawn": "الفجر", "grad-night": "ليلي" };
     const purposes = { general: "عام", gift: "إهداء", sadaqah: "صدقة جارية", reminder: "تذكير", dua: "دعاء" };
     wrap.innerHTML = `
       <div class="acct-upcoming-head">
         <div><span class="acct-kicker">الدفعة القادمة · ${upcoming.length} ${upcoming.length === 1 ? "فيديو" : "فيديوهات"}</span><h3 id="acctUpcomingTitle">ماذا سيُنشر ومتى؟</h3><p>الوقت المتوقع لبدء إنشاء ونشر الدفعة بالتوقيت المحلي في القاهرة.</p></div>
-        <div class="acct-upcoming-time"><small>موعد بدء الدفعة</small><b>${esc(cairoTime)}</b><small>${esc(utcTime)} UTC</small></div>
+        <div class="acct-upcoming-time"><small>موعد بدء الدفعة</small><b>${esc(batchCairoTime)}</b><small>${esc(batchUtcTime)} UTC</small></div>
       </div>
       <div class="acct-upcoming-list">${upcoming.map(item => `<article class="acct-upcoming-card">
         <span>الفيديو ${Number(item.daily_index) || 1} من ${Number(item.daily_total) || upcoming.length}</span>

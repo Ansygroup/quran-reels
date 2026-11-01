@@ -21,10 +21,10 @@ for (const [, id] of js.matchAll(/\$id\(["']([^"']+)["']\)/g)) {
   assert.ok(idCounts[id] || dynamicIds.has(id), `publish.js references missing #${id}`);
 }
 assert.match(html, /css\/style\.css\?v=14/, 'account CSS cache version must be bumped');
-assert.match(html, /js\/publish\.js\?v=27/, 'account JS cache version must be bumped');
-assert.match(sw, /const CACHE = "qr-v20"/, 'service worker cache must be invalidated');
+assert.match(html, /js\/publish\.js\?v=28/, 'account JS cache version must be bumped');
+assert.match(sw, /const CACHE = "qr-v21"/, 'service worker cache must be invalidated');
 assert.match(sw, /css\/style\.css\?v=14/, 'offline shell must include current account styles');
-assert.match(sw, /js\/publish\.js\?v=27/, 'offline shell must include current account logic');
+assert.match(sw, /js\/publish\.js\?v=28/, 'offline shell must include current account logic');
 assert.match(js, /openSchedule\("", file\)/, 'selected schedule video should remain local until the user saves');
 assert.match(js, /function safeExternalUrl\(/, 'published links must be restricted to known HTTPS hosts');
 assert.match(js, /function renderDashboard\(/, 'account dashboard must summarize and render the Kanban board');
@@ -33,6 +33,10 @@ assert.match(js, /dashboard\.upcoming/, 'upcoming videos must come from the auth
 assert.ok(js.includes('Africa/Cairo'), 'upcoming time must be converted to Cairo local time');
 assert.match(js, /UTC/, 'upcoming time must also show the cron UTC schedule');
 assert.match(api, /upcoming,/, 'authenticated account API must return private upcoming video previews');
+assert.match(api, /scheduleStatus,\s*nextRunAt/, 'account API must explain the schedule state and return its next scheduler check time');
+assert.match(js, /no_channels[\s\S]*?no_selected_channels/, 'account preview must distinguish missing linked channels from missing selections');
+assert.match(js, /موعد افتراضي عند التفعيل/, 'paused automation must label the shown time as hypothetical');
+assert.match(js, /لن يُنشأ أو يُنشر فيديو تلقائيًا الآن/, 'paused state must clearly say no video will be produced');
 assert.match(js, /dashboardLoading = true;/, 'account refresh must enter a loading state before reading settings');
 assert.match(js, /if \(dashboardLoading\) \{[\s\S]{0,500}لن يُحفَظ أي تغيير[\s\S]{0,200}return;/, 'automation form must not expose defaults during loading');
 assert.match(js, /await Promise\.all\(\[loadConnections\(\), loadQueue\(\), loadAutoHistory\(\)\]\);\s*if \(sequence !== refreshSequence\) return;\s*dashboardLoading = false;/, 'settings become editable only after the current refresh completes');
