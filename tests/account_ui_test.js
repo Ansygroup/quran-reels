@@ -21,16 +21,18 @@ for (const [, id] of js.matchAll(/\$id\(["']([^"']+)["']\)/g)) {
   assert.ok(idCounts[id] || dynamicIds.has(id), `publish.js references missing #${id}`);
 }
 assert.match(html, /css\/style\.css\?v=11/, 'account CSS cache version must be bumped');
-assert.match(html, /js\/publish\.js\?v=17/, 'account JS cache version must be bumped');
-assert.match(sw, /const CACHE = "qr-v10"/, 'service worker cache must be invalidated');
+assert.match(html, /js\/publish\.js\?v=18/, 'account JS cache version must be bumped');
+assert.match(sw, /const CACHE = "qr-v11"/, 'service worker cache must be invalidated');
 assert.match(sw, /css\/style\.css\?v=11/, 'offline shell must include current account styles');
-assert.match(sw, /js\/publish\.js\?v=17/, 'offline shell must include current account logic');
+assert.match(sw, /js\/publish\.js\?v=18/, 'offline shell must include current account logic');
 assert.match(js, /openSchedule\("", file\)/, 'selected schedule video should remain local until the user saves');
 assert.match(js, /function safeExternalUrl\(/, 'published links must be restricted to known HTTPS hosts');
 assert.match(js, /function renderDashboard\(/, 'account dashboard must summarize and render the Kanban board');
 assert.match(js, /kanban-column/, 'Kanban board must have visible status columns');
 assert.match(js, /autoPurpose/, 'user must be able to choose a publishing purpose');
 assert.match(js, /autoVideoStyle/, 'user must be able to choose or rotate video styles');
+assert.match(js, /autoReciter/, 'user must be able to lock a selected reciter into the automation template');
+assert.match(js, /reciter_mode, reciter/, 'selected reciter mode and identity must be persisted');
 assert.match(js, /autoCustomMessage/, 'user must be able to set optional published copy');
 assert.match(js, /window\.confirm\(`سيُنشر[^`]*الآن علنًا/, 'manual publish must require confirmation');
 assert.match(js, /needsConfirmation && !window\.confirm\(/, 'public automation changes must require confirmation');
@@ -47,6 +49,8 @@ assert.match(api, /youtube_connection_ids/, 'automation settings must accept sel
 assert.match(api, /daily_count/, 'automation settings must accept a per-day video count');
 assert.match(api, /custom_message/, 'automation API must persist the user-approved message');
 assert.match(api, /video_style/, 'automation API must persist the chosen visual style');
+assert.match(api, /reciter_mode/,'automation API must persist a fixed or rotating reciter mode');
+assert.match(api, /selectedReciter\.id/, 'automation API must validate and persist the selected reciter');
 assert.match(js, /class="autoChannel"/, 'the user must be able to select multiple linked channels');
 assert.match(js, /acct-run-steps/, 'each run must show visible progress steps');
 assert.match(api, /daily_index,daily_total,channel_name/, 'history includes per-video sequence and target channel');

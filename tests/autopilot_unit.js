@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { RECIPES, RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, metadata, cairoDate } = require("../lib/autopilot");
+const { RECIPES, RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, reciterFor, metadata, cairoDate } = require("../lib/autopilot");
 const autopilotApi = require("../api/autopilot");
 const quran = require("../public/data/quran-uthmani.json");
 
@@ -18,6 +18,7 @@ for (const recipe of RECIPES) {
 assert.equal(parseTemplate({ content_mode: "invalid" }).content_mode, "mix");
 assert.equal(parseTemplate({ content_mode: "famous", background: "bogus" }).background, "rotate");
 assert.equal(parseTemplate({ content_mode: "sequential" }).reciter_mode, "rotate");
+assert.equal(parseTemplate({ reciter_mode: "fixed", reciter: "not-a-supported-reciter" }).reciter_mode, "rotate");
 assert.equal(parseTemplate({ purpose: "sadaqah", video_style: "word", custom_message: "  لله الحمد  " }).purpose, "sadaqah");
 assert.equal(parseTemplate({ purpose: "bogus", video_style: "bogus" }).purpose, "general");
 assert.equal(parseTemplate({ video_style: "bogus" }).video_style, "rotate");
@@ -25,6 +26,15 @@ assert.equal(parseTemplate({ custom_message: "  نَصٌّ  " }).custom_message,
 assert.equal(chooseRecipe(parseTemplate({ content_mode: "sequential" }), 0).s, 1);
 assert.ok(chooseRecipe(parseTemplate({ content_mode: "famous" }), 0));
 const sampleRecipe = RECIPES[0];
+const fixedReciter = RECITERS.find(reciter => reciter.name !== sampleRecipe.reciter);
+const fixedTemplate = parseTemplate({ reciter_mode: "fixed", reciter: fixedReciter.id, video_style: "word", background: "bg-mosque-night" });
+assert.equal(fixedTemplate.reciter_mode, "fixed");
+assert.equal(fixedTemplate.reciter, fixedReciter.id);
+assert.equal(reciterFor(sampleRecipe, fixedTemplate, 0).id, fixedReciter.id, "the selected reciter must stay fixed while the recipe changes");
+const fixedCopy = metadata(sampleRecipe, fixedReciter, fixedTemplate);
+assert.match(fixedCopy.title, new RegExp(fixedReciter.name));
+assert.match(fixedCopy.caption, new RegExp(fixedReciter.name));
+assert.doesNotMatch(fixedCopy.caption, new RegExp(sampleRecipe.reciter));
 const baselineCopy = metadata(sampleRecipe, { name: sampleRecipe.reciter }, parseTemplate());
 const charityCopy = metadata(sampleRecipe, { name: sampleRecipe.reciter }, parseTemplate({ purpose: "sadaqah", custom_message: "صدقة جارية عن والدي" }));
 assert.equal(charityCopy.title, baselineCopy.title, "user-selected purpose must not distort the verified recipe title");

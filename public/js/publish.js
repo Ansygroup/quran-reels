@@ -483,6 +483,8 @@ const QRPublish = (() => {
     const apiChannels = Array.isArray(dashboard.channels) ? dashboard.channels : [];
     const channels = apiChannels.length ? apiChannels : conns.filter(x => x.platform === "youtube");
     const template = config.template || {};
+    const reciters = Array.isArray(dashboard.reciters) ? dashboard.reciters : [];
+    const selectedReciter = template.reciter_mode === "fixed" ? String(template.reciter || "") : "rotate";
     let selected = Array.isArray(config.youtube_connection_ids) ? config.youtube_connection_ids.map(String) : [];
     if (config.enabled && !selected.length) selected = channels.map(x => String(x.id));
     const selectedSet = new Set(selected);
@@ -499,6 +501,7 @@ const QRPublish = (() => {
       <div class="auto-settings-grid">
         <label class="auto-field"><span>عدد الفيديوهات يوميًا</span><select id="autoDailyCount">${[1,2,3].map(n => `<option value="${n}" ${Number(config.daily_count || 1) === n ? "selected" : ""}>${n} ${n === 1 ? "فيديو" : "فيديوهات"}</option>`).join("")}</select></label>
         <label class="auto-field"><span>نمط المحتوى القرآني</span><select id="autoContentMode">${modes.map(([id, name]) => `<option value="${id}" ${template.content_mode === id ? "selected" : ""}>${name}</option>`).join("")}</select></label>
+        <label class="auto-field"><span>قارئ التلاوة</span><select id="autoReciter"><option value="rotate" ${selectedReciter === "rotate" ? "selected" : ""}>تدوير تلقائي بين القرّاء</option>${reciters.map(reciter => `<option value="${esc(reciter.id)}" ${selectedReciter === String(reciter.id) ? "selected" : ""}>${esc(reciter.name)}</option>`).join("")}</select><small>اختيار قارئ يثبّته في القالب؛ الآيات تستمر بالتغيّر حسب نمط المحتوى.</small></label>
         <label class="auto-field"><span>شكل الفيديو</span><select id="autoVideoStyle">${videoStyles.map(([id, name]) => `<option value="${id}" ${(template.video_style || "rotate") === id ? "selected" : ""}>${name}</option>`).join("")}</select></label>
         <label class="auto-field"><span>الخلفية</span><select id="autoBackground">${backgrounds.map(id => `<option value="${id}" ${(template.background || "rotate") === id ? "selected" : ""}>${backgroundNames[id]}</option>`).join("")}</select></label>
         <label class="auto-field"><span>فكرة المقطع / نيّته</span><select id="autoPurpose">${purposes.map(([id, name]) => `<option value="${id}" ${(template.purpose || "general") === id ? "selected" : ""}>${name}</option>`).join("")}</select></label>
@@ -510,7 +513,7 @@ const QRPublish = (() => {
       </div>
       <div class="auto-enable-row"><label class="switch"><input type="checkbox" id="autoOn" aria-label="تفعيل النشر التلقائي" ${config.enabled ? "checked" : ""} ${channels.length || config.enabled ? "" : "disabled"}><i></i></label><div><b>تفعيل النشر التلقائي</b><small>متوقف افتراضيًا. لا تفعّله إلا إذا كنت تريد نشرًا عامًا بلا مراجعة لكل فيديو.</small></div></div>
       <div class="auto-action-row"><button class="btn btn-gold" id="autoSave" type="button">حفظ إعدادات الأتمتة</button><button class="btn btn-ghost" id="acctRunNow" type="button" ${channels.length ? "" : "disabled"}>إنشاء ونشر فيديو الآن</button></div>
-      <p class="acct-inline-note">تدوير الآيات والقرّاء والقنوات تلقائيًا · المحتوى عام · يمكنك إيقاف الأتمتة في أي وقت. يتطلب النشر ربط YouTube صالحًا.</p>`;
+      <p class="acct-inline-note">تتغيّر الآيات تلقائيًا؛ ويمكن تثبيت القارئ وشكل الفيديو والخلفية كقالب أو ترك أيٍّ منها للتدوير. المحتوى عام، ويمكنك إيقاف الأتمتة في أي وقت.</p>`;
     const copyPreview = $id("autoCopyPreviewText");
     const updateCopyPreview = () => {
       const canned = {
@@ -533,11 +536,14 @@ const QRPublish = (() => {
       const mode = $id("autoContentMode").value;
       const purpose = $id("autoPurpose").value;
       const video_style = $id("autoVideoStyle").value;
+      const selectedReciter = $id("autoReciter").value;
+      const reciter_mode = selectedReciter === "rotate" ? "rotate" : "fixed";
+      const reciter = reciter_mode === "fixed" ? selectedReciter : "";
       const custom_message = ($id("autoCustomMessage").value || "").normalize("NFC").trim().slice(0, 180);
       const background = $id("autoBackground").value;
       const channelsChanged = JSON.stringify([...youtube_connection_ids].sort()) !== JSON.stringify([...selected].sort());
       if (enabled && !youtube_connection_ids.length) return toast("اختر قناة واحدة على الأقل قبل التفعيل", "err");
-      const settingsChanged = channelsChanged || count !== Number(config.daily_count || 1) || mode !== template.content_mode || purpose !== (template.purpose || "general") || video_style !== (template.video_style || "rotate") || custom_message !== (template.custom_message || "") || background !== (template.background || "rotate");
+      const settingsChanged = channelsChanged || count !== Number(config.daily_count || 1) || mode !== template.content_mode || purpose !== (template.purpose || "general") || video_style !== (template.video_style || "rotate") || reciter_mode !== (template.reciter_mode || "rotate") || reciter !== (template.reciter || "") || custom_message !== (template.custom_message || "") || background !== (template.background || "rotate");
       const needsConfirmation = enabled && (!config.enabled || settingsChanged);
       if (needsConfirmation && !window.confirm(`ستُنشر الفيديوهات علنًا إلى القنوات المحددة بمعدل ${count} يوميًا، دون مراجعة كل فيديو. هل توافق على تطبيق هذه الإعدادات؟`)) {
         $id("autoOn").checked = !!config.enabled;
@@ -546,7 +552,7 @@ const QRPublish = (() => {
       }
       const button = $id("autoSave"); if (button) { button.disabled = true; button.textContent = "جارٍ الحفظ…"; }
       try {
-        await saveAutoSettings({ enabled, daily_count: count, youtube_connection_ids, template: { content_mode: mode, purpose, custom_message, video_style, background, reciter_mode: "rotate", privacy: "public" } });
+        await saveAutoSettings({ enabled, daily_count: count, youtube_connection_ids, template: { content_mode: mode, purpose, custom_message, video_style, background, reciter_mode, reciter, privacy: "public" } });
         toast(enabled ? "حُفظت الإعدادات — النشر التلقائي مفعّل" : "حُفظت الإعدادات؛ الأتمتة متوقفة");
         await refreshAccount();
       } catch (error) { toast(error.message || "تعذّر حفظ الإعدادات", "err"); if (button) { button.disabled = false; button.textContent = "حفظ إعدادات الأتمتة"; } }

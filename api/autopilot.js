@@ -5,7 +5,7 @@ const { json } = require("../lib/oauth");
 function autopilotLib() { return require("../lib/autopilot"); }
 
 const DAILY_COUNT_MAX = 3;
-const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", purpose: "general", custom_message: "", video_style: "rotate", reciter_mode: "rotate", background: "rotate", privacy: "public" } };
+const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", purpose: "general", custom_message: "", video_style: "rotate", reciter_mode: "rotate", reciter: "", background: "rotate", privacy: "public" } };
 
 async function readBody(req) {
   let text = "";
@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
   try {
     const uid = await getUserId(req);
     if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
-    const { CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = autopilotLib();
+    const { RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = autopilotLib();
     if (req.method === "GET") return json(res, 200, await accountData(uid));
     if (req.method !== "POST") return json(res, 405, { error: "method" });
     const body = await readBody(req);
@@ -68,6 +68,10 @@ module.exports = async (req, res) => {
       const video_style = VIDEO_STYLES.has(templateInput.video_style) ? templateInput.video_style : "rotate";
       const custom_message = typeof templateInput.custom_message === "string" ? templateInput.custom_message.normalize("NFC").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 180) : "";
       const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
+      const selectedReciter = RECITERS.find(reciter => reciter.id === templateInput.reciter);
+      const reciter_mode = templateInput.reciter_mode === "fixed" ? "fixed" : "rotate";
+      if (reciter_mode === "fixed" && !selectedReciter) return json(res, 400, { error: "اختر قارئًا صالحًا أو فعّل التدوير التلقائي" });
+      const reciter = reciter_mode === "fixed" ? selectedReciter.id : "";
       const enabled = body.enabled === true;
       const daily_count = Number(body.daily_count ?? 1);
       if (!Number.isInteger(daily_count) || daily_count < 1 || daily_count > DAILY_COUNT_MAX) {
@@ -80,7 +84,7 @@ module.exports = async (req, res) => {
         : [...validIds];
       if (requestedIds.some(id => !validIds.has(id))) return json(res, 400, { error: "اختيار قناة غير صالح؛ حدّث القائمة وحاول مرة أخرى" });
       if (enabled && !requestedIds.length) return json(res, 409, { error: "اربط واختر قناة YouTube واحدة على الأقل قبل تفعيل النشر الآلي" });
-      const template = { content_mode, purpose, custom_message, video_style, reciter_mode: "rotate", background, privacy: "public" };
+      const template = { content_mode, purpose, custom_message, video_style, reciter_mode, reciter, background, privacy: "public" };
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=representation" },
