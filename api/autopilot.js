@@ -2,10 +2,10 @@
 const { getUserId } = require("../lib/sess");
 const { q, q1, rest } = require("../lib/db");
 const { json } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = require("../lib/autopilot");
+function autopilotLib() { return require("../lib/autopilot"); }
 
 const DAILY_COUNT_MAX = 3;
-const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" } };
+const DEFAULTS = { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", purpose: "general", custom_message: "", video_style: "rotate", reciter_mode: "rotate", background: "rotate", privacy: "public" } };
 
 async function readBody(req) {
   let text = "";
@@ -16,10 +16,11 @@ async function readBody(req) {
   try { return JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
 }
 async function accountData(uid) {
-  const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-  const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,step,daily_index,daily_total,channel_name,youtube_connection_id,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=50`);
+  const { RECITERS, parseTemplate } = autopilotLib();
+  const config = await q1(`select enabled, at_utc, platforms, template, daily_count, youtube_connection_ids, updated_at from autopilot where user_id=$1 limit 1`, [uid]);
+  const rawRuns = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=id,run_type,run_date,status,step,daily_index,daily_total,channel_name,youtube_connection_id,recipe_key,reciter,title,external_url,error,created_at,completed_at,publish_queue_id&order=created_at.desc&limit=100`);
   const runs = Array.isArray(rawRuns) ? rawRuns : [];
-  const queueIds = [...new Set(runs.map(r => r.publish_queue_id).filter(Boolean))];
+  const queueIds = [...new Set(runs.map(r => String(r.publish_queue_id || "")).filter(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))];
   let queuedMedia = [];
   if (queueIds.length) {
     const params = new URLSearchParams({
@@ -30,7 +31,7 @@ async function accountData(uid) {
     try { queuedMedia = await rest(`/rest/v1/publish_queue?${params.toString()}`); } catch {}
   }
   const mediaById = new Map((Array.isArray(queuedMedia) ? queuedMedia : []).map(r => [String(r.id), r]));
-  const channels = await q(`select id, account_id, account_name from social_connections where user_id=$1 and platform='youtube' order by account_name, created_at`, [uid]);
+  const channels = await q(`select id, account_name from social_connections where user_id=$1 and platform='youtube' order by account_name, created_at`, [uid]);
   return {
     config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
     channels: Array.isArray(channels) ? channels : [],
@@ -52,9 +53,10 @@ async function accountData(uid) {
 }
 
 module.exports = async (req, res) => {
-  const uid = await getUserId(req);
-  if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
   try {
+    const uid = await getUserId(req);
+    if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
+    const { CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = autopilotLib();
     if (req.method === "GET") return json(res, 200, await accountData(uid));
     if (req.method !== "POST") return json(res, 405, { error: "method" });
     const body = await readBody(req);
@@ -62,6 +64,9 @@ module.exports = async (req, res) => {
     if (body.action === "save") {
       const templateInput = body.template && typeof body.template === "object" ? body.template : {};
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
+      const purpose = CONTENT_PURPOSES.has(templateInput.purpose) ? templateInput.purpose : "general";
+      const video_style = VIDEO_STYLES.has(templateInput.video_style) ? templateInput.video_style : "rotate";
+      const custom_message = typeof templateInput.custom_message === "string" ? templateInput.custom_message.normalize("NFC").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 180) : "";
       const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
       const enabled = body.enabled === true;
       const daily_count = Number(body.daily_count ?? 1);
@@ -75,7 +80,7 @@ module.exports = async (req, res) => {
         : [...validIds];
       if (requestedIds.some(id => !validIds.has(id))) return json(res, 400, { error: "اختيار قناة غير صالح؛ حدّث القائمة وحاول مرة أخرى" });
       if (enabled && !requestedIds.length) return json(res, 409, { error: "اربط واختر قناة YouTube واحدة على الأقل قبل تفعيل النشر الآلي" });
-      const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
+      const template = { content_mode, purpose, custom_message, video_style, reciter_mode: "rotate", background, privacy: "public" };
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=representation" },

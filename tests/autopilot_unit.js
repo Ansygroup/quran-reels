@@ -1,9 +1,11 @@
 const assert = require("node:assert/strict");
-const { RECIPES, RECITERS, CONTENT_MODES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, cairoDate } = require("../lib/autopilot");
+const { RECIPES, RECITERS, CONTENT_MODES, CONTENT_PURPOSES, VIDEO_STYLES, DAILY_COUNT_MAX, normalizeDailyCount, chooseYoutubeConnections, chooseYoutubeTarget, parseTemplate, chooseRecipe, metadata, cairoDate } = require("../lib/autopilot");
 const autopilotApi = require("../api/autopilot");
 const quran = require("../public/data/quran-uthmani.json");
 
 assert.equal(CONTENT_MODES.size, 3);
+assert.equal(CONTENT_PURPOSES.size, 5);
+assert.equal(VIDEO_STYLES.size, 3);
 assert.equal(RECITERS.length, 8);
 assert.ok(RECIPES.length >= 70, "curated rotation should include the prepared recipe library");
 for (const recipe of RECIPES) {
@@ -16,8 +18,20 @@ for (const recipe of RECIPES) {
 assert.equal(parseTemplate({ content_mode: "invalid" }).content_mode, "mix");
 assert.equal(parseTemplate({ content_mode: "famous", background: "bogus" }).background, "rotate");
 assert.equal(parseTemplate({ content_mode: "sequential" }).reciter_mode, "rotate");
+assert.equal(parseTemplate({ purpose: "sadaqah", video_style: "word", custom_message: "  لله الحمد  " }).purpose, "sadaqah");
+assert.equal(parseTemplate({ purpose: "bogus", video_style: "bogus" }).purpose, "general");
+assert.equal(parseTemplate({ video_style: "bogus" }).video_style, "rotate");
+assert.equal(parseTemplate({ custom_message: "  نَصٌّ  " }).custom_message, "نَصٌّ");
 assert.equal(chooseRecipe(parseTemplate({ content_mode: "sequential" }), 0).s, 1);
 assert.ok(chooseRecipe(parseTemplate({ content_mode: "famous" }), 0));
+const sampleRecipe = RECIPES[0];
+const baselineCopy = metadata(sampleRecipe, { name: sampleRecipe.reciter }, parseTemplate());
+const charityCopy = metadata(sampleRecipe, { name: sampleRecipe.reciter }, parseTemplate({ purpose: "sadaqah", custom_message: "صدقة جارية عن والدي" }));
+assert.equal(charityCopy.title, baselineCopy.title, "user-selected purpose must not distort the verified recipe title");
+assert.match(charityCopy.caption, /صدقة جارية/);
+assert.match(charityCopy.caption, /لا تتضمن هذه الرسالة طلب تبرعات مالية/);
+assert.match(charityCopy.caption, /صدقة جارية عن والدي/);
+assert.match(charityCopy.hashtags, /صدقة_جارية/);
 assert.equal(DAILY_COUNT_MAX, 3);
 assert.equal(normalizeDailyCount(2), 2);
 assert.equal(normalizeDailyCount(4), 1);
@@ -31,7 +45,7 @@ assert.equal(cairoDate(new Date("2026-10-30T04:15:00.000Z")), "2026-10-30");
 (async () => {
   const res = { statusCode: 0, headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(value) { this.body = value; } };
   await autopilotApi({ method: "GET", headers: {}, url: "/api/autopilot" }, res);
-  assert.equal(res.statusCode, 401, "dashboard API must reject unauthenticated requests");
+  assert.equal(res.statusCode, 401, "dashboard API must reject unauthenticated requests before loading the video renderer");
   assert.equal(JSON.parse(res.body).error, "سجّل الدخول أولًا");
   console.log("AUTOPILOT UNIT OK");
 })().catch(error => { console.error(error); process.exitCode = 1; });
