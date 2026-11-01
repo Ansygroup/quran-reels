@@ -851,3 +851,13 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .auto-copy-preview{margin:3px 0 13px;padding:11px 13px;border:1px solid rgba(45,212,160,.2);border-radius:12px;background:rgba(45,212,160,.045)}
 .auto-copy-preview b{display:block;color:#8ef0d2;font-size:.78rem}
 .auto-copy-preview p{margin:5px 0 0;color:var(--muted);font-size:.8rem;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Account history search and status filters */
+.acct-history-filters{display:grid;grid-template-columns:minmax(220px,1.5fr) minmax(180px,1fr) auto;align-items:end;gap:10px;margin:0 0 14px;padding:12px;border:1px solid var(--line-2);border-radius:14px;background:rgba(0,0,0,.12)}
+.acct-history-filters label{display:grid;gap:5px;min-width:0}
+.acct-history-filters label span{color:var(--muted);font-size:.73rem;font-weight:700}
+.acct-history-filters input,.acct-history-filters select{width:100%;min-width:0;min-height:42px;padding:8px 11px;border:1px solid var(--line-2);border-radius:10px;background:rgba(0,0,0,.2);color:var(--text);font:inherit;font-size:.84rem}
+.acct-history-filters input:focus,.acct-history-filters select:focus{outline:2px solid rgba(45,212,160,.38);outline-offset:1px}
+.acct-history-filters select option{background:#101b18;color:var(--text)}
+.acct-history-count{padding:0 3px 10px;color:var(--emerald);font-size:.76rem;font-weight:800;white-space:nowrap}
+@media(max-width:600px){.acct-history-filters{grid-template-columns:1fr 1fr}.acct-history-filters label:first-child{grid-column:1/-1}.acct-history-count{grid-column:1/-1;padding:0}}

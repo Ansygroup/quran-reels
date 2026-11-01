@@ -11,7 +11,7 @@ const sw = fs.readFileSync(path.join(root, 'public/sw.js'), 'utf8');
 
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
 const idCounts = ids.reduce((m, id) => (m[id] = (m[id] || 0) + 1, m), {});
-for (const id of ['view-account', 'acctNotice', 'acctAuth', 'acctDataNotice', 'acctStats', 'acctQuickActions', 'acctDashboardTitle', 'acctDashboardRefresh', 'acctDashStats', 'acctUpcoming', 'acctKanban', 'acctHowTo', 'acctChannels', 'acctQueue', 'acctAuto', 'acctAutoRuns', 'acctRunChannel', 'acctRunsRefresh', 'acctRunList', 'btnNewSched', 'schedFile']) {
+for (const id of ['view-account', 'acctNotice', 'acctAuth', 'acctDataNotice', 'acctStats', 'acctQuickActions', 'acctDashboardTitle', 'acctDashboardRefresh', 'acctDashStats', 'acctUpcoming', 'acctKanban', 'acctHowTo', 'acctChannels', 'acctQueue', 'acctAuto', 'acctAutoRuns', 'acctRunChannel', 'acctRunsRefresh', 'acctRunFilters', 'acctRunSearch', 'acctRunStatus', 'acctRunCount', 'acctRunList', 'btnNewSched', 'schedFile']) {
   assert.strictEqual(idCounts[id], 1, `expected exactly one #${id}`);
 }
 for (const [id, count] of Object.entries(idCounts)) assert.strictEqual(count, 1, `duplicate HTML id: ${id}`);
@@ -20,11 +20,11 @@ const dynamicIds = new Set([...js.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
 for (const [, id] of js.matchAll(/\$id\(["']([^"']+)["']\)/g)) {
   assert.ok(idCounts[id] || dynamicIds.has(id), `publish.js references missing #${id}`);
 }
-assert.match(html, /css\/style\.css\?v=12/, 'account CSS cache version must be bumped');
-assert.match(html, /js\/publish\.js\?v=25/, 'account JS cache version must be bumped');
-assert.match(sw, /const CACHE = "qr-v18"/, 'service worker cache must be invalidated');
-assert.match(sw, /css\/style\.css\?v=12/, 'offline shell must include current account styles');
-assert.match(sw, /js\/publish\.js\?v=25/, 'offline shell must include current account logic');
+assert.match(html, /css\/style\.css\?v=13/, 'account CSS cache version must be bumped');
+assert.match(html, /js\/publish\.js\?v=26/, 'account JS cache version must be bumped');
+assert.match(sw, /const CACHE = "qr-v19"/, 'service worker cache must be invalidated');
+assert.match(sw, /css\/style\.css\?v=13/, 'offline shell must include current account styles');
+assert.match(sw, /js\/publish\.js\?v=26/, 'offline shell must include current account logic');
 assert.match(js, /openSchedule\("", file\)/, 'selected schedule video should remain local until the user saves');
 assert.match(js, /function safeExternalUrl\(/, 'published links must be restricted to known HTTPS hosts');
 assert.match(js, /function renderDashboard\(/, 'account dashboard must summarize and render the Kanban board');
@@ -67,6 +67,11 @@ assert.match(api, /reciter_mode/,'automation API must persist a fixed or rotatin
 assert.match(api, /selectedReciter\.id/, 'automation API must validate and persist the selected reciter');
 assert.match(js, /class="autoChannel"/, 'the user must be able to select multiple linked channels');
 assert.match(js, /acct-run-steps/, 'each run must show visible progress steps');
+assert.match(js, /runSearch\.trim\(\)/, 'account video history must support search');
+assert.match(js, /runStatusFilter === "published"/, 'account video history must filter by status');
+assert.match(html, /acctRunFilters/, 'account history should expose accessible search and status controls');
+assert.match(js, /04:15 UTC[\s\S]*07:15/, 'automation time notice must explain Cairo seasonal time');
+assert.match(js, /function cairoDateTime[\s\S]{0,400}Africa\/Cairo/, 'account dates must render in Cairo time');
 assert.match(api, /daily_index,daily_total,channel_name/, 'history includes per-video sequence and target channel');
 const oauth = fs.readFileSync(path.join(root, 'lib/oauth.js'), 'utf8');
 const ytCallback = fs.readFileSync(path.join(root, 'lib/cb_youtube.js'), 'utf8');

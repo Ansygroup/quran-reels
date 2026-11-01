@@ -17,7 +17,7 @@ const QRPublish = (() => {
     x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
   };
   let conns = [], queue = [], connectionsError = "", queueError = "", connectionsLoading = false, queueLoading = false, schedBlob = null, schedPath = "", schedName = "";
-  let dashboard = { config: null, channels: [], runs: [], reciters: [] }, dashboardError = "", dashboardLoading = false, refreshSequence = 0, dashboardOwner = "", historyPollTimer = null;
+  let dashboard = { config: null, channels: [], runs: [], reciters: [] }, dashboardError = "", dashboardLoading = false, refreshSequence = 0, dashboardOwner = "", historyPollTimer = null, runSearch = "", runStatusFilter = "all";
 
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
@@ -172,6 +172,11 @@ const QRPublish = (() => {
     } catch { return ""; }
   }
 
+  function cairoDateTime(value, options = { dateStyle: "medium", timeStyle: "short" }) {
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("ar-EG", { timeZone: "Africa/Cairo", ...options });
+  }
+
   /* ---------- الرسم ---------- */
   function statusBadge(r) {
     const map = {
@@ -254,13 +259,13 @@ const QRPublish = (() => {
     wrap.innerHTML = queue.map(r => {
       const p = PLATFORMS[r.platform] || { name: r.platform, icon: "•" };
       const d = new Date(r.publish_at);
-      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+      const when = cairoDateTime(d);
       const canAct = r.status === "scheduled" || r.status === "failed";
       return `<div class="qrow">
         <span class="qic">${p.icon}</span>
         <div class="qinfo">
           <b>${esc(r.title || "ريلز")}</b>
-          <small>${esc(p.name)} · ${esc(when)}${r.error ? ` · <i class="qerr">${esc(r.error.slice(0, 90))}</i>` : ""}${safeExternalUrl(r.external_url) ? ` · <a href="${esc(safeExternalUrl(r.external_url))}" target="_blank" rel="noopener noreferrer">فتح ↗</a>` : ""}</small>
+          <small>${esc(p.name)} · ${esc(when)} القاهرة${r.error ? ` · <i class="qerr">${esc(r.error.slice(0, 90))}</i>` : ""}${safeExternalUrl(r.external_url) ? ` · <a href="${esc(safeExternalUrl(r.external_url))}" target="_blank" rel="noopener noreferrer">فتح ↗</a>` : ""}</small>
         </div>
         ${statusBadge(r)}
         <div class="qacts">
@@ -434,13 +439,13 @@ const QRPublish = (() => {
           const channel = item.channel_name || channels.find(c => String(c.id) === String(item.social_connection_id || item.youtube_connection_id))?.account_name || "القناة المحددة";
           const whenValue = item.publish_at || item.completed_at || item.created_at;
           const date = whenValue ? new Date(whenValue) : null;
-          const when = date && !Number.isNaN(date.getTime()) ? date.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "موعده حسب الجدول";
+          const when = date && !Number.isNaN(date.getTime()) ? cairoDateTime(date) : "موعده حسب الجدول";
           const link = safeExternalUrl(item.external_url);
           const kind = dashboardPurpose(item);
           return `<article class="kanban-card">
             <div class="kanban-card-top"><span>${item.boardType === "automatic" ? "أتمتة" : "جدولة"}</span><small>${esc(kind)}</small></div>
             <h4>${esc(title)}</h4>
-            <p>📺 ${esc(channel)}</p><p>🕒 ${esc(when)}</p>
+            <p>📺 ${esc(channel)}</p><p>🕒 ${esc(when)} · القاهرة</p>
             ${item.error ? `<p class="kanban-error">${esc(String(item.error).slice(0, 120))}</p>` : ""}
             ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener noreferrer">فتح الفيديو ↗</a>` : ""}
             ${item.status === "failed" && item.queue_status === "failed" && item.publish_queue_id ? `<button class="btn btn-gold btn-sm" type="button" data-kanban-pub="${esc(item.publish_queue_id)}">إعادة محاولة النشر</button>` : ""}
@@ -478,7 +483,9 @@ const QRPublish = (() => {
   function renderAutoRuns() {
     const wrap = $id("acctRunList"); if (!wrap) return;
     const channelLabel = $id("acctRunChannel");
+    const filters = $id("acctRunFilters"), searchInput = $id("acctRunSearch"), statusInput = $id("acctRunStatus"), countLabel = $id("acctRunCount");
     if (!QRAuth.user()) {
+      if (filters) filters.hidden = true;
       if (channelLabel) channelLabel.textContent = "🔒 سجل خاص";
       wrap.innerHTML = `<div class="acct-empty"><span>🔐</span><div><b>سجّل الدخول لعرض سجلّك</b><p>لا يمكن لغيرك الاطلاع على فيديوهاتك أو تفاصيل قنواتك.</p><button class="btn btn-em btn-sm" type="button" id="acctHistoryLogin">تسجيل الدخول</button></div></div>`;
       $id("acctHistoryLogin")?.addEventListener("click", openLogin);
@@ -487,20 +494,37 @@ const QRPublish = (() => {
     const runs = Array.isArray(dashboard.runs) ? dashboard.runs : [];
     if (channelLabel) channelLabel.textContent = `${dashboard.channels?.length || 0} قناة مرتبطة`;
     if (dashboardError) {
+      if (filters) filters.hidden = true;
       wrap.innerHTML = `<div class="acct-empty error"><span>⚠️</span><div><b>تعذّر تحميل السجل</b><p>${esc(dashboardError)}</p><button class="btn btn-ghost btn-sm" type="button" id="acctRetryHistory">حاول مرة أخرى</button></div></div>`;
       $id("acctRetryHistory")?.addEventListener("click", () => refreshAccount());
       return;
     }
     if (!runs.length) {
+      if (filters) filters.hidden = true;
       wrap.innerHTML = `<div class="acct-empty"><span>🌱</span><div><b>لا توجد فيديوهات آلية في السجل بعد</b><p>فعّل الأتمتة وحدد القنوات والعدد اليومي؛ سيظهر هنا كل فيديو وخطواته ورابطه.</p><a class="btn btn-ghost btn-sm" href="#/" style="margin-top:8px">أنشئ أول فيديو</a></div></div>`;
       return;
     }
-    wrap.innerHTML = runs.map(run => {
+    if (filters) filters.hidden = false;
+    if (searchInput) { if (searchInput.value !== runSearch) searchInput.value = runSearch; searchInput.oninput = () => { runSearch = searchInput.value; renderAutoRuns(); }; }
+    if (statusInput) { statusInput.value = runStatusFilter; statusInput.onchange = () => { runStatusFilter = statusInput.value; renderAutoRuns(); }; }
+    const needle = runSearch.trim().toLocaleLowerCase();
+    const filteredRuns = runs.filter(run => {
+      const stateMatches = runStatusFilter === "all" || (runStatusFilter === "published" && run.status === "published") || (runStatusFilter === "failed" && run.status === "failed") || (runStatusFilter === "active" && !["published", "failed"].includes(run.status));
+      const haystack = [run.title, run.channel_name, run.reciter, run.recipe_key, run.run_date].join(" ").toLocaleLowerCase();
+      return stateMatches && (!needle || haystack.includes(needle));
+    });
+    if (countLabel) countLabel.textContent = `عرض ${filteredRuns.length.toLocaleString("ar-EG")} من ${runs.length.toLocaleString("ar-EG")}`;
+    if (!filteredRuns.length) {
+      wrap.innerHTML = `<div class="acct-empty compact"><span>🔎</span><div><b>لا توجد نتائج مطابقة</b><p>غيّر عبارة البحث أو اختر حالة أخرى.</p><button class="btn btn-ghost btn-sm" type="button" id="acctRunFiltersClear">مسح البحث والفلاتر</button></div></div>`;
+      $id("acctRunFiltersClear")?.addEventListener("click", () => { runSearch = ""; runStatusFilter = "all"; renderAutoRuns(); });
+      return;
+    }
+    wrap.innerHTML = filteredRuns.map(run => {
       const [statusText, statusClass] = runStatus(run);
       const videoId = youtubeVideoId(run.external_url);
       const publishedDate = run.completed_at || run.created_at;
       const parsedDate = publishedDate ? new Date(publishedDate) : null;
-      const when = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" }) : "";
+      const when = parsedDate && !Number.isNaN(parsedDate.getTime()) ? cairoDateTime(parsedDate) : "";
       const sequence = run.daily_total > 1 ? `الفيديو ${Number(run.daily_index) || 1} من ${Number(run.daily_total)}` : "فيديو اليوم";
       const link = safeExternalUrl(run.external_url);
       return `<article class="acct-run-card ${statusClass}">
@@ -586,7 +610,7 @@ const QRPublish = (() => {
     const backgroundNames = { rotate: "تدوير الخلفيات تلقائيًا", "bg-mosque-night": "مسجد ليلي", "bg-starry-desert": "صحراء مرصعة بالنجوم", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية", "bg-mountains-dawn": "الفجر والجبال", "bg-mosque-silhouette": "ظلال مسجد", "bg-garden-tulips": "حديقة", "bg-arabesque-dark": "أرابيسك داكن", "bg-heavenly-clouds": "غيوم هادئة", "grad-emerald": "تدرج زمردي", "grad-gold": "تدرج ذهبي", "grad-dawn": "تدرج الفجر", "grad-night": "تدرج ليلي" };
     wrap.innerHTML = `
       <div class="acct-section-head"><div><span class="acct-kicker">YouTube · نشر عام تلقائي</span><h2>إعدادات الأتمتة</h2></div><span class="acct-secure-badge ${config.enabled ? "is-on" : ""}">${config.enabled ? "● مفعّلة" : "○ متوقفة"}</span></div>
-      <p class="hint">الوقت اليومي ثابت قرابة <b>06:15 بتوقيت القاهرة</b>، وقد يتأخر التشغيل حتى 59 دقيقة. يُنشر المحتوى علنًا دون مراجعة كل فيديو بعد تفعيلك للأتمتة.</p>
+      <p class="hint">يبدأ المجدول قرابة <b>04:15 UTC</b> — أي 06:15 شتاءً و07:15 صيفًا بتوقيت القاهرة — وقد يتأخر بدء التشغيل حتى 59 دقيقة. يُنشر المحتوى علنًا دون مراجعة كل فيديو بعد تفعيلك للأتمتة.</p>
       <div class="auto-settings-grid">
         <label class="auto-field"><span>عدد الفيديوهات يوميًا</span><select id="autoDailyCount">${[1,2,3].map(n => `<option value="${n}" ${Number(config.daily_count || 1) === n ? "selected" : ""}>${n} ${n === 1 ? "فيديو" : "فيديوهات"}</option>`).join("")}</select></label>
         <label class="auto-field"><span>نمط المحتوى القرآني</span><select id="autoContentMode">${modes.map(([id, name]) => `<option value="${id}" ${template.content_mode === id ? "selected" : ""}>${name}</option>`).join("")}</select></label>
@@ -726,6 +750,7 @@ const QRPublish = (() => {
     if (!user) {
       dashboardLoading = false; connectionsLoading = false; queueLoading = false;
       dashboardOwner = "";
+      runSearch = ""; runStatusFilter = "all";
       conns = []; queue = []; connectionsError = ""; queueError = "";
       dashboard = { config: null, channels: [], runs: [], reciters: [] };
       dashboardError = "";
@@ -737,6 +762,7 @@ const QRPublish = (() => {
     }
     dashboardLoading = true; connectionsLoading = true; queueLoading = true;
     if (dashboardOwner !== String(user.id)) {
+      runSearch = ""; runStatusFilter = "all";
       dashboardOwner = String(user.id);
       conns = []; queue = []; connectionsError = ""; queueError = "";
       dashboard = { config: { enabled: false, daily_count: 1, youtube_connection_ids: [], template: { content_mode: "mix", background: "rotate" } }, channels: [], runs: [], reciters: [] };
