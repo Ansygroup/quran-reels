@@ -861,3 +861,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .acct-history-filters select option{background:#101b18;color:var(--text)}
 .acct-history-count{padding:0 3px 10px;color:var(--emerald);font-size:.76rem;font-weight:800;white-space:nowrap}
 @media(max-width:600px){.acct-history-filters{grid-template-columns:1fr 1fr}.acct-history-filters label:first-child{grid-column:1/-1}.acct-history-count{grid-column:1/-1;padding:0}}
+
+.auto-save-status{margin:8px 0 0;padding:9px 11px;border:1px solid rgba(45,212,160,.18);border-radius:11px;background:rgba(45,212,160,.045);color:var(--muted);font-size:.76rem;line-height:1.7}
+.auto-save-status.is-dirty{border-color:rgba(245,158,11,.36);background:rgba(245,158,11,.07);color:#fde68a}
+.auto-action-row button:disabled{opacity:.55;cursor:not-allowed}

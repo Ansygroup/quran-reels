@@ -626,6 +626,7 @@ const QRPublish = (() => {
       </div>
       <div class="auto-enable-row"><label class="switch"><input type="checkbox" id="autoOn" aria-label="تفعيل النشر التلقائي" ${config.enabled ? "checked" : ""} ${channels.length || config.enabled ? "" : "disabled"}><i></i></label><div><b>تفعيل النشر التلقائي</b><small>متوقف افتراضيًا. لا تفعّله إلا إذا كنت تريد نشرًا عامًا بلا مراجعة لكل فيديو.</small></div></div>
       <div class="auto-action-row"><button class="btn btn-gold" id="autoSave" type="button">حفظ إعدادات الأتمتة</button><button class="btn btn-ghost" id="acctRunNow" type="button" ${channels.length ? "" : "disabled"}>إنشاء ونشر فيديو الآن</button></div>
+      <p class="auto-save-status" id="autoSaveStatus" role="status" aria-live="polite"></p>
       <p class="acct-inline-note">تتغيّر الآيات تلقائيًا؛ ويمكن تثبيت القارئ وشكل الفيديو والخلفية كقالب أو ترك أيٍّ منها للتدوير. المحتوى عام، ويمكنك إيقاف الأتمتة في أي وقت.</p>`;
     const copyPreview = $id("autoCopyPreviewText");
     const updateCopyPreview = () => {
@@ -642,6 +643,44 @@ const QRPublish = (() => {
     $id("autoPurpose")?.addEventListener("change", updateCopyPreview);
     $id("autoCustomMessage")?.addEventListener("input", updateCopyPreview);
     updateCopyPreview();
+    const saveButton = $id("autoSave"), runNowButton = $id("acctRunNow"), saveStatus = $id("autoSaveStatus");
+    const draftChanged = () => {
+      const draftChannels = [...document.querySelectorAll(".autoChannel:checked")].map(x => String(x.value)).sort();
+      const savedChannels = [...selected].map(String).sort();
+      const draftReciter = $id("autoReciter")?.value || "rotate";
+      const draftMessage = ($id("autoCustomMessage")?.value || "").normalize("NFC").trim().slice(0, 180);
+      return JSON.stringify(draftChannels) !== JSON.stringify(savedChannels)
+        || Number($id("autoDailyCount")?.value || 1) !== Number(config.daily_count || 1)
+        || $id("autoContentMode")?.value !== (template.content_mode || "mix")
+        || $id("autoPurpose")?.value !== (template.purpose || "general")
+        || $id("autoVideoStyle")?.value !== (template.video_style || "rotate")
+        || (draftReciter === "rotate" ? "rotate" : "fixed") !== (template.reciter_mode || "rotate")
+        || (draftReciter === "rotate" ? "" : draftReciter) !== (template.reciter || "")
+        || draftMessage !== (template.custom_message || "")
+        || $id("autoBackground")?.value !== (template.background || "rotate")
+        || !!$id("autoOn")?.checked !== !!config.enabled;
+    };
+    const updateDraftStatus = () => {
+      const dirty = draftChanged();
+      if (saveButton) saveButton.textContent = dirty ? "حفظ التغييرات" : "حفظ إعدادات الأتمتة";
+      if (runNowButton) {
+        runNowButton.disabled = !channels.length || dirty;
+        runNowButton.title = dirty ? "احفظ التعديلات أولًا؛ التشغيل اليدوي يستخدم الإعدادات المحفوظة." : "";
+      }
+      if (saveStatus) {
+        saveStatus.classList.toggle("is-dirty", dirty);
+        saveStatus.textContent = dirty
+          ? "لديك تغييرات غير محفوظة. احفظها أولًا قبل إنشاء فيديو يدوي حتى يُستخدم القارئ والقالب والقناة التي اخترتها."
+          : (channels.length ? "التشغيل اليدوي يستخدم إعداداتك المحفوظة الحالية." : "اربط قناة YouTube أولًا لتفعيل التشغيل اليدوي.");
+      }
+    };
+    ["autoOn", "autoDailyCount", "autoContentMode", "autoReciter", "autoVideoStyle", "autoBackground", "autoPurpose", "autoCustomMessage"].forEach(id => {
+      const control = $id(id);
+      control?.addEventListener("input", updateDraftStatus);
+      control?.addEventListener("change", updateDraftStatus);
+    });
+    document.querySelectorAll(".autoChannel").forEach(control => control.addEventListener("change", updateDraftStatus));
+    updateDraftStatus();
     $id("autoSave").onclick = async () => {
       const enabled = $id("autoOn").checked;
       const youtube_connection_ids = [...document.querySelectorAll(".autoChannel:checked")].map(x => x.value);
@@ -656,11 +695,12 @@ const QRPublish = (() => {
       const background = $id("autoBackground").value;
       const channelsChanged = JSON.stringify([...youtube_connection_ids].sort()) !== JSON.stringify([...selected].sort());
       if (enabled && !youtube_connection_ids.length) return toast("اختر قناة واحدة على الأقل قبل التفعيل", "err");
-      const settingsChanged = channelsChanged || count !== Number(config.daily_count || 1) || mode !== template.content_mode || purpose !== (template.purpose || "general") || video_style !== (template.video_style || "rotate") || reciter_mode !== (template.reciter_mode || "rotate") || reciter !== (template.reciter || "") || custom_message !== (template.custom_message || "") || background !== (template.background || "rotate");
+      const settingsChanged = channelsChanged || count !== Number(config.daily_count || 1) || mode !== (template.content_mode || "mix") || purpose !== (template.purpose || "general") || video_style !== (template.video_style || "rotate") || reciter_mode !== (template.reciter_mode || "rotate") || reciter !== (template.reciter || "") || custom_message !== (template.custom_message || "") || background !== (template.background || "rotate");
       const needsConfirmation = enabled && (!config.enabled || settingsChanged);
       if (needsConfirmation && !window.confirm(`ستُنشر الفيديوهات علنًا إلى القنوات المحددة بمعدل ${count} يوميًا، دون مراجعة كل فيديو. هل توافق على تطبيق هذه الإعدادات؟`)) {
         $id("autoOn").checked = !!config.enabled;
         document.querySelectorAll(".autoChannel").forEach(x => { x.checked = selectedSet.has(String(x.value)); });
+        updateDraftStatus();
         return;
       }
       const button = $id("autoSave"); if (button) { button.disabled = true; button.textContent = "جارٍ الحفظ…"; }

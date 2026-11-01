@@ -20,11 +20,11 @@ const dynamicIds = new Set([...js.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
 for (const [, id] of js.matchAll(/\$id\(["']([^"']+)["']\)/g)) {
   assert.ok(idCounts[id] || dynamicIds.has(id), `publish.js references missing #${id}`);
 }
-assert.match(html, /css\/style\.css\?v=13/, 'account CSS cache version must be bumped');
-assert.match(html, /js\/publish\.js\?v=26/, 'account JS cache version must be bumped');
-assert.match(sw, /const CACHE = "qr-v19"/, 'service worker cache must be invalidated');
-assert.match(sw, /css\/style\.css\?v=13/, 'offline shell must include current account styles');
-assert.match(sw, /js\/publish\.js\?v=26/, 'offline shell must include current account logic');
+assert.match(html, /css\/style\.css\?v=14/, 'account CSS cache version must be bumped');
+assert.match(html, /js\/publish\.js\?v=27/, 'account JS cache version must be bumped');
+assert.match(sw, /const CACHE = "qr-v20"/, 'service worker cache must be invalidated');
+assert.match(sw, /css\/style\.css\?v=14/, 'offline shell must include current account styles');
+assert.match(sw, /js\/publish\.js\?v=27/, 'offline shell must include current account logic');
 assert.match(js, /openSchedule\("", file\)/, 'selected schedule video should remain local until the user saves');
 assert.match(js, /function safeExternalUrl\(/, 'published links must be restricted to known HTTPS hosts');
 assert.match(js, /function renderDashboard\(/, 'account dashboard must summarize and render the Kanban board');
@@ -68,6 +68,9 @@ assert.match(api, /selectedReciter\.id/, 'automation API must validate and persi
 assert.match(js, /class="autoChannel"/, 'the user must be able to select multiple linked channels');
 assert.match(js, /acct-run-steps/, 'each run must show visible progress steps');
 assert.match(js, /runSearch\.trim\(\)/, 'account video history must support search');
+assert.match(js, /const draftChanged = \(\) =>/, 'manual publishing must detect unsaved automation edits');
+assert.match(js, /runNowButton\.disabled = !channels\.length \|\| dirty/, 'manual publishing must wait until edits are saved');
+assert.match(js, /id="autoSaveStatus"/, 'account must explain when automation settings are unsaved');
 assert.match(js, /runStatusFilter === "published"/, 'account video history must filter by status');
 assert.match(html, /acctRunFilters/, 'account history should expose accessible search and status controls');
 assert.match(js, /04:15 UTC[\s\S]*07:15/, 'automation time notice must explain Cairo seasonal time');
