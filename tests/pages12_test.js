@@ -4,6 +4,24 @@
  */
 const BASE = (process.env.BASE || "https://quran-reels-tau.vercel.app").replace(/\/+$/, "");
 
+/* البوابة تحدّ الطلبات لكل IP (60/دقيقة) — نتباعد تحتها ونتريّث عند 429 */
+const MIN_GAP_MS = Number(process.env.MIN_GAP_MS || 1050);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let lastAt = 0;
+async function req(url, opts) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const wait = lastAt + MIN_GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastAt = Date.now();
+    const r = await globalThis.fetch(url, opts);
+    if (r.status !== 429) return r;
+    const retry = Number(r.headers.get("retry-after") || 0) * 1000;
+    await r.text().catch(() => {});
+    await sleep(Math.min(retry || 5000, 65000));
+  }
+  return globalThis.fetch(url, opts);
+}
+
 let ok = 0, fail = 0;
 const fails = [];
 const chk = (name, cond, extra = "") => {
@@ -15,14 +33,14 @@ const chk = (name, cond, extra = "") => {
   console.log("BASE =", BASE, "· K12 pages test");
 
   // 1) خريطة الموقع كلها 200 + canonical متطابق
-  const sm = await (await fetch(BASE + "/sitemap.xml")).text();
+  const sm = await (await req(BASE + "/sitemap.xml")).text();
   const locs = [...sm.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
   chk("sitemap = 154 urls", locs.length === 154, String(locs.length));
 
   let bad = [];
   for (const loc of locs) {
     try {
-      const r = await fetch(loc);
+      const r = await req(loc);
       if (r.status !== 200) { bad.push(loc + " → " + r.status); continue; }
       const html = await r.text();
       const can = (html.match(/<link rel="canonical" href="([^"]+)"/) || [])[1];
@@ -35,7 +53,7 @@ const chk = (name, cond, extra = "") => {
   const enPaths = ["/en/", "/en/quran-video-maker/", "/en/quran-video-with-translation/",
     "/en/quran-video-tiktok/", "/en/prayer-times/", "/en/qibla-direction/"];
   for (const p of enPaths) {
-    const html = await (await fetch(BASE + p)).text();
+    const html = await (await req(BASE + p)).text();
     chk("en " + p + " lang+hreflang",
       html.includes('<html lang="en"') && (html.match(/hreflang=/g) || []).length >= 3,
       "lang=" + html.includes('<html lang="en"') + " hreflang=" + (html.match(/hreflang=/g) || []).length);
@@ -45,59 +63,59 @@ const chk = (name, cond, extra = "") => {
   const arPaired = ["/", "/ar/quran-video-maker/", "/ar/quran-video-with-translation/",
     "/ar/quran-video-tiktok/", "/ar/prayer-times/", "/ar/qibla-direction/"];
   for (const p of arPaired) {
-    const html = await (await fetch(BASE + p)).text();
+    const html = await (await req(BASE + p)).text();
     chk("pair " + p + " → hreflang en", /hreflang="en" href="https:\/\/[^"]+\/en/.test(html));
   }
 
   // 4) فهرس القرّاء: 47 بطاقة
-  const hub = await (await fetch(BASE + "/ar/reciters/")).text();
+  const hub = await (await req(BASE + "/ar/reciters/")).text();
   const cards = (hub.match(/class="rc-card"/g) || []).length;
   chk("hub = 47 reciter cards", cards === 47, String(cards));
 
   // 5) صفحة قارئ: CTA بالمعرّف المجلّد + JSON-LD breadcrumb
-  const rec = await (await fetch(BASE + "/ar/reciter/alafasy/")).text();
+  const rec = await (await req(BASE + "/ar/reciter/alafasy/")).text();
   chk("reciter CTA ?r=", rec.includes("/?r=Alafasy_128kbps"));
   chk("reciter breadcrumb LD", rec.includes("BreadcrumbList"));
 
   // 6) صفحات الثقة: نموذج تواصل عامل + الروابط في الفوتر
-  const contact = await (await fetch(BASE + "/contact/")).text();
+  const contact = await (await req(BASE + "/contact/")).text();
   chk("contact form present", contact.includes('id="cForm"') && contact.includes("/rest/v1/rpc/submit_contact"));
 
   // كمل#14: /api/contact يرفض المدخلات الخاطئة (دون أي كتابة في القاعدة)
-  const cbad = await fetch(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x", email: "not-an-email", message: "hello" }) });
+  const cbad = await req(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "x", email: "not-an-email", message: "hello" }) });
   chk("contact API 400 bad email", cbad.status === 400, "status " + cbad.status);
-  const cempty = await fetch(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+  const cempty = await req(BASE + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
   chk("contact API 400 empty", cempty.status === 400, "status " + cempty.status);
-  const about = await (await fetch(BASE + "/about/")).text();
+  const about = await (await req(BASE + "/about/")).text();
   chk("about AboutPage LD", about.includes('"@type":"AboutPage"'));
-  const footer = await (await fetch(BASE + "/")).text();
+  const footer = await (await req(BASE + "/")).text();
   chk("root footer → trust links", ["/about/", "/terms/", "/privacy/", "/contact/", "/ar/reciters/"]
     .every(h => footer.includes('href="' + h + '"')));
   // كمل#15: وسم GSC بالقيمة الدقيقة على الرئيسية (و79/79 في المراقبة)
   chk("GSC token exact on home", footer.includes('content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo"'));
   // كمل#15ب: ملف التحقق بأسلوب رفع الملف (يجب أن يبقى في الجذر)
-  const gv = await fetch(BASE + "/googleb789508316de731f.html");
+  const gv = await req(BASE + "/googleb789508316de731f.html");
   const gvt = gv.ok ? await gv.text() : "";
   chk("GSC html verify file", gv.status === 200 && gvt.trim() === "google-site-verification: googleb789508316de731f.html", "status " + gv.status);
 
   // كمل#17: صفحات المنصّات الثلاث (إنستغرام/واتساب/فيسبوك) + رابط ميّت مُزال
   let plat = [];
   for (const s of ["quran-video-instagram", "quran-video-whatsapp", "quran-video-facebook"]) {
-    const r = await fetch(BASE + "/ar/" + s + "/");
+    const r = await req(BASE + "/ar/" + s + "/");
     const t = r.ok ? await r.text() : "";
     if (!(r.status === 200 && t.includes('content="IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo"') && t.includes('rel="canonical"') && t.includes("FAQPage"))) plat.push(s + "=" + r.status);
   }
   chk("platform pages 200+GSC+canonical+LD", plat.length === 0, plat.join(","));
-  const tr = await (await fetch(BASE + "/ar/quran-video-with-translation/")).text();
+  const tr = await (await req(BASE + "/ar/quran-video-with-translation/")).text();
   chk("dead dawah link removed", !tr.includes("quran-reels-for-dawah"));
 
   // كمل#18: كلمات صفحة تمييز الكلمة + عدّاد رمضان الحيّ في الصفحة
-  const wh = await (await fetch(BASE + "/ar/quran-word-highlight/")).text();
+  const wh = await (await req(BASE + "/ar/quran-word-highlight/")).text();
   chk("word-highlight keyword present", wh.includes("كلمة-بكلمة") && wh.includes("FAQPage"), "len=" + wh.length);
-  const ram = await (await fetch(BASE + "/ar/kam-baqi/ramadan/")).text();
+  const ram = await (await req(BASE + "/ar/kam-baqi/ramadan/")).text();
   // كمل#19: صفحات الجذر وur/id — لغة صحيحة + GSC
-  const ur = await (await fetch(BASE + "/ur/quran-video-with-translation/")).text();
-  const idp = await (await fetch(BASE + "/id/video-quran-dengan-terjemahan/")).text();
+  const ur = await (await req(BASE + "/ur/quran-video-with-translation/")).text();
+  const idp = await (await req(BASE + "/id/video-quran-dengan-terjemahan/")).text();
   chk("ur/id lang+GSC+LD", ur.includes('<html lang="ur"') && idp.includes('<html lang="id"') &&
       ur.includes("IHmoe5") && idp.includes("IHmoe5") && ur.includes("FAQPage"));
   chk("ramadan countdown inline script", ram.includes('id="kbc"') && ram.includes("8 فبراير 2027") && ram.includes("setInterval"), "len=" + ram.length);
@@ -106,7 +124,7 @@ const chk = (name, cond, extra = "") => {
   const sample = ["/", "/ar/reciters/", "/about/", "/terms/", "/privacy/", "/en/"];
   let d404 = [];
   for (const p of sample) {
-    const r = await fetch(BASE + p);
+    const r = await req(BASE + p);
     if (r.status !== 200) d404.push(p + "=" + r.status);
   }
   chk("trust/hub sample 200", d404.length === 0, d404.join(","));
