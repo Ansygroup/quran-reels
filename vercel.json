@@ -137,7 +137,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://quge5.com https://3nbf4.com https://6opo.com https://vaimucuvikuwu.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.quge5.com https://*.3nbf4.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net https://quge5.com https://3nbf4.com https://6opo.com https://vaimucuvikuwu.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self' https://3nbf4.com; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self' https:; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         },
         {
           "key": "X-Frame-Options",
@@ -166,7 +166,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://quge5.com https://3nbf4.com https://6opo.com https://vaimucuvikuwu.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.quge5.com https://*.3nbf4.com; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://everyayah.com https://overpass-api.de https://overpass.osm.ch https://cdn.jsdelivr.net https://quge5.com https://3nbf4.com https://6opo.com https://vaimucuvikuwu.net; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self' https://3nbf4.com; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' blob: https://everyayah.com https://qurango.net; worker-src 'self' https:; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         },
         {
           "key": "X-Frame-Options",
