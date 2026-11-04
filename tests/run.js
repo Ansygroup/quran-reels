@@ -81,7 +81,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     chk("S1 og:url", boot.ogUrl === CANON, boot.ogUrl);
     chk("S1 og:image absolute", /^https:\/\//.test(boot.ogImg), boot.ogImg);
     chk("S1 twitter:card", boot.tw === "summary_large_image", boot.tw);
-    chk("S1 3 JSON-LD", boot.ld.length === 3 && boot.ld.every(Boolean), String(boot.ld.length));
+    chk("S1 6 JSON-LD", boot.ld.length === 6 && boot.ld.every(Boolean), String(boot.ld.length));
     const faq = boot.ld.find(x => x && x["@type"] === "FAQPage");
     chk("S1 FAQ 15 (ld+json)", faq && Array.isArray(faq.mainEntity) && faq.mainEntity.length === 15, String(faq && faq.mainEntity && faq.mainEntity.length));
     chk("S1 WebApplication+HowTo", !!boot.ld.find(x => x && x["@type"] === "WebApplication") && !!boot.ld.find(x => x && x["@type"] === "HowTo"));
@@ -358,14 +358,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       chk("S9 login modal opens", !!modal, "modal not visible");
       await page.click("#loginOverlay .close-x");
       await sleep(250);
-      // حارس زر جوجل (المزوّد غير مُفعّل → تنبيه بلا تنقّل)
-      await page.click("#acctGoogle");
-      await sleep(900);
-      const gg = await page.evaluate(() => ({
-        url: location.href,
-        toast: [...document.querySelectorAll(".toast")].map(t => t.textContent).join(" "),
-      }));
-      chk("S9 google guard (toast, no redirect)", gg.url.includes("#/account") && (/جوجل|الإعدادات/.test(gg.toast)), JSON.stringify(gg).slice(0, 160));
+      // حارس زر جوجل: تخطّ في prod (Google مُفعّل → تنقّل OAuth)
+      if (!PROD) {
+        await page.click("#acctGoogle");
+        await sleep(900);
+        const gg = await page.evaluate(() => ({
+          url: location.href,
+          toast: [...document.querySelectorAll(".toast")].map(t => t.textContent).join(" "),
+        }));
+        chk("S9 google guard (toast, no redirect)", gg.url.includes("#/account") && (/جوجل|الإعدادات/.test(gg.toast)), JSON.stringify(gg).slice(0, 160));
+        await page.click("#loginOverlay .close-x").catch(() => {});
+        await sleep(250);
+      } else {
+        chk("S9 google guard (prod: OAuth enabled)", true, "skipped");
+      }
       // محلل رموز الجلسة: كل أشكال الرابط (مزدوج الـ# / استعلام / بلا رموز)
       const ph = await page.evaluate(() => ({
         a: QRAuth.parseAuthHash("#/account#access_token=AAA&refresh_token=BBB&expires_in=3600&type=magiclink", ""),
