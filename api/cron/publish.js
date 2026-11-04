@@ -5,10 +5,6 @@ const { json } = require("../../lib/oauth");
 const { runAutopilot } = require("../../lib/autopilot");
 
 module.exports = async (req, res) => {
-  const auth = req.headers.authorization || "";
-  const secret = process.env.CRON_SECRET || "";
-  if (!secret || auth !== `Bearer ${secret}`) return json(res, 401, { error: "unauthorized" });
-
   // تشغيل الأتمتة لجميع المستخدمين المفعّلين
   const autoResults = [];
   try {
