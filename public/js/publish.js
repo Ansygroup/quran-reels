@@ -161,6 +161,7 @@ const QRPublish = (() => {
       location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
     });
     wrap.querySelectorAll("[data-disc]").forEach(b => b.onclick = async () => {
+      if (!confirm("هل تريد فك الربط؟")) return;
       const t = await QRAuth.token();
       await fetch("/api/social?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
       toast("تم فك الربط");
