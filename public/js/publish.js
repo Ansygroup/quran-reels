@@ -107,6 +107,13 @@ const QRPublish = (() => {
       return Array.isArray(rows) && rows[0] ? rows[0] : null;
     } catch { return null; }
   }
+  async function loadRuns() {
+    try {
+      const u = QRAuth.user(); if (!u) return [];
+      const rows = await sb(`/rest/v1/autopilot_runs?user_id=eq.${u.id}&order=created_at.desc&limit=20`);
+      return Array.isArray(rows) ? rows : [];
+    } catch { return []; }
+  }
   async function saveAuto(obj) {
     const u = QRAuth.user();
     await sb(`/rest/v1/autopilot?on_conflict=user_id`, {
@@ -204,28 +211,94 @@ const QRPublish = (() => {
 
   async function renderAuto() {
     const wrap = $id("acctAuto"); if (!wrap) return;
-    const a = await loadAuto() || { enabled: false, at_utc: "04:15:00", platforms: ["youtube"] };
+    const a = await loadAuto() || { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], youtube_connection_ids: [], template: {} };
     const plats = Array.isArray(a.platforms) ? a.platforms : ["youtube"];
-    const hhmm = (a.at_utc || "04:15:00").slice(0, 5);
+    const ytConns = conns.filter(c => c.platform === "youtube");
+    const selYt = Array.isArray(a.youtube_connection_ids) ? a.youtube_connection_ids : [];
+    const tmpl = a.template || {};
     wrap.innerHTML = `
       <div class="auto-head">
         <h3>🤖 الأتمتة — النشر التلقائي اليومي</h3>
         <label class="switch"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""}><i></i></label>
       </div>
-      <p class="hint">مهام «المستحقة» تُنشر آليًا يوميًا الساعة <b>06:15 بتوقيت القاهرة</b> (ويمكنك النشر الفوري دائمًا). اضبط وقت المهام عند الجدولة حسب ذلك.</p>
+      <p class="hint">تُنشر ريلز قرآنية آليًا يوميًا. الأتمتة تولّد فيديو وتختار آية عشوائيًا ثم تنشره على المنصات المختارة.</p>
       <div class="auto-row">
         <label>المنصات المفعّلة:</label>
         ${Object.entries(PLATFORMS).map(([k, p]) => `<label class="chk"><input type="checkbox" class="autoPlat" value="${k}" ${plats.includes(k) ? "checked" : ""}> ${p.icon} ${p.name}</label>`).join("")}
+      </div>
+      ${ytConns.length ? `
+      <div class="auto-row">
+        <label>قنوات YouTube للأتمتة:</label>
+        ${ytConns.map(c => `<label class="chk"><input type="checkbox" class="autoYt" value="${esc(c.id)}" ${selYt.includes(c.id) ? "checked" : ""}> 🎬 ${esc(c.account_name)}</label>`).join("")}
+      </div>` : ""}
+      <div class="auto-row">
+        <label>نمط المحتوى:</label>
+        <select id="autoContentMode" class="sel-sm">
+          <option value="mix" ${tmpl.content_mode === "mix" ? "selected" : ""}>مزيج (آيات + أدعية)</option>
+          <option value="ayah" ${tmpl.content_mode === "ayah" ? "selected" : ""}>آيات فقط</option>
+          <option value="dua" ${tmpl.content_mode === "dua" ? "selected" : ""}>أدعية فقط</option>
+        </select>
+      </div>
+      <div class="auto-row">
+        <label>نمط القارئ:</label>
+        <select id="autoReciterMode" class="sel-sm">
+          <option value="rotate" ${tmpl.reciter_mode === "rotate" ? "selected" : ""}>تناوب (عشوائي)</option>
+          <option value="fixed" ${tmpl.reciter_mode === "fixed" ? "selected" : ""}>ثابت</option>
+        </select>
+      </div>
+      <div class="auto-row">
+        <label>نمط الخلفية:</label>
+        <select id="autoBgMode" class="sel-sm">
+          <option value="rotate" ${tmpl.background === "rotate" ? "selected" : ""}>تناوب (عشوائي)</option>
+          <option value="fixed" ${tmpl.background === "fixed" ? "selected" : ""}>ثابت</option>
+        </select>
+      </div>
+      <div class="auto-row">
+        <label>رسالة مخصصة:</label>
+        <input type="text" id="autoMsg" class="inp-sm" value="${esc(tmpl.custom_message || "")}" placeholder="صدقه جارية...">
       </div>
       <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>`;
     $id("autoSave").onclick = async () => {
       const enabled = $id("autoOn").checked;
       const platforms = [...document.querySelectorAll(".autoPlat:checked")].map(x => x.value);
+      const ytIds = [...document.querySelectorAll(".autoYt:checked")].map(x => x.value);
+      const template = {
+        content_mode: $id("autoContentMode") ? $id("autoContentMode").value : "mix",
+        reciter_mode: $id("autoReciterMode") ? $id("autoReciterMode").value : "rotate",
+        background: $id("autoBgMode") ? $id("autoBgMode").value : "rotate",
+        custom_message: $id("autoMsg") ? $id("autoMsg").value : "",
+        privacy: "public",
+        purpose: "general",
+        reciter: "",
+        video_style: "rotate",
+      };
       try {
-        await saveAuto({ enabled, platforms, at_utc: (a.at_utc || "04:15:00") });
-        toast(enabled ? "الأتمتة مفعّلة 🤖" : "تم حفظ الإعدادات");
+        await saveAuto({ enabled, platforms, at_utc: (a.at_utc || "04:15:00"), youtube_connection_ids: ytIds, template });
+        toast(enabled ? "الأتمتة مفعّلة" : "تم حفظ الإعدادات");
+        renderRuns();
       } catch (e) { toast("تعذّر الحفظ", "err"); }
     };
+  }
+
+  async function renderRuns() {
+    const wrap = $id("acctRuns"); if (!wrap) return;
+    const runs = await loadRuns();
+    if (!runs.length) { wrap.innerHTML = `<div class="hint">لا توجد عمليات بعد.</div>`; return; }
+    wrap.innerHTML = runs.map(r => {
+      const d = new Date(r.created_at);
+      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+      const statusMap = { rendering: "⏳ جارٍ", queued: "🕐 في الانتظار", published: "✅ منشور", failed: "⚠️ فشل" };
+      const st = statusMap[r.status] || r.status;
+      const cls = r.status === "published" ? "ok" : r.status === "failed" ? "err" : "sch";
+      return `<div class="qrow">
+        <span class="qic">🤖</span>
+        <div class="qinfo">
+          <b>${esc(r.step || r.status)}</b>
+          <small>${when}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${r.video_path ? ` · ${esc(r.video_path.split("/").pop())}` : ""}</small>
+        </div>
+        <span class="qbadge ${cls}">${st}</span>
+      </div>`;
+    }).join("");
   }
 
   function renderAuthCard() {
@@ -290,10 +363,12 @@ const QRPublish = (() => {
     renderAuthCard();
     const u = QRAuth.user();
     if (u) { await loadConnections(); await loadQueue(); }
-    renderChannels(); renderQueue(); renderAuto();
+    renderChannels(); renderQueue(); renderAuto(); renderRuns();
     // بطاقة المهمة الجديدة
     const ns = $id("btnNewSched");
     if (ns) ns.onclick = () => $id("schedFile").click();
+    const br = $id("btnRefreshRuns");
+    if (br) br.onclick = () => renderRuns();
   }
 
   /* ---------- نافذة الجدولة ---------- */
