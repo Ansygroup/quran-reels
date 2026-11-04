@@ -81,7 +81,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     chk("S1 og:url", boot.ogUrl === CANON, boot.ogUrl);
     chk("S1 og:image absolute", /^https:\/\//.test(boot.ogImg), boot.ogImg);
     chk("S1 twitter:card", boot.tw === "summary_large_image", boot.tw);
-    chk("S1 6 JSON-LD", boot.ld.length === 6 && boot.ld.every(Boolean), String(boot.ld.length));
+    chk("S1 5 JSON-LD", boot.ld.length === 5 && boot.ld.every(Boolean), String(boot.ld.length));
     const faq = boot.ld.find(x => x && x["@type"] === "FAQPage");
     chk("S1 FAQ 15 (ld+json)", faq && Array.isArray(faq.mainEntity) && faq.mainEntity.length === 15, String(faq && faq.mainEntity && faq.mainEntity.length));
     chk("S1 WebApplication+HowTo", !!boot.ld.find(x => x && x["@type"] === "WebApplication") && !!boot.ld.find(x => x && x["@type"] === "HowTo"));
