@@ -356,6 +356,7 @@ const QRPublish = (() => {
       else if (k === "youtube_err_token") toast("فشل تبادل التوكن — تأكد من إعدادات Google Cloud", "err");
       else if (k === "youtube_err_norefresh") toast("لم يُمنح refresh token — أعد الموافقة مع جميع الصلاحيات", "err");
       else if (k === "youtube_err_channel") toast("تعذّر جلب القناة — تأكد من وجود قناة YouTube", "err");
+      else if (k === "youtube_err_store") toast("تم الربط لكن فشل حفظ البيانات — تحقق من RLS", "err");
       else if (k.endsWith("_err")) toast("تعذّر إتمام الربط — تأكد من الموافقة على الصلاحيات", "err");
       else if (k !== "undefined") toast("تم الربط بنجاح 🎉");
       history.replaceState(null, "", location.pathname + "#/account");
