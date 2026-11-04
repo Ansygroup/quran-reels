@@ -183,6 +183,10 @@
     {
       "path": "/api/cron/monitor",
       "schedule": "30 6 * * 1"
+    },
+    {
+      "path": "/api/autopilot",
+      "schedule": "0 4 * * *"
     }
   ],
   "functions": {
@@ -209,6 +213,9 @@
     },
     "api/oauth/callback.js": {
       "maxDuration": 30
+    },
+    "api/autopilot.js": {
+      "maxDuration": 300
     }
   }
 }
