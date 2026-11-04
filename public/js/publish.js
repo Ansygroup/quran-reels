@@ -114,6 +114,14 @@ const QRPublish = (() => {
       return Array.isArray(rows) ? rows : [];
     } catch { return []; }
   }
+  async function clearRuns() {
+    try {
+      const u = QRAuth.user(); if (!u) return;
+      await sb(`/rest/v1/autopilot_runs?user_id=eq.${u.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      toast("تم مسح السجل");
+      renderRuns();
+    } catch { toast("تعذّر المسح", "err"); }
+  }
   async function saveAuto(obj) {
     const u = QRAuth.user();
     await sb(`/rest/v1/autopilot?on_conflict=user_id`, {
@@ -149,7 +157,10 @@ const QRPublish = (() => {
           <small class="${linked ? "ok" : ""}">${linked ? "✓ " + sub : sub}</small>
         </div>
         ${linked
-          ? `<button class="btn btn-ghost btn-sm" data-disc="${c.id}">فك الربط</button>`
+          ? `<div style="display:flex;gap:4px">
+              <button class="btn btn-ghost btn-sm" data-test="${c.id}" title="اختبار">🔍</button>
+              <button class="btn btn-ghost btn-sm" data-disc="${c.id}">فك</button>
+            </div>`
           : `<button class="btn btn-em btn-sm" data-conn="${k}">اربط</button>`}
       </div>`;
     }).join("");
@@ -159,6 +170,13 @@ const QRPublish = (() => {
       if (!t) { openLogin(); return; }
       const pk = k === "facebook" ? "meta" : k;
       location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
+    });
+    // Channel health check
+    wrap.querySelectorAll("[data-test]").forEach(b => b.onclick = async () => {
+      const t = await QRAuth.token();
+      const r = await fetch("/api/social?op=test", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.test }) });
+      const j = await r.json().catch(() => ({}));
+      toast(j.ok ? "✓ الاتصال يعمل" : (j.error || "فشل الاتصال"), j.ok ? "" : "err");
     });
     wrap.querySelectorAll("[data-disc]").forEach(b => b.onclick = async () => {
       if (!confirm("هل تريد فك الربط؟")) return;
@@ -312,15 +330,18 @@ const QRPublish = (() => {
       const statusMap = { rendering: "⏳ جارٍ", queued: "🕐 في الانتظار", published: "✅ منشور", failed: "⚠️ فشل" };
       const st = statusMap[r.status] || r.status;
       const cls = r.status === "published" ? "ok" : r.status === "failed" ? "err" : "sch";
+      const channel = r.channel_name ? ` · ${esc(r.channel_name)}` : "";
       return `<div class="qrow">
         <span class="qic">🤖</span>
         <div class="qinfo">
-          <b>${esc(r.step || r.status)}</b>
+          <b>${esc(r.step || r.status)}${channel}</b>
           <small>${when}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${r.video_path ? ` · ${esc(r.video_path.split("/").pop())}` : ""}</small>
         </div>
         <span class="qbadge ${cls}">${st}</span>
       </div>`;
-    }).join("");
+    }).join("") + `<div style="margin-top:8px;text-align:center"><button class="btn btn-ghost btn-sm" id="btnClearRuns">🗑️ مسح السجل</button></div>`;
+    const cr = $id("btnClearRuns");
+    if (cr) cr.onclick = () => { if (confirm("مسح كل السجل؟")) clearRuns(); };
   }
 
   function renderAuthCard() {
