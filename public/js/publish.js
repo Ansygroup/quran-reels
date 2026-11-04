@@ -154,7 +154,7 @@ const QRPublish = (() => {
         <div class="chan-ic">${p.icon}</div>
         <div class="chan-info">
           <b>${p.name}</b>
-          <small class="${linked ? "ok" : ""}">${linked ? "✓ " + sub : sub}</small>
+          <small class="${linked ? "ok" : ""}">${linked ? "✓ " + sub + (c.expires_at && Number(c.expires_at) < Date.now() ? " ⚠️ منتهي" : "") : sub}</small>
         </div>
         ${linked
           ? `<div style="display:flex;gap:4px">
