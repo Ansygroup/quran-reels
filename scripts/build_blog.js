@@ -100,6 +100,8 @@ function articlePage(a) {
 ${a.faq.map(([q, x]) => `{"@type":"Question","name":${JSON.stringify(q)},"acceptedAnswer":{"@type":"Answer","text":${JSON.stringify(x)}}}`).join(",\n")}
 ]}
 </script>${extraLd}
+<script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
+<script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
 </head>
 <body>
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
@@ -175,6 +177,8 @@ function hubPage(articles) {
 ${articles.map(a => `{"@type":"BlogPosting","headline":${JSON.stringify(a.title)},"url":"${ORIGIN}/blog/${a.slug}/","datePublished":"${PUB}","author":{"@type":"Organization","name":"قرآن ريلز"}}`).join(",\n")}
 ]}
 </script>
+<script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
+<script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
 </head>
 <body>
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>

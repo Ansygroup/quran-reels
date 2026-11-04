@@ -3030,6 +3030,8 @@ ${p.faq.map(([q, a]) => `{"@type":"Question","name":${JSON.stringify(q)},"accept
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"الرئيسية","item":"${ORIGIN}/"},{"@type":"ListItem","position":2,"name":${JSON.stringify(p.h1)},"item":"${ORIGIN}${PUB}"}]}
 </script>
+<script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
+<script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
 </head>
 <body>
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
