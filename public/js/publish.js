@@ -257,7 +257,27 @@ const QRPublish = (() => {
         <label>رسالة مخصصة:</label>
         <input type="text" id="autoMsg" class="inp-sm" value="${esc(tmpl.custom_message || "")}" placeholder="صدقه جارية...">
       </div>
-      <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>`;
+      <div class="auto-row">
+        <label>وقت النشر (UTC):</label>
+        <input type="time" id="autoTime" class="inp-sm" value="${hhmm}">
+      </div>
+      <div class="auto-row" style="gap:8px">
+        <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>
+        <button class="btn btn-em btn-sm" id="autoRunNow">▶ تشغيل الآن</button>
+      </div>`;
+    const runBtn = $id("autoRunNow");
+    if (runBtn) runBtn.onclick = async () => {
+      runBtn.disabled = true; runBtn.textContent = "…";
+      try {
+        const t = await QRAuth.token();
+        const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ autopilot: true }) });
+        const j = await r.json().catch(() => ({}));
+        if (j.ok) toast("تم تشغيل الأتمتة ✓");
+        else toast(j.error || "تم تشغيل الأتمتة ✓");
+      } catch (e) { toast(String(e.message || e), "err"); }
+      runBtn.disabled = false; runBtn.textContent = "▶ تشغيل الآن";
+      renderRuns();
+    };
     $id("autoSave").onclick = async () => {
       const enabled = $id("autoOn").checked;
       const platforms = [...document.querySelectorAll(".autoPlat:checked")].map(x => x.value);
@@ -272,9 +292,10 @@ const QRPublish = (() => {
         reciter: "",
         video_style: "rotate",
       };
+      const atUtc = $id("autoTime") ? $id("autoTime").value + ":00" : (a.at_utc || "04:15:00");
       try {
-        await saveAuto({ enabled, platforms, at_utc: (a.at_utc || "04:15:00"), youtube_connection_ids: ytIds, template });
-        toast(enabled ? "الأتمتة مفعّلة" : "تم حفظ الإعدادات");
+        await saveAuto({ enabled, platforms, at_utc: atUtc, youtube_connection_ids: ytIds, template });
+        toast(enabled ? "الأتمتة مفعّلة 🤖" : "تم حفظ الإعدادات");
         renderRuns();
       } catch (e) { toast("تعذّر الحفظ", "err"); }
     };

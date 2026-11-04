@@ -657,6 +657,8 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 .qacts{display:flex;gap:6px}
 .auto-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .auto-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:12px 0}
+.sel-sm, .inp-sm { padding:6px 10px; font-size:.85rem; border-radius:8px; min-width:120px; }
+.inp-sm { min-width:180px; }
 .chk{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);cursor:pointer}
 .notice-card{border-color:rgba(212,175,55,.5);background:rgba(212,175,55,.07);margin-top:16px;line-height:1.9}
 .setup-list{margin:8px 0 0;padding-inline-start:20px}
