@@ -417,6 +417,8 @@ const QRPublish = (() => {
     if (ns) ns.onclick = () => $id("schedFile").click();
     const br = $id("btnRefreshRuns");
     if (br) br.onclick = () => renderRuns();
+    const ba = $id("btnRefreshAcct");
+    if (ba) ba.onclick = () => refreshAccount();
   }
 
   /* ---------- نافذة الجدولة ---------- */
