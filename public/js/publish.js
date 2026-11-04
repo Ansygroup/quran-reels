@@ -333,6 +333,7 @@ const QRPublish = (() => {
       const cls = r.status === "published" ? "ok" : r.status === "failed" ? "err" : "sch";
       const channel = r.channel_name ? ` · ${esc(r.channel_name)}` : "";
       const canRerun = r.status === "failed" && r.run_key;
+      const hasVideo = !!r.video_path;
       return `<div class="qrow">
         <span class="qic">🤖</span>
         <div class="qinfo">
@@ -340,6 +341,7 @@ const QRPublish = (() => {
           <small>${when}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${r.video_path ? ` · ${esc(r.video_path.split("/").pop())}` : ""}</small>
         </div>
         <span class="qbadge ${cls}">${st}</span>
+        ${hasVideo ? `<a class="btn btn-ghost btn-sm" href="https://lbblhpscncqsyzvuujpw.supabase.co/storage/v1/object/public/reels/${esc(r.video_path)}" target="_blank" download>⬇️</a>` : ""}
         ${canRerun ? `<button class="btn btn-ghost btn-sm" data-rerun="${r.id}">↻ إعادة</button>` : ""}
       </div>`;
     }).join("") + `<div style="margin-top:8px;text-align:center"><button class="btn btn-ghost btn-sm" id="btnClearRuns">🗑️ مسح السجل</button></div>`;
