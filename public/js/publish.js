@@ -235,6 +235,7 @@ const QRPublish = (() => {
     const ytConns = conns.filter(c => c.platform === "youtube");
     const selYt = Array.isArray(a.youtube_connection_ids) ? a.youtube_connection_ids : [];
     const tmpl = a.template || {};
+    const hhmm = (a.at_utc || "04:15:00").slice(0, 5);
     wrap.innerHTML = `
       <div class="auto-head">
         <h3>🤖 الأتمتة — النشر التلقائي اليومي</h3>
@@ -331,6 +332,7 @@ const QRPublish = (() => {
       const st = statusMap[r.status] || r.status;
       const cls = r.status === "published" ? "ok" : r.status === "failed" ? "err" : "sch";
       const channel = r.channel_name ? ` · ${esc(r.channel_name)}` : "";
+      const canRerun = r.status === "failed" && r.run_key;
       return `<div class="qrow">
         <span class="qic">🤖</span>
         <div class="qinfo">
@@ -338,10 +340,17 @@ const QRPublish = (() => {
           <small>${when}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${r.video_path ? ` · ${esc(r.video_path.split("/").pop())}` : ""}</small>
         </div>
         <span class="qbadge ${cls}">${st}</span>
+        ${canRerun ? `<button class="btn btn-ghost btn-sm" data-rerun="${r.id}">↻ إعادة</button>` : ""}
       </div>`;
     }).join("") + `<div style="margin-top:8px;text-align:center"><button class="btn btn-ghost btn-sm" id="btnClearRuns">🗑️ مسح السجل</button></div>`;
     const cr = $id("btnClearRuns");
     if (cr) cr.onclick = () => { if (confirm("مسح كل السجل؟")) clearRuns(); };
+    wrap.querySelectorAll("[data-rerun]").forEach(b => b.onclick = async () => {
+      const t = await QRAuth.token();
+      await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ autopilot: true }) });
+      toast("تم إعادة التشغيل");
+      renderRuns();
+    });
   }
 
   function renderAuthCard() {
