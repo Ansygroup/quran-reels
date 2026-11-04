@@ -352,7 +352,11 @@ const QRPublish = (() => {
     } else if (mLinked) {
       wrap.hidden = true;
       const k = mLinked[1];
-      if (k.endsWith("_err")) toast("تعذّر إتمام الربط — تأكد من الموافقة على الصلاحيات", "err");
+      if (k === "youtube_err_state") toast("انتهت صلاحية الجلسة — أعد المحاولة", "err");
+      else if (k === "youtube_err_token") toast("فشل تبادل التوكن — تأكد من إعدادات Google Cloud", "err");
+      else if (k === "youtube_err_norefresh") toast("لم يُمنح refresh token — أعد الموافقة مع جميع الصلاحيات", "err");
+      else if (k === "youtube_err_channel") toast("تعذّر جلب القناة — تأكد من وجود قناة YouTube", "err");
+      else if (k.endsWith("_err")) toast("تعذّر إتمام الربط — تأكد من الموافقة على الصلاحيات", "err");
       else if (k !== "undefined") toast("تم الربط بنجاح 🎉");
       history.replaceState(null, "", location.pathname + "#/account");
     } else wrap.hidden = true;
