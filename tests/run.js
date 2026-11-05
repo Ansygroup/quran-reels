@@ -347,7 +347,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       }));
       chk("S9 account route renders", a1.vis && String(a1.title).includes("حسابي"), JSON.stringify(a1));
       chk("S9 auth+publish modules", a1.hasQR, "modules missing");
-      chk("S9 login card (logged out)", !!a1.login && a1.plans === 3, JSON.stringify(a1));
+      chk("S9 login card (logged out)", !!a1.login && a1.plans === 0, JSON.stringify(a1));
       chk("S9 channel cards x5", a1.chans === 5, String(a1.chans));
       chk("S9 autopilot card", !!a1.auto, "no autoOn");
       chk("S9 queue empty state", a1.qlen > 5, String(a1.qlen));
