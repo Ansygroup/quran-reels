@@ -201,27 +201,49 @@ const QRPublish = (() => {
     });
   }
 
-  function renderQueue() {
+  async function renderQueue() {
     const wrap = $id("acctQueue"); if (!wrap) return;
-    if (!queue.length) { wrap.innerHTML = `<div class="hint">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
-    wrap.innerHTML = queue.map(r => {
-      const p = PLATFORMS[r.platform] || { name: r.platform, icon: "•" };
-      const d = new Date(r.publish_at);
-      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
-      const canAct = r.status === "scheduled" || r.status === "failed";
-      return `<div class="qrow">
-        <span class="qic">${p.icon}</span>
-        <div class="qinfo">
-          <b>${esc(r.title || "ريلز")}</b>
-          <small>${p.name} · ${when}${r.error ? ` · <i class="qerr">${esc(r.error.slice(0, 90))}</i>` : ""}${r.external_url ? ` · <a href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</small>
-        </div>
-        ${statusBadge(r)}
-        <div class="qacts">
-          ${canAct ? `<button class="btn btn-gold btn-sm" data-pub="${r.id}">انشر الآن</button>` : ""}
-          <button class="btn btn-ghost btn-sm" data-del="${r.id}">حذف</button>
+    if (!queue.length) { wrap.innerHTML = `<div class="hint" style="padding:20px;text-align:center">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
+    const cols = [
+      { key: "scheduled", label: "🕐 مجدولة", cls: "sch" },
+      { key: "publishing", label: "⏳ تُنشر", cls: "sch" },
+      { key: "published", label: "✅ منشورة", cls: "ok" },
+      { key: "failed", label: "⚠️ فشلت", cls: "err" },
+    ];
+    const byStatus = {};
+    for (const c of cols) byStatus[c.key] = [];
+    for (const r of queue) {
+      const st = r.status === "draft" ? "scheduled" : r.status;
+      if (byStatus[st]) byStatus[st].push(r); else byStatus.scheduled.push(r);
+    }
+    wrap.innerHTML = `<div class="kanban-cols">${cols.map(col => {
+      const items = byStatus[col.key] || [];
+      return `<div class="kanban-col">
+        <div class="kanban-col-head ${col.cls}">${col.label} <span class="kanban-count">${items.length}</span></div>
+        <div class="kanban-col-body">
+          ${items.map(r => {
+            const p = PLATFORMS[r.platform] || { name: r.platform, icon: "•" };
+            const d = new Date(r.publish_at);
+            const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+            const canAct = r.status === "scheduled" || r.status === "failed";
+            return `<div class="kanban-card">
+              <div class="kc-head">
+                <span class="kc-icon">${p.icon}</span>
+                <b>${esc(r.title || "ريلز")}</b>
+              </div>
+              <small class="kc-meta">${p.name} · ${when}</small>
+              ${r.error ? `<small class="kc-err">${esc(r.error.slice(0, 60))}</small>` : ""}
+              ${r.external_url ? `<a class="kc-link" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}
+              <div class="kc-acts">
+                ${canAct ? `<button class="btn btn-gold btn-sm" data-pub="${r.id}">انشر الآن</button>` : ""}
+                <button class="btn btn-ghost btn-sm" data-del="${r.id}">حذف</button>
+              </div>
+            </div>`;
+          }).join("")}
+          ${!items.length ? `<div class="kanban-empty">لا مهام</div>` : ""}
         </div>
       </div>`;
-    }).join("");
+    }).join("")}</div>`;
     wrap.querySelectorAll("[data-pub]").forEach(b => b.onclick = () => publishNow(b.dataset.pub, b));
     wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
       const u = QRAuth.user();
