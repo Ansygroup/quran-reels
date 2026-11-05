@@ -642,7 +642,9 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 .chan-info{display:flex;flex-direction:column;min-width:0;flex:1}
 .chan-info small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chan-info small.ok{color:#7ee0a2}
-.kanban-board{margin-top:10px}
+.kanban-channels{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-2);margin-bottom:8px}
+.kc-label{font-size:.8rem;color:var(--muted);font-weight:600}
+.kc-chip{background:rgba(255,255,255,.08);border:1px solid var(--line-2);border-radius:99px;padding:3px 10px;font-size:.78rem;display:inline-flex;align-items:center;gap:4px}
 .kanban-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
 .kanban-col{background:var(--panel-2,var(--panel));border:1px solid var(--line-2);border-radius:14px;overflow:hidden}
 .kanban-col-head{padding:10px 12px;font-weight:700;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line-2)}

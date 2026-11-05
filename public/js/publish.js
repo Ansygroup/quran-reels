@@ -203,7 +203,16 @@ const QRPublish = (() => {
 
   async function renderQueue() {
     const wrap = $id("acctQueue"); if (!wrap) return;
-    if (!queue.length) { wrap.innerHTML = `<div class="hint" style="padding:20px;text-align:center">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
+    // عرض القنوات المربوطة في أعلى جدول النشر
+    const chanSummary = conns.length ? `<div class="kanban-channels">
+      <span class="kc-label">القنوات المربوطة:</span>
+      ${conns.map(c => {
+        const p = PLATFORMS[c.platform] || { name: c.platform, icon: "•" };
+        return `<span class="kc-chip">${p.icon} ${esc(c.account_name)}</span>`;
+      }).join("")}
+      ${conns.filter(c => c.platform === "youtube").length > 1 ? `<span class="kc-chip" style="background:rgba(212,175,55,.15)">🎬 ${conns.filter(c => c.platform === "youtube").length} قنوات YouTube</span>` : ""}
+    </div>` : `<div class="hint" style="padding:8px 0">لا توجد قنوات مربوطة — اربط من "ربط المنصات" أعلاه.</div>`;
+    if (!queue.length) { wrap.innerHTML = chanSummary + `<div class="hint" style="padding:20px;text-align:center">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
     const cols = [
       { key: "scheduled", label: "🕐 مجدولة", cls: "sch" },
       { key: "publishing", label: "⏳ تُنشر", cls: "sch" },
@@ -216,7 +225,7 @@ const QRPublish = (() => {
       const st = r.status === "draft" ? "scheduled" : r.status;
       if (byStatus[st]) byStatus[st].push(r); else byStatus.scheduled.push(r);
     }
-    wrap.innerHTML = `<div class="kanban-cols">${cols.map(col => {
+    wrap.innerHTML = chanSummary + `<div class="kanban-cols">${cols.map(col => {
       const items = byStatus[col.key] || [];
       return `<div class="kanban-col">
         <div class="kanban-col-head ${col.cls}">${col.label} <span class="kanban-count">${items.length}</span></div>
