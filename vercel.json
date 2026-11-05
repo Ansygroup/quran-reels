@@ -178,7 +178,7 @@
   "crons": [
     {
       "path": "/api/cron/publish",
-      "schedule": "15 4 * * *"
+      "schedule": "0 0,8,16 * * *"
     },
     {
       "path": "/api/cron/monitor",

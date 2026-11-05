@@ -314,8 +314,14 @@ const QRPublish = (() => {
         <input type="text" id="autoMsg" class="inp-sm" value="${esc(tmpl.custom_message || "")}" placeholder="صدقه جارية...">
       </div>
       <div class="auto-row">
-        <label>وقت النشر (UTC):</label>
-        <input type="time" id="autoTime" class="inp-sm" value="${hhmm}">
+        <label>عدد الفيديوهات يوميًا:</label>
+        <select id="autoDailyCount" class="sel-sm">
+          <option value="1" ${a.daily_count == 1 ? "selected" : ""}>1 فيديو</option>
+          <option value="2" ${a.daily_count == 2 ? "selected" : ""}>2 فيديو</option>
+          <option value="3" ${a.daily_count == 3 ? "selected" : ""}>3 فيديوهات</option>
+          <option value="4" ${a.daily_count == 4 ? "selected" : ""}>4 فيديوهات</option>
+        </select>
+        <small class="hint" style="margin-inline-start:8px">موزّعة على 24 ساعة (0:00، 8:00، 16:00 UTC)</small>
       </div>
       <div class="auto-row" style="gap:8px">
         <button class="btn btn-gold" id="autoSave">حفظ الأتمتة</button>
@@ -348,9 +354,10 @@ const QRPublish = (() => {
         reciter: "",
         video_style: "rotate",
       };
-      const atUtc = $id("autoTime") ? $id("autoTime").value + ":00" : (a.at_utc || "04:15:00");
+      const atUtc = "00:00:00";
+      const dailyCount = $id("autoDailyCount") ? parseInt($id("autoDailyCount").value) : (a.daily_count || 3);
       try {
-        await saveAuto({ enabled, platforms, at_utc: atUtc, youtube_connection_ids: ytIds, template });
+        await saveAuto({ enabled, platforms, at_utc: atUtc, youtube_connection_ids: ytIds, template, daily_count: dailyCount });
         toast(enabled ? "الأتمتة مفعّلة 🤖" : "تم حفظ الإعدادات");
         renderRuns();
       } catch (e) { toast("تعذّر الحفظ", "err"); }
@@ -368,12 +375,13 @@ const QRPublish = (() => {
       const st = statusMap[r.status] || r.status;
       const cls = r.status === "published" ? "ok" : r.status === "failed" ? "err" : "sch";
       const channel = r.channel_name ? ` · ${esc(r.channel_name)}` : "";
+      const daily = r.daily_total > 1 ? ` (${r.daily_index}/${r.daily_total})` : "";
       const canRerun = r.status === "failed" && r.run_key;
       const hasVideo = !!r.video_path;
       return `<div class="qrow">
         <span class="qic">🤖</span>
         <div class="qinfo">
-          <b>${esc(r.step || r.status)}${channel}</b>
+          <b>${esc(r.step || r.status)}${channel}${daily}</b>
           <small>${when}${r.error ? ` · <i class="qerr">${esc(String(r.error).slice(0, 90))}</i>` : ""}${r.video_path ? ` · ${esc(r.video_path.split("/").pop())}` : ""}</small>
         </div>
         <span class="qbadge ${cls}">${st}</span>
