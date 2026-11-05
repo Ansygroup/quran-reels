@@ -646,6 +646,11 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 .kc-label{font-size:.8rem;color:var(--muted);font-weight:600}
 .kc-chip{background:rgba(255,255,255,.08);border:1px solid var(--line-2);border-radius:99px;padding:3px 10px;font-size:.78rem;display:inline-flex;align-items:center;gap:4px}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.cal-day{background:var(--panel-2,var(--panel));border:1px solid var(--line-2);border-radius:8px;padding:6px;min-height:40px;font-size:.75rem;text-align:center}
+.cal-day.has-post{background:rgba(212,175,55,.12);border-color:var(--gold)}
+.cal-day.today{border-color:#7ee0a2}
+.cal-head{font-size:.7rem;color:var(--muted);text-align:center;padding:4px}
 .kanban-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
 .stat-card{background:var(--panel-2,var(--panel));border:1px solid var(--line-2);border-radius:12px;padding:14px;text-align:center}
 .stat-card b{display:block;font-size:1.6rem;font-weight:800;color:var(--gold)}

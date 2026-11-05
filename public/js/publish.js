@@ -566,6 +566,63 @@ const QRPublish = (() => {
     };
     reader.readAsText(file);
   }
+    /* ---------- تقويم المحتوى ---------- */
+  let calDate = new Date();
+  function renderCalendar() {
+    const wrap = $id("contentCalendar"); if (!wrap) return;
+    const y = calDate.getFullYear(), m = calDate.getMonth();
+    const monthName = calDate.toLocaleString("ar-EG", { month: "long", year: "numeric" });
+    const cm = $id("calMonth"); if (cm) cm.textContent = monthName;
+    const first = new Date(y, m, 1);
+    const last = new Date(y, m + 1, 0);
+    const startDay = first.getDay();
+    const days = last.getDate();
+    const postsByDay = {};
+    for (const r of queue) {
+      const d = new Date(r.publish_at);
+      if (d.getFullYear() === y && d.getMonth() === m) {
+        const day = d.getDate();
+        if (!postsByDay[day]) postsByDay[day] = [];
+        postsByDay[day].push(r);
+      }
+    }
+    const today = new Date();
+    const heads = ["أحد", "إثن", "ثلا", "أرب", "خمس", "جمع", "سبت"];
+    let html = heads.map(h => `<div class="cal-head">${h}</div>`).join("");
+    for (let i = 0; i < startDay; i++) html += `<div class="cal-day"></div>`;
+    for (let d = 1; d <= days; d++) {
+      const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+      const hasPost = postsByDay[d];
+      html += `<div class="cal-day${hasPost ? " has-post" : ""}${isToday ? " today" : ""}" title="${hasPost ? hasPost.length + " منشور" : ""}">${d}${hasPost ? `<br><small>${hasPost.length}</small>` : ""}</div>`;
+    }
+    wrap.innerHTML = html;
+  }
+
+  /* ---------- مكتبة الفيديو ---------- */
+  async function renderVideoLibrary() {
+    const wrap = $id("videoLibrary"); if (!wrap) return;
+    const u = QRAuth.user(); if (!u) { wrap.innerHTML = `<div class="hint">سجّل الدخول لعرض الفيديوهات.</div>`; return; }
+    try {
+      const t = await QRAuth.token();
+      const c = await QRAuth.conf();
+      const r = await fetch(`${c.url}/storage/v1/object/list/reels`, {
+        method: "POST", headers: { apikey: c.anonKey || "", Authorization: "Bearer " + t, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: u.id + "/", limit: 50, sortBy: { column: "created_at", order: "desc" } })
+      });
+      const files = await r.json();
+      if (!Array.isArray(files) || !files.length) { wrap.innerHTML = `<div class="hint">لا توجد فيديوهات بعد.</div>`; return; }
+      wrap.innerHTML = files.map(f => {
+        const name = f.name || f.id || "";
+        const size = f.metadata?.size ? (f.metadata.size / 1024 / 1024).toFixed(1) + " MB" : "";
+        const url = `${c.url}/storage/v1/object/public/reels/${u.id}/${name}`;
+        return `<div class="qrow">
+          <span class="qic">🎬</span>
+          <div class="qinfo"><b>${esc(name)}</b><small>${size}</small></div>
+          <a class="btn btn-ghost btn-sm" href="${url}" target="_blank" download>⬇️</a>
+        </div>`;
+      }).join("");
+    } catch { wrap.innerHTML = `<div class="hint">تعذّر تحميل المكتبة.</div>`; }
+  }
     async function refreshAccount() {
     renderNotice();
     renderAuthCard();
@@ -573,6 +630,7 @@ const QRPublish = (() => {
     if (u) { await loadConnections(); await loadQueue(); }
     renderChannels(); renderQueue(); renderAuto(); renderRuns();
     renderStats(); renderTemplates(); renderActivity();
+    renderCalendar(); renderVideoLibrary();
     // تحميل إعدادات الإشعارات
     const ns2 = loadNotif();
     const n1 = $id("notifSuccess"); if (n1 && ns2.success !== undefined) n1.checked = ns2.success;
@@ -585,6 +643,11 @@ const QRPublish = (() => {
     if (br) br.onclick = () => renderRuns();
     const ba = $id("btnRefreshAcct");
     if (ba) ba.onclick = () => refreshAccount();
+    // تقويم
+    const bp = $id("btnPrevMonth"); if (bp) bp.onclick = () => { calDate.setMonth(calDate.getMonth() - 1); renderCalendar(); };
+    const bn = $id("btnNextMonth"); if (bn) bn.onclick = () => { calDate.setMonth(calDate.getMonth() + 1); renderCalendar(); };
+    // مكتبة
+    const brl = $id("btnRefreshLib"); if (brl) brl.onclick = () => renderVideoLibrary();
     // قوالب
     const bst = $id("btnSaveTpl"); if (bst) bst.onclick = saveTemplate;
     // إشعارات
