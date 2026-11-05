@@ -488,6 +488,17 @@
     <div id="acctNotice" class="card notice-card" hidden></div>
     <div id="acctAuth"></div>
 
+    <!-- إحصائيات الأداء -->
+    <div class="card" style="margin-top:16px" id="acctStats">
+      <div class="auto-head"><h2>📊 إحصائيات الأداء</h2></div>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><b id="statPublished">0</b><small>منشور</small></div>
+        <div class="stat-card"><b id="statFailed">0</b><small>فشل</small></div>
+        <div class="stat-card"><b id="statScheduled">0</b><small>مجدول</small></div>
+        <div class="stat-card"><b id="statSuccess">0%</b><small>نسبة النجاح</small></div>
+      </div>
+    </div>
+
     <div class="plans-row">
       <div class="plan-card"><b>مجاني</b><span class="price">٠</span><ul><li>إنشاء بلا حدود</li><li>حفظ وجدولة النشر</li><li>ربط منصة واحدة</li></ul></div>
       <div class="plan-card hot"><b>برو</b><span class="price">قريبًا</span><ul><li>كل المجاني</li><li>5 منصات معًا</li><li>أولوية نشر</li></ul></div>
@@ -513,8 +524,49 @@
       <div class="auto-head"><h2>📜 سجل الأتمتة</h2>
         <button class="btn btn-ghost btn-sm" id="btnRefreshRuns">🔄 تحديث</button></div>
       <div id="acctRuns" class="qlist"><div class="hint">لا توجد عمليات بعد.</div></div>
-    </div>
-  </section>
+      </div>
+
+      <!-- قوالب البوستات -->
+      <div class="card" style="margin-top:16px">
+        <div class="auto-head"><h2>📝 قوالب البوستات</h2>
+          <button class="btn btn-gold btn-sm" id="btnSaveTpl">+ حفظ قالب</button></div>
+        <p class="hint">احفظ قوالب بوستات لإعادة استخدامها بسرعة.</p>
+        <div id="tplList" class="qlist"><div class="hint">لا توجد قوالب بعد.</div></div>
+      </div>
+
+      <!-- إعدادات الإشعارات -->
+      <div class="card" style="margin-top:16px">
+        <div class="auto-head"><h2>🔔 الإشعارات</h2></div>
+        <div class="auto-row">
+          <label class="chk"><input type="checkbox" id="notifSuccess" checked> إشعار عند نشر ناجح</label>
+        </div>
+        <div class="auto-row">
+          <label class="chk"><input type="checkbox" id="notifFail" checked> إشعار عند فشل نشر</label>
+        </div>
+        <div class="auto-row">
+          <label class="chk"><input type="checkbox" id="notifDaily"> تقرير يومي (ملخص الأتمتة)</label>
+        </div>
+        <button class="btn btn-em btn-sm" id="btnSaveNotif" style="margin-top:8px">حفظ</button>
+      </div>
+
+      <!-- سجل النشاط -->
+      <div class="card" style="margin-top:16px">
+        <div class="auto-head"><h2>📋 سجل النشاط</h2>
+          <button class="btn btn-ghost btn-sm" id="btnClearActivity">🗑️ مسح</button></div>
+        <div id="activityLog" class="qlist"><div class="hint">لا توجد أنشطة بعد.</div></div>
+      </div>
+
+      <!-- تصدير/استيراد -->
+      <div class="card" style="margin-top:16px">
+        <div class="auto-head"><h2>💾 النسخ الاحتياطي</h2></div>
+        <p class="hint">صدّر إعداداتك وقوالبك وجدولك كملف JSON، أو استوردها على جهاز آخر.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-gold btn-sm" id="btnExport">⬇️ تصدير</button>
+          <button class="btn btn-em btn-sm" id="btnImport">⬆️ استيراد</button>
+          <input type="file" id="importFile" accept=".json" hidden>
+        </div>
+      </div>
+      </section>
 </div>
 
 <!-- ================= الفوتر ================= -->

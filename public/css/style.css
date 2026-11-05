@@ -645,7 +645,12 @@ table.tbl tr:hover td{background:rgba(255,255,255,.03)}
 .kanban-channels{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-2);margin-bottom:8px}
 .kc-label{font-size:.8rem;color:var(--muted);font-weight:600}
 .kc-chip{background:rgba(255,255,255,.08);border:1px solid var(--line-2);border-radius:99px;padding:3px 10px;font-size:.78rem;display:inline-flex;align-items:center;gap:4px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
 .kanban-cols{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.stat-card{background:var(--panel-2,var(--panel));border:1px solid var(--line-2);border-radius:12px;padding:14px;text-align:center}
+.stat-card b{display:block;font-size:1.6rem;font-weight:800;color:var(--gold)}
+.stat-card small{color:var(--muted);font-size:.78rem}
+@media (max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
 .kanban-col{background:var(--panel-2,var(--panel));border:1px solid var(--line-2);border-radius:14px;overflow:hidden}
 .kanban-col-head{padding:10px 12px;font-weight:700;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line-2)}
 .kanban-col-head.sch{background:rgba(212,175,55,.08);color:var(--gold)}

@@ -268,7 +268,7 @@ const QRPublish = (() => {
       const t = await QRAuth.token();
       const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
       const j = await r.json().catch(() => ({}));
-      if (j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
+      if (j.ok) { toast("تم النشر بنجاح 🎉"); logActivity("نشر ناجح: " + (id || "")); } else { toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err"); logActivity("فشل نشر: " + (j.error || "")); }
     } catch (e) { toast(String(e.message || e), "err"); }
     refreshAccount();
   }
@@ -373,6 +373,19 @@ const QRPublish = (() => {
     };
   }
 
+  async function renderStats() {
+    const runs = await loadRuns();
+    const pub = runs.filter(r => r.status === "published").length;
+    const fail = runs.filter(r => r.status === "failed").length;
+    const sched = queue.filter(r => r.status === "scheduled" || r.status === "draft").length;
+    const total = pub + fail;
+    const rate = total > 0 ? Math.round((pub / total) * 100) : 0;
+    const sp = $id("statPublished"); if (sp) sp.textContent = pub;
+    const sf = $id("statFailed"); if (sf) sf.textContent = fail;
+    const ss = $id("statScheduled"); if (ss) ss.textContent = sched;
+    const sr = $id("statSuccess"); if (sr) sr.textContent = rate + "%";
+  }
+
   async function renderRuns() {
     const wrap = $id("acctRuns"); if (!wrap) return;
     const runs = await loadRuns();
@@ -470,12 +483,101 @@ const QRPublish = (() => {
     } else wrap.hidden = true;
   }
 
-  async function refreshAccount() {
+  /* ---------- قوالب البوستات ---------- */
+  const TPL_KEY = "qr_post_templates";
+  function loadTemplates() { try { return JSON.parse(localStorage.getItem(TPL_KEY) || "[]"); } catch { return []; } }
+  function saveTemplates(t) { localStorage.setItem(TPL_KEY, JSON.stringify(t)); }
+  function renderTemplates() {
+    const wrap = $id("tplList"); if (!wrap) return;
+    const tpls = loadTemplates();
+    if (!tpls.length) { wrap.innerHTML = `<div class="hint">لا توجد قوالب بعد.</div>`; return; }
+    wrap.innerHTML = tpls.map((t, i) => `<div class="qrow">
+      <span class="qic">📝</span>
+      <div class="qinfo"><b>${esc(t.name)}</b><small>${esc(t.title || "").slice(0, 60)}</small></div>
+      <button class="btn btn-ghost btn-sm" data-del-tpl="${i}">🗑️</button>
+    </div>`).join("");
+    wrap.querySelectorAll("[data-del-tpl]").forEach(b => b.onclick = () => {
+      const tpls = loadTemplates(); tpls.splice(parseInt(b.dataset.delTpl), 1); saveTemplates(tpls); renderTemplates(); toast("تم حذف القالب");
+    });
+  }
+  function saveTemplate() {
+    const name = prompt("اسم القالب:");
+    if (!name) return;
+    const tpls = loadTemplates();
+    tpls.push({ name, title: $id("schedTitle")?.value || "", caption: $id("schedCaption")?.value || "", hashtags: $id("schedTags")?.value || "", created: Date.now() });
+    saveTemplates(tpls); renderTemplates(); toast("تم حفظ القالب ✓");
+  }
+
+  /* ---------- إعدادات الإشعارات ---------- */
+  const NOTIF_KEY = "qr_notif_settings";
+  function loadNotif() { try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || "{}"); } catch { return {}; } }
+  function saveNotif() {
+    const s = { success: $id("notifSuccess")?.checked, fail: $id("notifFail")?.checked, daily: $id("notifDaily")?.checked };
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(s));
+    toast("تم حفظ إعدادات الإشعارات ✓");
+  }
+
+  /* ---------- سجل النشاط ---------- */
+  const ACT_KEY = "qr_activity_log";
+  function logActivity(msg) {
+    const log = JSON.parse(localStorage.getItem(ACT_KEY) || "[]");
+    log.unshift({ msg, time: new Date().toISOString() });
+    if (log.length > 50) log.length = 50;
+    localStorage.setItem(ACT_KEY, JSON.stringify(log));
+    renderActivity();
+  }
+  function renderActivity() {
+    const wrap = $id("activityLog"); if (!wrap) return;
+    const log = JSON.parse(localStorage.getItem(ACT_KEY) || "[]");
+    if (!log.length) { wrap.innerHTML = `<div class="hint">لا توجد أنشطة بعد.</div>`; return; }
+    wrap.innerHTML = log.map(e => {
+      const d = new Date(e.time);
+      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" });
+      return `<div class="qrow"><span class="qic">📋</span><div class="qinfo"><b>${esc(e.msg)}</b><small>${when}</small></div></div>`;
+    }).join("");
+  }
+  function clearActivity() { localStorage.removeItem(ACT_KEY); renderActivity(); toast("تم مسح السجل"); }
+
+  /* ---------- تصدير/استيراد ---------- */
+  function exportSettings() {
+    const data = {
+      templates: loadTemplates(),
+      notifications: loadNotif(),
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "quran-reels-settings.json"; a.click();
+    URL.revokeObjectURL(url);
+    toast("تم تصدير الإعدادات ✓");
+    logActivity("تصدير الإعدادات");
+  }
+  function importSettings(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.templates) saveTemplates(data.templates);
+        if (data.notifications) localStorage.setItem(NOTIF_KEY, JSON.stringify(data.notifications));
+        renderTemplates();
+        toast("تم استيراد الإعدادات ✓");
+        logActivity("استيراد الإعدادات");
+      } catch { toast("ملف غير صالح", "err"); }
+    };
+    reader.readAsText(file);
+  }
+    async function refreshAccount() {
     renderNotice();
     renderAuthCard();
     const u = QRAuth.user();
     if (u) { await loadConnections(); await loadQueue(); }
     renderChannels(); renderQueue(); renderAuto(); renderRuns();
+    renderStats(); renderTemplates(); renderActivity();
+    // تحميل إعدادات الإشعارات
+    const ns2 = loadNotif();
+    const n1 = $id("notifSuccess"); if (n1 && ns2.success !== undefined) n1.checked = ns2.success;
+    const n2 = $id("notifFail"); if (n2 && ns2.fail !== undefined) n2.checked = ns2.fail;
+    const n3 = $id("notifDaily"); if (n3 && ns2.daily !== undefined) n3.checked = ns2.daily;
     // بطاقة المهمة الجديدة
     const ns = $id("btnNewSched");
     if (ns) ns.onclick = () => $id("schedFile").click();
@@ -483,6 +585,16 @@ const QRPublish = (() => {
     if (br) br.onclick = () => renderRuns();
     const ba = $id("btnRefreshAcct");
     if (ba) ba.onclick = () => refreshAccount();
+    // قوالب
+    const bst = $id("btnSaveTpl"); if (bst) bst.onclick = saveTemplate;
+    // إشعارات
+    const bsn = $id("btnSaveNotif"); if (bsn) bsn.onclick = saveNotif;
+    // سجل نشاط
+    const bca = $id("btnClearActivity"); if (bca) bca.onclick = () => { if (confirm("مسح السجل؟")) clearActivity(); };
+    // تصدير/استيراد
+    const be = $id("btnExport"); if (be) be.onclick = exportSettings;
+    const bi = $id("btnImport"); if (bi) bi.onclick = () => $id("importFile").click();
+    const fi = $id("importFile"); if (fi) fi.onchange = () => { if (fi.files?.[0]) importSettings(fi.files[0]); fi.value = ""; };
   }
 
   /* ---------- نافذة الجدولة ---------- */
