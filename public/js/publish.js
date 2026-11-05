@@ -629,35 +629,12 @@ const QRPublish = (() => {
     const u = QRAuth.user();
     if (u) { await loadConnections(); await loadQueue(); }
     renderChannels(); renderQueue(); renderAuto(); renderRuns();
-    renderStats(); renderTemplates(); renderActivity();
-    renderCalendar(); renderVideoLibrary();
-    // تحميل إعدادات الإشعارات
-    const ns2 = loadNotif();
-    const n1 = $id("notifSuccess"); if (n1 && ns2.success !== undefined) n1.checked = ns2.success;
-    const n2 = $id("notifFail"); if (n2 && ns2.fail !== undefined) n2.checked = ns2.fail;
-    const n3 = $id("notifDaily"); if (n3 && ns2.daily !== undefined) n3.checked = ns2.daily;
-    // بطاقة المهمة الجديدة
     const ns = $id("btnNewSched");
     if (ns) ns.onclick = () => $id("schedFile").click();
     const br = $id("btnRefreshRuns");
     if (br) br.onclick = () => renderRuns();
     const ba = $id("btnRefreshAcct");
     if (ba) ba.onclick = () => refreshAccount();
-    // تقويم
-    const bp = $id("btnPrevMonth"); if (bp) bp.onclick = () => { calDate.setMonth(calDate.getMonth() - 1); renderCalendar(); };
-    const bn = $id("btnNextMonth"); if (bn) bn.onclick = () => { calDate.setMonth(calDate.getMonth() + 1); renderCalendar(); };
-    // مكتبة
-    const brl = $id("btnRefreshLib"); if (brl) brl.onclick = () => renderVideoLibrary();
-    // قوالب
-    const bst = $id("btnSaveTpl"); if (bst) bst.onclick = saveTemplate;
-    // إشعارات
-    const bsn = $id("btnSaveNotif"); if (bsn) bsn.onclick = saveNotif;
-    // سجل نشاط
-    const bca = $id("btnClearActivity"); if (bca) bca.onclick = () => { if (confirm("مسح السجل؟")) clearActivity(); };
-    // تصدير/استيراد
-    const be = $id("btnExport"); if (be) be.onclick = exportSettings;
-    const bi = $id("btnImport"); if (bi) bi.onclick = () => $id("importFile").click();
-    const fi = $id("importFile"); if (fi) fi.onchange = () => { if (fi.files?.[0]) importSettings(fi.files[0]); fi.value = ""; };
   }
 
   /* ---------- نافذة الجدولة ---------- */

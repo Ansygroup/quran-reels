@@ -488,20 +488,9 @@
     <div id="acctNotice" class="card notice-card" hidden></div>
     <div id="acctAuth"></div>
 
-    <!-- إحصائيات الأداء -->
-    <div class="card" style="margin-top:16px" id="acctStats">
-      <div class="auto-head"><h2>📊 إحصائيات الأداء</h2></div>
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-card"><b id="statPublished">0</b><small>منشور</small></div>
-        <div class="stat-card"><b id="statFailed">0</b><small>فشل</small></div>
-        <div class="stat-card"><b id="statScheduled">0</b><small>مجدول</small></div>
-        <div class="stat-card"><b id="statSuccess">0%</b><small>نسبة النجاح</small></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:18px">
+    <div class="card" style="margin-top:16px">
       <h2>🔗 ربط المنصات</h2>
-      <p class="hint">اضغط «اربط» ووافق مرة واحدة — بعدها ينشر الموقع نيابةً عنك. التوكنات مشفّرة ولا تظهر لأحد (حتى لك).</p>
+      <p class="hint">اضغط «اربط» ووافق مرة واحدة — بعدها ينشر الموقع نيابةً عنك.</p>
       <div class="chan-grid" id="acctChannels"></div>
     </div>
 
@@ -518,65 +507,8 @@
       <div class="auto-head"><h2>📜 سجل الأتمتة</h2>
         <button class="btn btn-ghost btn-sm" id="btnRefreshRuns">🔄 تحديث</button></div>
       <div id="acctRuns" class="qlist"><div class="hint">لا توجد عمليات بعد.</div></div>
-      </div>
-
-      <!-- قوالب البوستات -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>📝 قوالب البوستات</h2>
-          <button class="btn btn-gold btn-sm" id="btnSaveTpl">+ حفظ قالب</button></div>
-        <p class="hint">احفظ قوالب بوستات لإعادة استخدامها بسرعة.</p>
-        <div id="tplList" class="qlist"><div class="hint">لا توجد قوالب بعد.</div></div>
-      </div>
-
-      <!-- إعدادات الإشعارات -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>🔔 الإشعارات</h2></div>
-        <div class="auto-row">
-          <label class="chk"><input type="checkbox" id="notifSuccess" checked> إشعار عند نشر ناجح</label>
-        </div>
-        <div class="auto-row">
-          <label class="chk"><input type="checkbox" id="notifFail" checked> إشعار عند فشل نشر</label>
-        </div>
-        <div class="auto-row">
-          <label class="chk"><input type="checkbox" id="notifDaily"> تقرير يومي (ملخص الأتمتة)</label>
-        </div>
-        <button class="btn btn-em btn-sm" id="btnSaveNotif" style="margin-top:8px">حفظ</button>
-      </div>
-
-      <!-- تقويم المحتوى -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>📅 تقويم المحتوى</h2>
-          <button class="btn btn-ghost btn-sm" id="btnPrevMonth">◀</button>
-          <span id="calMonth" style="font-weight:700;margin:0 8px"></span>
-          <button class="btn btn-ghost btn-sm" id="btnNextMonth">▶</button></div>
-        <div id="contentCalendar" class="cal-grid"></div>
-      </div>
-
-      <!-- مكتبة الفيديو -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>🎬 مكتبة الفيديو</h2>
-          <button class="btn btn-ghost btn-sm" id="btnRefreshLib">🔄</button></div>
-        <div id="videoLibrary" class="qlist"><div class="hint">لا توجد فيديوهات بعد.</div></div>
-      </div>
-
-      <!-- سجل النشاط -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>📋 سجل النشاط</h2>
-          <button class="btn btn-ghost btn-sm" id="btnClearActivity">🗑️ مسح</button></div>
-        <div id="activityLog" class="qlist"><div class="hint">لا توجد أنشطة بعد.</div></div>
-      </div>
-
-      <!-- تصدير/استيراد -->
-      <div class="card" style="margin-top:16px">
-        <div class="auto-head"><h2>💾 النسخ الاحتياطي</h2></div>
-        <p class="hint">صدّر إعداداتك وقوالبك وجدولك كملف JSON، أو استوردها على جهاز آخر.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-gold btn-sm" id="btnExport">⬇️ تصدير</button>
-          <button class="btn btn-em btn-sm" id="btnImport">⬆️ استيراد</button>
-          <input type="file" id="importFile" accept=".json" hidden>
-        </div>
-      </div>
-      </section>
+    </div>
+  </section>
 </div>
 
 <!-- ================= الفوتر ================= -->
