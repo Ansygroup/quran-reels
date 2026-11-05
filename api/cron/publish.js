@@ -9,12 +9,21 @@ module.exports = async (req, res) => {
   const secret = process.env.CRON_SECRET || "";
   if (!secret || auth !== `Bearer ${secret}`) return json(res, 401, { error: "unauthorized" });
 
-  // تشغيل الأتمتة لجميع المستخدمين المفعّلين
+  // تشغيل الأتمتة لجميع المستخدمين المفعّلين (حتى daily_count فيديوهات)
   const autoResults = [];
   try {
     const users = await q("select user_id from autopilot where enabled=true");
     for (const u of users) {
-      autoResults.push(await runAutopilot(u.user_id));
+      let runs = 0;
+      const dailyCount = (await q1("select daily_count from autopilot where user_id=$1", [u.user_id]))?.daily_count || 3;
+      while (runs < dailyCount) {
+        const r = await runAutopilot(u.user_id);
+        autoResults.push(r);
+        runs++;
+        if (r.skipped || r.error) break;
+        // انتظر 5 ثوانٍ بين الفيديوهات
+        if (runs < dailyCount) await new Promise(res => setTimeout(res, 5000));
+      }
     }
   } catch (e) {
     autoResults.push({ ok: false, error: String(e.message || e) });
