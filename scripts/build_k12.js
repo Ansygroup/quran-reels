@@ -154,8 +154,15 @@ ${o.faq.map(([q, a]) => `{"@type":"Question","name":${JSON.stringify(q)},"accept
 </script>` : ""}${extraLd}
 <script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
 <script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
+<!-- Google Tag Manager -->
+<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-M2P3KJ57"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());</script>
+<!-- End Google Tag Manager -->
 </head>
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M2P3KJ57" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 <div class="topbar">${topbar}</div>
 <header class="site-header">
   <div class="container header-in">
