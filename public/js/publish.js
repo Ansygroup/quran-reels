@@ -143,27 +143,42 @@ const QRPublish = (() => {
 
   function renderChannels() {
     const wrap = $id("acctChannels"); if (!wrap) return;
-    wrap.innerHTML = Object.entries(PLATFORMS).map(([k, p]) => {
-      const c = conns.find(x => x.platform === k);
-      const igAttached = k === "instagram" && !c && conns.find(x => x.platform === "facebook")?.extra?.ig;
-      const linked = !!c;
-      const sub = linked
-        ? (k === "facebook" && c.extra?.pages?.length ? esc(c.account_name + " · " + c.extra.pages.length + " صفحة") : esc(c.account_name))
-        : (igAttached ? "متاح عبر ربط فيسبوك" : "غير مرتبطة");
-      return `<div class="chan-card ${linked ? "on" : ""}">
+    // Group connections by platform
+    const byPlat = {};
+    for (const c of conns) { if (!byPlat[c.platform]) byPlat[c.platform] = []; byPlat[c.platform].push(c); }
+    const html = Object.entries(PLATFORMS).map(([k, p]) => {
+      const platConns = byPlat[k] || [];
+      const igAttached = k === "instagram" && !platConns.length && conns.find(x => x.platform === "facebook")?.extra?.ig;
+      if (!platConns.length) {
+        return `<div class="chan-card">
+          <div class="chan-ic">${p.icon}</div>
+          <div class="chan-info">
+            <b>${p.name}</b>
+            <small>${igAttached ? "متاح عبر ربط فيسبوك" : "غير مرتبطة"}</small>
+          </div>
+          ${igAttached ? "" : `<button class="btn btn-em btn-sm" data-conn="${k}">اربط</button>`}
+        </div>`;
+      }
+      return platConns.map(c => {
+        const expired = c.expires_at && Number(c.expires_at) < Date.now();
+        return `<div class="chan-card on">
+          <div class="chan-ic">${p.icon}</div>
+          <div class="chan-info">
+            <b>${p.name}</b>
+            <small class="ok">✓ ${k === "facebook" && c.extra?.pages?.length ? esc(c.account_name + " · " + c.extra.pages.length + " صفحة") : esc(c.account_name)}${expired ? " ⚠️ منتهي" : ""}</small>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" data-test="${c.id}" title="اختبار">🔍</button>
+            <button class="btn btn-ghost btn-sm" data-disc="${c.id}">فك</button>
+          </div>
+        </div>`;
+      }).join("") + (k === "youtube" ? `<div class="chan-card" style="opacity:.7">
         <div class="chan-ic">${p.icon}</div>
-        <div class="chan-info">
-          <b>${p.name}</b>
-          <small class="${linked ? "ok" : ""}">${linked ? "✓ " + sub + (c.expires_at && Number(c.expires_at) < Date.now() ? " ⚠️ منتهي" : "") : sub}</small>
-        </div>
-        ${linked
-          ? `<div style="display:flex;gap:4px">
-              <button class="btn btn-ghost btn-sm" data-test="${c.id}" title="اختبار">🔍</button>
-              <button class="btn btn-ghost btn-sm" data-disc="${c.id}">فك</button>
-            </div>`
-          : `<button class="btn btn-em btn-sm" data-conn="${k}">اربط</button>`}
-      </div>`;
+        <div class="chan-info"><b>${p.name}</b><small>ربط قناة إضافية</small></div>
+        <button class="btn btn-em btn-sm" data-conn="${k}">+ أضف</button>
+      </div>` : "");
     }).join("");
+    wrap.innerHTML = html;
     wrap.querySelectorAll("[data-conn]").forEach(b => b.onclick = async () => {
       const k = b.dataset.conn;
       const t = await QRAuth.token();
@@ -171,7 +186,6 @@ const QRPublish = (() => {
       const pk = k === "facebook" ? "meta" : k;
       location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
     });
-    // Channel health check
     wrap.querySelectorAll("[data-test]").forEach(b => b.onclick = async () => {
       const t = await QRAuth.token();
       const r = await fetch("/api/social?op=test", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.test }) });
