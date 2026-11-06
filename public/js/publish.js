@@ -1,6 +1,4 @@
-/* ============================================================
-   QRPublish — الحساب، ربط المنصات، جدول النشر، الأتمتة، مولّد البوست
-   ============================================================ */
+/* ============================================================\n   QRPublish — الحساب، ربط المنصات، جدول النشر، الأتمتة، مولّد البوست\n   ============================================================ */
 const QRPublish = (() => {
   const $id = i => document.getElementById(i);
   const PLATFORMS = {
@@ -9,6 +7,9 @@ const QRPublish = (() => {
     instagram: { name: "إنستغرام", icon: "📸", color: "#e1306c" },
     tiktok: { name: "تيك توك", icon: "🎵", color: "#111" },
     x: { name: "X", icon: "𝕏", color: "#000" },
+    linkedin: { name: "لينكد إن", icon: "💼", color: "#0077b5" },
+    telegram: { name: "تيليجرام", icon: "✈️", color: "#0088cc" },
+    whatsapp: { name: "واتساب", icon: "💬", color: "#25d366" }
   };
   const SETUP_TEXT = {
     youtube: { env: "GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET", where: "Google Cloud Console → OAuth consent screen → Credentials", redirect: "/api/oauth/callback" },
@@ -21,7 +22,7 @@ const QRPublish = (() => {
   /* ---------- مساعدات REST ---------- */
   async function sb(path, opts = {}) {
     const t = await QRAuth.token();
-    if (!t) throw new Error("سجل الدخول أولًا");
+    if (!t) throw new Error("سجّل الدخول أولًا");
     const c = await QRAuth.conf();
     const r = await fetch(c.url + path, {
       ...opts,
@@ -35,7 +36,7 @@ const QRPublish = (() => {
 
   /* ---------- رفع الفيديو للتخزين ---------- */
   async function uploadVideo(blob, name) {
-    const u = QRAuth.user(); if (!u) throw new Error("سجل الدخول أولًا");
+    const u = QRAuth.user(); if (!u) throw new Error("سجّل الدخول أولًا");
     const c = await QRAuth.conf();
     const t = await QRAuth.token();
     const path = `${u.id}/${Date.now()}-${String(name || "reel.mp4").replace(/[^\w.\-]/g, "_")}`;
@@ -240,11 +241,11 @@ const QRPublish = (() => {
 
   async function renderAuto() {
     const wrap = $id("acctAuto"); if (!wrap) return;
-    if (!QRAuth.user()) { wrap.innerHTML = `<h2>🤖 لوحة الأتمتة</h2><p class="hint">سجّل الدخول، ثم اربط قناة YouTube لإدارة الإنشاء والنشر التلقائي.</p>`; return; }
+    if (!QRAuth.user()) { wrap.innerHTML = `<h2>🤖 لوحة الأتمتة</h2><p class="hint">سجّل الدخول، ثم اربط القنوات لإدارة الإنشاء والنشر التلقائي.</p>`; return; }
     const data = await loadAuto();
     const a = data?.config || { enabled: false, template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", article_mode: "random" } };
     const t = a.template && typeof a.template === "object" ? a.template : {};
-    const connected = !!data?.connected || conns.some(x => x.platform === "youtube");
+    const connected = !!data?.connected || conns.some(x => PLATFORMS[x.platform]);
     const runs = Array.isArray(data?.runs) ? data.runs : [];
     const modes = { mix: "تنويع كل المقاطع", famous: "آيات وسور مشهورة", sequential: "التدرّج حسب ترتيب السور", article: "توليد من المقالات (10,000 مقال)" };
     const backgrounds = {
@@ -258,22 +259,22 @@ const QRPublish = (() => {
       const [label, cls] = runStatus[r.status] || [esc(r.status || "—"), "sch"];
       const date = r.created_at ? new Date(r.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" }) : "";
       const articleInfo = r.article_id ? `<small class="article-ref">📄 من المقال: ${esc(r.article_title || "مقال")}</small>` : "";
-      return `<div class="auto-run${r.article_id ? " article-card" : ""}"><div><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small>${articleInfo}</div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
+      return `<div class="auto-run${r.article_id ? " article-card" : ""}"><div class="auto-info"><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small>${articleInfo}</div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
     }).join("") : `<p class="hint">لا توجد عمليات إنشاء بعد.</p>`;
 
     wrap.innerHTML = `
-      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد أو المقالات ثم رفعه علنًا إلى قناتك على YouTube.</p></div>
+      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد أو المقالات ثم رفعه علنًا إلى القنوات المختارة (${Object.values(PLATFORMS).map(p => p.name).join(", ")}).</p></div>
         <label class="switch" title="تشغيل أو إيقاف النشر اليومي"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""} ${connected ? "" : "disabled"}><i></i></label>
       </div>
-      ${!connected ? `<div class="auto-warning">اربط قناة YouTube من بطاقة «ربط المنصات» أولًا، ثم فعّل الأتمتة.</div>` : `<div class="auto-health"><span class="auto-dot ${a.enabled ? "on" : ""}"></span><b>${a.enabled ? "الأتمتة مفعّلة" : "الأتمتة متوقفة"}</b><span>· ${esc(data?.channel || "قناة YouTube المرتبطة")}</span></div>`}
+      ${!connected ? `<div class="auto-warning">اربط قناة واحدة على الأقل من بطاقة «ربط المنصات» أولًا، ثم فعّل الأتمتة.</div>` : `<div class="auto-health"><span class="auto-dot ${a.enabled ? "on" : ""}">${a.enabled ? "الأتمتة مفعّلة" : "الأتمتة متوقفة"}</span><span>· ${esc(data?.channel || "القنوات المرتبطة")}</span></div>`}
       <div class="auto-grid">
         <div class="f-group"><label for="autoContent">محتوى المقاطع</label><select id="autoContent" style="width:100%">${Object.entries(modes).map(([k,v]) => `<option value="${k}" ${t.content_mode === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="f-group"><label>القارئ</label><div class="auto-static">التناوب بين القراء المتاحين</div></div>
         <div class="f-group"><label for="autoBg">الخلفية</label><select id="autoBg" style="width:100%">${Object.entries(backgrounds).map(([k,v]) => `<option value="${k}" ${(t.background || "rotate") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
-        <div class="f-group"><label>قناة النشر</label><div class="auto-static">🎬 YouTube · عام تلقائيًا</div></div>
+        <div class="f-group"><label>قنوات النشر</label><div class="auto-static">${Object.values(PLATFORMS).map(p => p.name).join(", ")}</div></div>
       </div>
       <div class="auto-schedule"><b>🗓️ الموعد:</b> يوميًا، الهدف ${cairoClockLabel()}. <span>قد يتفاوت التنفيذ حتى نحو ساعة على خطة الاستضافة الحالية، ويتغير التوقيت المحلي مع التوقيت الصيفي.</span></div>
-      <div class="auto-actions"><button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button><button class="btn btn-ghost" id="autoRun" ${connected ? "" : "disabled"}>أنشئ وانشر الآن</button></div>
+      <div class="auto-actions"><button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button><button class="btn btn-em" id="autoRun" ${connected ? "" : "disabled"}>أنشئ وانشر الآن</button><button class="btn btn-blue" id="autoMulti" ${connected ? "" : "disabled"}>🔗 نشر متزامن (كل القنوات)</button></div>
       <p class="hint auto-note">سيُنشأ الفيديو تلقائيًا بخلفية عمودية 9:16 وصيغة WebM/MP4 بحسب دعم محرّك الموقع، مع التناوب بين القراء، ثم يُرفع علنًا دون مراجعة. استخدم الإيقاف لإيقاف الدورات القادمة. تحقّق من أذونات إعادة نشر ملفات التلاوة قبل تفعيل النشر العام.</p>
       <div class="auto-history-head"><b>سجل الإنشاء والنشر</b><small>${runs.length} من آخر العمليات</small></div><div class="auto-runs">${runRows}</div>`;
 
@@ -288,7 +289,7 @@ const QRPublish = (() => {
     };
     const run = $id("autoRun");
     run.onclick = async () => {
-      if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على قناة YouTube المرتبطة. هل تريد المتابعة؟")) return;
+      if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على القنوات المرتبطة. هل تريد المتابعة؟")) return;
       run.disabled = true; run.textContent = "جارٍ إنشاء الفيديو ورفعه…";
       try {
         await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public", article_mode: t.article_mode || "random" } });
@@ -297,6 +298,20 @@ const QRPublish = (() => {
         const j = await r.json().catch(() => ({}));
         if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر إنشاء الفيديو أو نشره");
         toast("تم إنشاء الفيديو ونشره ✓");
+      } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
+      await refreshAccount();
+    };
+    const multi = $id("autoMulti");
+    if (multi) multi.onclick = async () => {
+      if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على جميع القنوات المرتبطة. هل تريد المتابعة؟")) return;
+      multi.disabled = true; multi.textContent = "جارٍ إنشاء الفيديو ورفعه…";
+      try {
+        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public", article_mode: t.article_mode || "random" } });
+        const token = await QRAuth.token();
+        const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "run_all" }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر التنفيذ المتزامن");
+        toast("تم بدء النشر المتزامن على جميع القنوات ✓");
       } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
       await refreshAccount();
     };
@@ -385,6 +400,18 @@ const QRPublish = (() => {
     const bqm = $id("btnQuickMix");
     if (bqm) bqm.onclick = () => {
       Router.go("#/create"); // أو فتح نافذة الجدولة بمحتوى عشوائي
+    };
+    const bqm2 = $id("btnQuickMulti");
+    if (bqm2) bqm2.onclick = async () => {
+      if (!u) { openLogin(); return; }
+      try {
+        const t = await QRAuth.token();
+        const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ action: "run_all" }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر النشر المتزامن");
+        toast("تم بدء النشر المتزامن على جميع القنوات ✓");
+        await refreshAccount();
+      } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
     };
   }
 

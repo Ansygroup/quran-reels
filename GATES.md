@@ -41,9 +41,13 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 
 # ملاحظات إضافية:
 - تم إضافة دعم "توليد البوست من المقالات" (10,000 مقال) في:
-  - public/js/publish.js (PostGen.article, renderAuto, refreshAccount)
-  - public/index.html (زر توليد من مقال)
-  - public/css/style.css (نمط .article-card)
-  - api/autopilot.js (دعم article_random)
+  - public/js/publish.js (PostGen.article, renderAuto, refreshAccount, دعم تعدد القنوات)
+  - public/index.html (زر توليد من مقال، دعم تعدد القنوات)
+  - public/css/style.css (نمط .article-card، دعم تعدد القنوات)
+  - api/autopilot.js (دعم article_random، دعم التوازي وتعدد القنوات)
+  - lib/autopilot.js (دعم التوازي وتعدد القنوات)
 - الخادم المحلي (PID 1800) يعمل على المنفذ 8787.
 - تم الالتزام بفرع arena/2b12c7a8-quran-reels.
+- **تحديثات GATES:**
+  - **G2, G3:** تتطلب بيئة Vercel/إنتاج (قيد الانتظار).
+  - **G7:** تم تحديث الكود المحلي (تعدد القنوات، التوازي) - سيتم الالتزام بـ Git.
