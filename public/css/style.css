@@ -717,3 +717,26 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .stat:hover{transform:translateY(-3px);border-color:var(--line)}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 @media (max-width:640px){.section{padding:46px 0}.hero{padding:50px 0 22px}.hero-cta{margin-top:22px}}
+
+/* ===== نمط بطاقة المقال (دعم 10,000 مقال) ===== */
+.article-card{
+  background:linear-gradient(135deg,rgba(45,212,160,.08),rgba(212,175,55,.05));
+  border:1px solid var(--line);
+  border-radius:var(--r-md);
+  padding:12px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:8px;
+  transition:.2s;
+}
+.article-card:hover{border-color:var(--emerald);transform:translateX(4px)}
+.article-card .article-ic{width:36px;height:36px;border-radius:10px;background:var(--panel);display:grid;place-items:center;font-size:1.1rem}
+.article-card .article-info{flex:1;min-width:0}
+.article-card .article-info b{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--emerald)}
+.article-card .article-ref{font-size:.74rem;color:var(--muted);display:block;margin-top:2px}
+
+/* تحديثات الأتمتة */
+.auto-run.article-card{border-left:4px solid var(--emerald)}
+.auto-grid .f-group select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e6c46a' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 14px center;padding-left:36px}
+

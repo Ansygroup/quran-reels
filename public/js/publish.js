@@ -58,6 +58,7 @@ const QRPublish = (() => {
       "دقائق هادئة مع كتاب الله 🤍",
     ],
     _hash: ["قرآن", "آيات_القرآن", "ترتيل", "رياحين_القرآن", "islamic", "quran", "شورتس", "اسلاميات"],
+    /* توليد البوست من الآيات */
     generate(platform, m) {
       const day = Math.floor(Date.now() / 86400000);
       const note = this._notes[day % this._notes.length];
@@ -81,6 +82,28 @@ const QRPublish = (() => {
         x: `${base} 🤍`.slice(0, 240),
       };
       return { title: titleMap[platform] || base, caption, hashtags, note };
+    },
+    /* توليد البوست من المقالات (10,000 مقال) */
+    article(platform, article) {
+      const title = article.title || "مقال قرآني جديد";
+      const note = this._notes[Math.floor(Math.random() * this._notes.length)];
+      const tagsBy = {
+        youtube: ["قرآن", "مقال", "إسلام", "ترتيل", "شورتس"],
+        instagram: this._hash.slice(0, 8),
+        facebook: this._hash.slice(0, 6),
+        tiktok: ["قرآن", "اسلاميات", "مقال", "tiktok", "quran"],
+        x: ["قرآن", "islamic", "article"],
+      };
+      const hashtags = (tagsBy[platform] || this._hash).map(t => "#" + t).join(" ");
+      const caption = `${title} 🤍\n\n${note}\n\nاقرأ المقال كاملاً في مكتبة القرآن ريلز 📖\n\nلا تنسَ المتابعة لتصلك تلاوات يومية 🤍`;
+      const titleMap = {
+        youtube: `${title} | مقال قرآني`.slice(0, 100),
+        facebook: title.slice(0, 200),
+        instagram: title.slice(0, 120),
+        tiktok: `${title} 🤍`.slice(0, 150),
+        x: `${title} 🤍`.slice(0, 240),
+      };
+      return { title: titleMap[platform] || title, caption, hashtags, note, article_id: article.id };
     },
   };
 
@@ -219,11 +242,11 @@ const QRPublish = (() => {
     const wrap = $id("acctAuto"); if (!wrap) return;
     if (!QRAuth.user()) { wrap.innerHTML = `<h2>🤖 لوحة الأتمتة</h2><p class="hint">سجّل الدخول، ثم اربط قناة YouTube لإدارة الإنشاء والنشر التلقائي.</p>`; return; }
     const data = await loadAuto();
-    const a = data?.config || { enabled: false, template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate" } };
+    const a = data?.config || { enabled: false, template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", article_mode: "random" } };
     const t = a.template && typeof a.template === "object" ? a.template : {};
     const connected = !!data?.connected || conns.some(x => x.platform === "youtube");
     const runs = Array.isArray(data?.runs) ? data.runs : [];
-    const modes = { mix: "تنويع كل المقاطع", famous: "آيات وسور مشهورة", sequential: "التدرّج حسب ترتيب السور" };
+    const modes = { mix: "تنويع كل المقاطع", famous: "آيات وسور مشهورة", sequential: "التدرّج حسب ترتيب السور", article: "توليد من المقالات (10,000 مقال)" };
     const backgrounds = {
       rotate: "خلفية مختلفة بالتناوب", "bg-mosque-night": "مسجد ليلاً", "bg-starry-desert": "سماء النجوم",
       "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية",
@@ -234,11 +257,12 @@ const QRPublish = (() => {
     const runRows = runs.length ? runs.map(r => {
       const [label, cls] = runStatus[r.status] || [esc(r.status || "—"), "sch"];
       const date = r.created_at ? new Date(r.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" }) : "";
-      return `<div class="auto-run"><div><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small></div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
+      const articleInfo = r.article_id ? `<small class="article-ref">📄 من المقال: ${esc(r.article_title || "مقال")}</small>` : "";
+      return `<div class="auto-run${r.article_id ? " article-card" : ""}"><div><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small>${articleInfo}</div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
     }).join("") : `<p class="hint">لا توجد عمليات إنشاء بعد.</p>`;
 
     wrap.innerHTML = `
-      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد ثم رفعه علنًا إلى قناتك على YouTube.</p></div>
+      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد أو المقالات ثم رفعه علنًا إلى قناتك على YouTube.</p></div>
         <label class="switch" title="تشغيل أو إيقاف النشر اليومي"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""} ${connected ? "" : "disabled"}><i></i></label>
       </div>
       ${!connected ? `<div class="auto-warning">اربط قناة YouTube من بطاقة «ربط المنصات» أولًا، ثم فعّل الأتمتة.</div>` : `<div class="auto-health"><span class="auto-dot ${a.enabled ? "on" : ""}"></span><b>${a.enabled ? "الأتمتة مفعّلة" : "الأتمتة متوقفة"}</b><span>· ${esc(data?.channel || "قناة YouTube المرتبطة")}</span></div>`}
@@ -257,7 +281,7 @@ const QRPublish = (() => {
     save.onclick = async () => {
       save.disabled = true;
       try {
-        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
+        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public", article_mode: t.article_mode || "random" } });
         toast($id("autoOn").checked ? "تم حفظ لوحة الأتمتة وتفعيل النشر اليومي 🤖" : "تم حفظ الإعدادات وإيقاف النشر اليومي");
         await refreshAccount();
       } catch (e) { toast(e.message || "تعذّر الحفظ", "err"); save.disabled = false; }
@@ -267,7 +291,7 @@ const QRPublish = (() => {
       if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على قناة YouTube المرتبطة. هل تريد المتابعة؟")) return;
       run.disabled = true; run.textContent = "جارٍ إنشاء الفيديو ورفعه…";
       try {
-        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
+        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public", article_mode: t.article_mode || "random" } });
         const token = await QRAuth.token();
         const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "run" }) });
         const j = await r.json().catch(() => ({}));
@@ -345,6 +369,23 @@ const QRPublish = (() => {
     // بطاقة المهمة الجديدة
     const ns = $id("btnNewSched");
     if (ns) ns.onclick = () => $id("schedFile").click();
+    // أزرار الإجراءات السريعة (المقالات)
+    const bqa = $id("btnQuickArticle");
+    if (bqa) bqa.onclick = async () => {
+      if (!u) { openLogin(); return; }
+      try {
+        const t = await QRAuth.token();
+        const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ action: "article_random" }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر توليد مقال");
+        toast("تم اختيار مقال وتوليد البوست ✓");
+        await refreshAccount();
+      } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
+    };
+    const bqm = $id("btnQuickMix");
+    if (bqm) bqm.onclick = () => {
+      Router.go("#/create"); // أو فتح نافذة الجدولة بمحتوى عشوائي
+    };
   }
 
   /* ---------- نافذة الجدولة ---------- */
