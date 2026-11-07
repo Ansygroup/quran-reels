@@ -102,3 +102,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: ‏run_all وgenerateAndPublish يفلتران المنصات بالربط الفعلي (لا صفوف «لا يوجد ربط») · renderSelfTest يعيد تقريرًا (ok/node/ms/مسار أو خطأ) وزر «🔍 فحص محرّك التوليد» في اللوحة
   EVIDENCE: 2026-11-07 — 16 صفًا فاشلًا في publish_queue بخطأ «لا يوجد ربط لهذه المنصة»، وفشل إطلاق chromium بـ«libnss3.so: cannot open shared object file» على Vercel.
+
+- [ ] G17: ربط القنوات يعمل من الواجهة (لا خادم بلا أزرار)
+  CHECK: npm run test:connect   (ويفشل كذلك داخل npm test)
+  EXPECT: في صفحة «حسابي» زر «اربط» لكل منصة لها OAuth · المنصة المرتبطة تظهر باسم قناتها مع «فك الربط» · `connectPath` يبني `/api/gw?op=start&p=…&t=…` ويحوّل instagram/facebook إلى meta · `window.QRPublish` مُعرَّف بدواله الأربع
+  EVIDENCE: 2026-11-07 — المسارات الأربعة (start/list/disconnect) كانت قائمة على الخادم بينما لا زر واحد يستدعيها، و`QRPublish` غير مُعرَّف أصلًا رغم أن app.js يناديه 3 مرات، فكانت صفحة الحساب تُفتح فارغة.

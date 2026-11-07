@@ -7,6 +7,9 @@ module.exports = async (req, res) => {
   const op = u.searchParams.get("op") || "";
   const p = u.searchParams.get("p") || "";
   if (op !== "start") return json(res, 404, { error: "unknown op" });
-  if (!["youtube", "meta", "tiktok", "x"].includes(p)) return json(res, 404, { error: "unknown platform" });
-  return handleStart(req, res, p);
+  /* facebook وinstagram يتشاركان تطبيق Meta — نقبل الاسمين حتى لا يفشل
+   * الرابط القادم من الواجهة أو من رابط قديم محفوظ في الـService Worker. */
+  const prov = p === "facebook" || p === "instagram" ? "meta" : p;
+  if (!["youtube", "meta", "tiktok", "x"].includes(prov)) return json(res, 404, { error: "unknown platform", platforms: ["youtube", "facebook", "instagram", "meta", "tiktok", "x"] });
+  return handleStart(req, res, prov);
 };

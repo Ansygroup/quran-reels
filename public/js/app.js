@@ -164,7 +164,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     QRAuth.on(u => {
       const b = $("#authBtn");
       if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
-      if (u && typeof QRPublish !== "undefined" && !window._authBooted) QRPublish.afterLogin();
+      /* كان الشرط !window._authBooted والراية تُضبط بعد QRAuth.boot() مباشرة،
+       * فحين تصل نتيجة الجلسة (غير متزامنة) تكون الراية true ولا يُنفَّذ
+       * afterLogin أبدًا — فلا تُحمَّل لوحة الحساب بعد الدخول. */
+      if (!u) { window._afterLoginDone = false; return; }
+      if (typeof QRPublish !== "undefined" && !window._afterLoginDone) {
+        window._afterLoginDone = true;
+        QRPublish.afterLogin();
+      }
     });
     QRAuth.boot();
     window._authBooted = true;
