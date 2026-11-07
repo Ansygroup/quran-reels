@@ -1,117 +1,109 @@
 #!/usr/bin/env node
 /* ============================================================
- * build_sitemap.js — كمل#24 (+ كمل#24ه: وسوم صور image:)
- * يقرأ public/sitemap.xml الحالي (يشمل 500 مقالة قديمة) ويُعيد بناءه:
- *   (القديم − روابط المقالات القديمة) + 20,000 مقالة + 136 بوابة + صفحات الأرشيف المادية
- * الناتج الحالي المتوقع: 20,000 مقال + 136 محورًا + 143 أرشيفًا + الصفحات الحية الأخرى. الاستدعاء: node scripts/build_sitemap.js
- * كمل#24ه: أي مقالة لها public/img/articles/<slug>.jpg تأخذ <image:image>
- *   (loc + title) بحسب مخطط Google Image Sitemap — تُعاد بعد كل دفعة صور.
- */
-"use strict";
+ * باني خريطة الموقع — يجعل sitemap.xml مطابقًا للملفات الموجودة فعلًا.
+ * ------------------------------------------------------------
+ * المشكلة التي وُلد بسببها: كانت الخريطة تعلن 20,536 رابطًا منها 12,286
+ * (61%) بلا صفحة على القرص — قسم /articles وحده يعلن 20,280 رابطًا والموجود
+ * 7,994. النتيجة: زحف محركات البحث إلى آلاف صفحات 404 ناعمة، وإشارة جودة
+ * سلبية للنطاق كله.
+ *
+ * القاعدة: الخريطة تُبنى من القرص لا من قائمة أمنيات.
+ *   • تُضمّن كل صفحة HTML قابلة للفهرسة تحت public/ (index.html → /)
+ *   • تُستثنى 404 والصفحات التي فيها robots=noindex وملفات تحقق جوجل
+ *   • تُبقى <lastmod> القديمة للروابط القائمة (لا نغيّر تواريخها زورًا)
+ *     والجديدة تأخذ تاريخ آخر تعديل للملف
+ *
+ * التشغيل: node scripts/build_sitemap.js [--check]
+ *   --check: يتحقّق فقط ويخرج بـ1 عند أي انحراف (يُستخدم في الاختبارات)
+ * ============================================================ */
 const fs = require("fs");
 const path = require("path");
-const ORIGIN = "https://quran-reels-tau.vercel.app";
-const PUB = "2026-10-30";
-const CLUSTERS = ["video", "reciters", "prayer", "hifz", "azkar", "seasons", "family", "publishing"];
 
-const root = path.join(__dirname, "..");
-const smPath = path.join(root, "public", "sitemap.xml");
-const xml = fs.readFileSync(smPath, "utf8");
-const oldLocs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-if (oldLocs.length < 700) throw new Error("old sitemap too small: " + oldLocs.length);
+const ROOT = path.join(__dirname, "..");
+const PUBLIC = path.join(ROOT, "public");
+const SITE = "https://quran-reels-tau.vercel.app";
+const MAP = path.join(PUBLIC, "sitemap.xml");
+const CHECK = process.argv.includes("--check");
 
-const OLD = require(path.join(root, "posts", "index.js"));
-const oldSlugs = new Set(OLD.map((s) => s.slug));
-const isOldArticle = (loc) => {
-  // تُحذف كل مقالات المكتبة القديمة؛ يعاد بناؤها من مصادرها الحالية أدناه.
-  const m = loc.match(/\/articles\/([^/]+)\/$/);
-  return !!m && !loc.includes("/en/");
-};
-const hasLocalPage = (loc) => {
-  try {
-    const pathname = decodeURIComponent(new URL(loc).pathname).replace(/^\/+/, "");
-    const base = path.join(root, "public", pathname);
-    return fs.existsSync(base) && fs.statSync(base).isFile()
-      || fs.existsSync(path.join(base, "index.html"));
-  } catch (e) { return false; }
-};
+const EXCLUDE_NAMES = new Set(["404.html"]);
+const isVerification = (f) => /^google[0-9a-z]+\.html$/i.test(f);
 
-const entries = []; // {loc, lastmod?, title?}
-const seen = new Set();
-const push = (loc, lastmod, title) => {
-  if (seen.has(loc)) return;
-  seen.add(loc);
-  entries.push(title ? { loc, lastmod, title } : { loc, lastmod });
-};
-const escXml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-// 1) ما عدا المقالات القديمة من الخريطة الحالية (يبقى lastmod الأصلي إن وُجد)
-const oldLastmod = new Map();
-for (const block of xml.split("<url>").slice(1)) {
-  const l = block.match(/<loc>([^<]+)<\/loc>/);
-  const d = block.match(/<lastmod>([^<]+)<\/lastmod>/);
-  if (l) oldLastmod.set(l[1], d ? d[1] : null);
-}
-let kept = 0, droppedMissing = 0;
-for (const loc of oldLocs) {
-  if (isOldArticle(loc)) continue;
-  if (!hasLocalPage(loc)) { droppedMissing++; continue; }
-  push(loc, oldLastmod.get(loc) || undefined);
-  kept++;
+function walk(dir, acc = []) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (["node_modules", ".vercel", "img", "fonts", "data", "css", "js"].includes(e.name)) continue;
+      walk(p, acc);
+    } else if (e.name.endsWith(".html")) acc.push(p);
+  }
+  return acc;
 }
 
-// 2) 20,000 مقالة (500 أصلية + 19,500 مولّدة) بآخر تحديث اليوم
-const allSlugs = [];
-for (const s of OLD) allSlugs.push(s.slug);
-for (const c of CLUSTERS) {
-  const arr = JSON.parse(fs.readFileSync(path.join(root, "posts", "out", c + ".json"), "utf8"));
-  for (const s of arr) allSlugs.push(s.slug);
+/* رابط الصفحة من مسار الملف */
+function urlPathOf(file) {
+  let rel = path.relative(PUBLIC, file).split(path.sep).join("/");
+  if (rel === "index.html") return "/";
+  if (rel.endsWith("/index.html")) return "/" + rel.slice(0, -"index.html".length);
+  return "/" + rel;
 }
-if (new Set(allSlugs).size !== 20000) throw new Error("slugs != 20000: " + new Set(allSlugs).size);
-// كمل#24ه: عنوان كل مقالة + صورها إن وُجدت
-const IMGDIR = path.join(root, "public", "img", "articles");
-let imgN = 0;
-for (const s of OLD) {
-  const has = fs.existsSync(path.join(IMGDIR, s.slug + ".jpg"));
-  if (has) imgN++;
-  push(`${ORIGIN}/articles/${s.slug}/`, PUB, has ? s.title : undefined);
+
+/* استبعاد صفحات لا تُفهرس */
+function indexable(file) {
+  const name = path.basename(file);
+  if (EXCLUDE_NAMES.has(name) || isVerification(name)) return false;
+  const head = fs.readFileSync(file, "utf8").slice(0, 4000);
+  if (/name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(head)) return false;
+  return true;
 }
-for (const c of CLUSTERS) {
-  const arr = JSON.parse(fs.readFileSync(path.join(root, "posts", "out", c + ".json"), "utf8"));
-  for (const s of arr) {
-    const has = fs.existsSync(path.join(IMGDIR, s.slug + ".jpg"));
-    if (has) imgN++;
-    push(`${ORIGIN}/articles/${s.slug}/`, PUB, has ? s.title : undefined);
+
+function lastmodOf(file) {
+  const d = fs.statSync(file).mtime;
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+/* lastmod الموجودة حاليًا (نحترمها) */
+const existing = new Map();
+if (fs.existsSync(MAP)) {
+  const xml = fs.readFileSync(MAP, "utf8");
+  for (const m of xml.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?<\/url>/g)) {
+    const p = m[1].replace(/^https?:\/\/[^/]+/, "");
+    existing.set(decodeURIComponent(p), m[2] || "");
   }
 }
 
-// 3) 136 بوابة محور
-const GEN = {};
-const gslugs = [];
-for (const c of CLUSTERS) {
-  GEN[c] = require(path.join(root, "posts", "gen_data_" + c + ".js"));
-  for (const g of GEN[c].groups) gslugs.push(g.slug);
+const pages = walk(PUBLIC).filter(indexable);
+const entries = [];
+for (const file of pages) {
+  const p = urlPathOf(file);
+  if (/\s/.test(p)) continue;
+  const lastmod = existing.get(decodeURIComponent(p)) || lastmodOf(file);
+  entries.push({ path: p, lastmod });
 }
-if (gslugs.length !== 136 || new Set(gslugs).size !== 136) throw new Error("group slugs != 136");
-for (const g of gslugs) push(`${ORIGIN}/articles/${g}/`, PUB);
 
-// 4) صفحات المقالات المادية خارج مجموعة الـ20,000 والبوابات: أرشيف ثابت بلا تكرار
-const currentSlugs = new Set([...allSlugs, ...gslugs]);
-const articlesDir = path.join(root, "public", "articles");
-const legacySlugs = fs.readdirSync(articlesDir, { withFileTypes: true })
-  .filter((d) => d.isDirectory() && /^[a-z0-9-]+$/.test(d.name) && !currentSlugs.has(d.name)
-    && fs.existsSync(path.join(articlesDir, d.name, "index.html")))
-  .map((d) => d.name)
-  .sort();
-for (const slug of legacySlugs) push(`${ORIGIN}/articles/${slug}/`, undefined);
+/* العدد الأكبر من الروابط الموجودة في الخريطة القديمة = كلها ميتة، تُهمل */
+entries.sort((a, b) => (a.path === "/" ? -1 : b.path === "/" ? 1 : a.path.localeCompare(b.path)));
 
-const out = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-${entries.map((e) => `  <url><loc>${e.loc}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}${e.title ? `<image:image><image:loc>${ORIGIN}/img/articles/${e.loc.match(/\/articles\/([^/]+)\/$/)[1]}.jpg</image:loc><image:title>${escXml(e.title)}</image:title></image:image>` : ""}</url>`).join("\n")}
-</urlset>
-`;
-const expectedTotal = kept + allSlugs.length + gslugs.length + legacySlugs.length;
-if (entries.length !== expectedTotal) throw new Error(`TOTAL != ${expectedTotal}: ` + entries.length);
-fs.writeFileSync(smPath, out);
-console.log(`sitemap: kept=${kept} (missing dropped=${droppedMissing}) + articles=${allSlugs.length} + hubs=${gslugs.length} + archive=${legacySlugs.length} → TOTAL=${entries.length} · image:blocks=${imgN}`);
-console.log(`OK → public/sitemap.xml (${entries.length})`);
+const xml = [
+  '<?xml version="1.0" encoding="UTF-8"?>',
+  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">',
+  ...entries.map((e) => `  <url><loc>${SITE}${e.path}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ""}</url>`),
+  "</urlset>",
+  "",
+].join("\n");
+
+const current = fs.existsSync(MAP) ? fs.readFileSync(MAP, "utf8") : "";
+const removed = [...existing.keys()].filter((p) => !entries.some((e) => decodeURIComponent(e.path) === p)).length;
+
+if (CHECK) {
+  const okNow = current === xml;
+  console.log(`sitemap: ${[...existing.keys()].length} رابطًا حاليًا · ${entries.length} صفحة على القرص · ${removed} رابطًا ميتًا`);
+  if (!okNow) {
+    console.log("FAIL خريطة الموقع لا تطابق الملفات — شغّل: node scripts/build_sitemap.js");
+    process.exit(1);
+  }
+  console.log("OK   خريطة الموقع مطابقة لما على القرص");
+  process.exit(0);
+}
+
+fs.writeFileSync(MAP, xml, "utf8");
+console.log(`✓ كُتب sitemap.xml: ${entries.length} رابطًا (حُذف ${removed} رابطًا بلا صفحة)`);

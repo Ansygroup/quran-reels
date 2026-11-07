@@ -181,6 +181,24 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   }
   chk("تعذّر تحميل محرّك المتصفح يعطي خطأ مفهومًا لا انهيارًا", friendly, why);
 
+  /* 11) لا مهام نشر لمنصة غير مرتبطة (16 صفًا فاشلًا في الإنتاج) */
+  const libAuto2 = require(path.join(ROOT, "lib", "autopilot.js"));
+  setDb({ rest: async (p) => (/social_connections/.test(p) ? [{ platform: "youtube" }] : []) });
+  const set1 = await libAuto2.__test.connectedPlatforms("u1");
+  chk("connectedPlatforms يعيد المنصات المرتبطة فقط", set1 instanceof Set && set1.has("youtube") && !set1.has("tiktok"),
+    [...(set1 || [])].join(","));
+  const autoSrc2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("generateAndPublish يفلتر المنصات بالربط", /requested\.filter\(p => connectedSet\.has\(p\)\)/.test(autoSrc2));
+  const apiSrc2 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
+  chk("run_all لا يشمل إلا المنصات المرتبطة", /platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
+
+  /* 12) فحص محرّك التوليد متاح ويعيد تقريرًا منظّمًا */
+  let st = null, stErr = null;
+  try { st = await libAuto2.__test.renderSelfTest(); } catch (e) { stErr = e; }
+  chk("renderSelfTest يُرجع تقريرًا بلا استثناء", Boolean(st) && typeof st.ok === "boolean" && typeof st.node === "string" && typeof st.ms === "number",
+    stErr ? String(stErr.message).slice(0, 80) : JSON.stringify(st).slice(0, 120));
+  chk("renderSelfTest يحمل مسار التنفيذ أو رسالة خطأ", Boolean(st && (st.executable_path || st.error)));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);

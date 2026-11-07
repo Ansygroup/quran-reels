@@ -92,3 +92,13 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: npm run test:boot && npm run test:login
   EXPECT: ‏10 + 14 فحصًا — لا استثناءات إقلاع · 114 سورة في القائمة · الراوتر يبدّل العروض · #year/الكوكيز موجودة · «دخول» يفتح النافذة · الرابط السحري يُستدعى بالبريد · جوجل · Esc/إغلاق
   EVIDENCE: 2026-11-07 — بعد استعادة الصفحة، كان أول سطر في app.js يرمي `#year` غير موجود فيتوقف الراوتر وتهيئة الصانع (موقع «مش شغال»)، وزر «دخول» بلا مستمع نقر ونافذة الدخول غير موجودة أصلًا.
+
+- [ ] G15: خريطة الموقع والأرقام المعلنة تطابق المخزون
+  CHECK: npm run test:sitemap   (والتصحيح: npm run sitemap)
+  EXPECT: ‏sitemap.xml = عدد صفحات القرص (8,250) بلا رابط ميت · كل مقال مُدرج · لا رقم مقالات في الواجهة/llms يتجاوز العدد الحقيقي
+  EVIDENCE: 2026-11-07 — كانت الخريطة تعلن 20,536 رابطًا منها 12,286 بلا صفحة، والصفحة الرئيسية وllms.txt يقولان «20,000 مقال» بينما المخزون 7,993.
+
+- [ ] G16: النشر الآلي لا يعد بما لا يُنشر + فحص محرّك التوليد
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: ‏run_all وgenerateAndPublish يفلتران المنصات بالربط الفعلي (لا صفوف «لا يوجد ربط») · renderSelfTest يعيد تقريرًا (ok/node/ms/مسار أو خطأ) وزر «🔍 فحص محرّك التوليد» في اللوحة
+  EVIDENCE: 2026-11-07 — 16 صفًا فاشلًا في publish_queue بخطأ «لا يوجد ربط لهذه المنصة»، وفشل إطلاق chromium بـ«libnss3.so: cannot open shared object file» على Vercel.

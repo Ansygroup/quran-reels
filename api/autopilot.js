@@ -2,7 +2,7 @@
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = require("../lib/autopilot");
+const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
@@ -169,8 +169,17 @@ const handler = async (req, res) => {
       if (Array.isArray(active) && active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
       
       const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-      const platforms = (config?.platforms || DEFAULTS.platforms).filter(p => PLATFORMS[p]);
-      if (platforms.length === 0) return json(res, 409, { error: "لا توجد قنوات مرتبطة لتشغيل التوازي" });
+      /* لا نُشغّل إلا ما يمكن نشره فعلًا: قناة مرتبطة + منصة يدعمها lib/publish.
+       * كان التشغيل يمرّر كل منصات الإعداد، فتُنشأ مهام لِما لا ربط له وتفشل
+       * بـ«لا يوجد ربط لهذه المنصة» (16 صفًا فاشلًا في publish_queue). */
+      const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=platform`);
+      const connectedPlatforms = Array.isArray(connected) ? [...new Set(connected.map(c => c.platform))] : [];
+      const requested = (config?.platforms || DEFAULTS.platforms).filter(p => PLATFORMS[p]);
+      const platforms = requested.filter(p => connectedPlatforms.includes(p));
+      if (connectedPlatforms.length === 0) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تشغيل التوازي" });
+      if (platforms.length === 0) {
+        return json(res, 409, { error: `المنصات المختارة غير مرتبطة (${requested.join(", ")}) — اربطها أولًا أو اختر منصة مرتبطة` });
+      }
       
       // تشغيل التوازي (Promise.all)
       const results = await Promise.all(platforms.map(platform => 
@@ -191,6 +200,13 @@ const handler = async (req, res) => {
       return json(res, result.ok ? 200 : 502, { ...result, article_id: article.id, article_title: article.title });
     }
 
+    /* فحص محرّك التوليد: هل يستطيع الخادم إطلاق المتصفح وفتح الصانع؟
+     * (لا يُنشئ فيديو ولا ينشر) — يجيب عن «هل النشر الآلي يعمل الآن؟» */
+    if (body.action === "selftest_render") {
+      const report = await renderSelfTest();
+      return json(res, report.ok ? 200 : 502, report);
+    }
+
     return json(res, 400, { error: "إجراء غير معروف" });
   } catch (error) {
     return json(res, 500, { error: String(error?.message || error).slice(0, 300) });
@@ -199,4 +215,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST };
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest };

@@ -107,6 +107,7 @@ window.PublishApp = {
         <div class="row gap-lg">
           <button class="btn btn-gold" id="quickGenArticle">${articleLabel}</button>
           <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
+          <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
         </div>
       `;
     }
@@ -179,7 +180,7 @@ window.PublishApp = {
           <button class="btn btn-gold" id="autoGenArticle">${articleLabel}</button>
         </div>
         
-        <!-- بطاقة المقال (دعم 10,000 مقال) -->
+        <!-- بطاقة المقال (العدد الحقيقي يأتي من الخادم) -->
         <div id="acctArticles" class="card" style="margin-top:18px;display:none">
           <h2>📚 مكتبة المقالات${articleCount ? ` (${articleCount.toLocaleString("ar-EG")})` : ""}</h2>
           <div class="row gap-lg" id="articleCards">
@@ -235,7 +236,7 @@ window.PublishApp = {
       else alert(data.error || "خطأ في التشغيل المتوازي");
     });
 
-    // توليد من مقال (10,000 مقال)
+    // توليد من مقال (العدد من الخادم)
     document.getElementById("autoGenArticle")?.addEventListener("click", async () => {
       const res = await fetch("/api/autopilot", {
         method: "POST",
@@ -249,6 +250,34 @@ window.PublishApp = {
 
     // زر الإجراءات السريعة (توليد من مقال)
     document.getElementById("quickGenArticle")?.addEventListener("click", () => document.getElementById("autoGenArticle")?.click());
+
+    /* فحص محرّك التوليد: يخبر المستخدم فورًا هل النشر الآلي قادر على العمل،
+     * وبنص الخطأ الحقيقي (libnss3، مسار التنفيذ، زمن الإقلاع) بدل التخمين. */
+    document.getElementById("quickSelfTest")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget, notice = document.getElementById("acctNotice");
+      const original = btn.textContent;
+      btn.disabled = true; btn.textContent = "⏳ جارٍ الفحص…";
+      if (notice) { notice.style.display = "block"; notice.textContent = "نجرّب إطلاق المتصفح على الخادم…"; }
+      try {
+        const res = await fetch("/api/autopilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+          body: JSON.stringify({ action: "selftest_render" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (notice) {
+          notice.style.display = "block";
+          notice.textContent = data.ok
+            ? `✅ محرّك التوليد يعمل (Node ${data.node} · ${Math.round((data.ms || 0) / 100) / 10}ث · صفحة: ${String(data.page_title || "").slice(0, 60)})`
+            : `⚠️ محرّك التوليد لا يعمل: ${String(data.error || "سبب غير معروف").slice(0, 200)}`;
+          notice.style.color = data.ok ? "#7ee0a2" : "#ffb4a2";
+        }
+      } catch (error) {
+        if (notice) { notice.style.display = "block"; notice.textContent = "تعذّر تنفيذ الفحص: " + String(error?.message || error).slice(0, 120); }
+      } finally {
+        btn.disabled = false; btn.textContent = original;
+      }
+    });
     
     // زر الإجراءات السريعة (توازي)
     document.getElementById("quickRunAll")?.addEventListener("click", () => document.getElementById("autoRunAll")?.click());
