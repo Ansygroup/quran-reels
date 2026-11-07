@@ -1,469 +1,335 @@
 /* ============================================================
-   QRPublish — الحساب، ربط المنصات، جدول النشر، الأتمتة، مولّد البوست
+   قرآن ريلز — QuranReels Pro  |  Publish Logic (v9)
    ============================================================ */
-const QRPublish = (() => {
-  const $id = i => document.getElementById(i);
-  const PLATFORMS = {
-    youtube: { name: "يوتيوب", icon: "🎬", color: "#ff0033" },
-    facebook: { name: "فيسبوك", icon: "👥", color: "#1877f2" },
-    instagram: { name: "إنستغرام", icon: "📸", color: "#e1306c" },
-    tiktok: { name: "تيك توك", icon: "🎵", color: "#111" },
-    x: { name: "X", icon: "𝕏", color: "#000" },
-  };
-  const SETUP_TEXT = {
-    youtube: { env: "GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET", where: "Google Cloud Console → OAuth consent screen → Credentials", redirect: "/api/oauth/callback" },
-    meta: { env: "META_APP_ID + META_APP_SECRET", where: "developers.facebook.com → My Apps → إضافة تطبيق", redirect: "/api/oauth/callback" },
-    tiktok: { env: "TIKTOK_CLIENT_KEY + TIKTOK_CLIENT_SECRET", where: "developers.tiktok.com → تسجيل تطبيق", redirect: "/api/oauth/callback" },
-    x: { env: "X_CLIENT_ID + X_CLIENT_SECRET", where: "developer.x.com → Projects & Apps", redirect: "/api/oauth/callback" },
-  };
-  let conns = [], queue = [], schedBlob = null, schedPath = "", autoData = null;
+const { getUserId } = require("../lib/sess");
+const { q1, rest } = require("../lib/db");
+const { json } = require("../lib/oauth");
+const { renderAuto, renderQueue, PostGen, cairoClockLabel, PLATFORMS } = require("./core");
 
-  /* ---------- مساعدات REST ---------- */
-  async function sb(path, opts = {}) {
-    const t = await QRAuth.token();
-    if (!t) throw new Error("سجل الدخول أولًا");
-    const c = await QRAuth.conf();
-    const r = await fetch(c.url + path, {
-      ...opts,
-      headers: { apikey: c.anon, Authorization: "Bearer " + t, "Content-Type": "application/json", ...(opts.headers || {}) },
-    });
-    if (!r.ok) throw new Error(`تعذّر (${r.status})`);
-    const j = await r.text();
-    try { return JSON.parse(j); } catch { return j; }
+// دعم جميع المنصات (تعدد القنوات)
+const ALL_PLATFORMS = Object.keys(PLATFORMS);
+
+async function readBody(req) {
+  let text = "";
+  for await (const part of req) {
+    text += part;
+    if (text.length > 20000) throw new Error("الطلب أكبر من المسموح");
   }
-  const restHeaders = extra => ({ Prefer: "return=representation", ...(extra || {}) });
+  try { return JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
+}
 
-  /* ---------- رفع الفيديو للتخزين ---------- */
-  async function uploadVideo(blob, name) {
-    const u = QRAuth.user(); if (!u) throw new Error("سجل الدخول أولًا");
-    const c = await QRAuth.conf();
-    const t = await QRAuth.token();
-    const path = `${u.id}/${Date.now()}-${String(name || "reel.mp4").replace(/[^\w.\-]/g, "_")}`;
-    const r = await fetch(`${c.url}/storage/v1/object/reels/${path}`, {
-      method: "POST",
-      headers: { apikey: c.anon, Authorization: "Bearer " + t, "Content-Type": blob.type || "video/mp4", "x-upsert": "true" },
-      body: blob,
-    });
-    if (!r.ok) throw new Error(`رفع الفيديو فشل (${r.status})`);
-    return path;
-  }
-
-  /* ---------- مولّد البوستات ---------- */
-  const PostGen = {
-    _notes: [
-      "﴿وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا﴾ 🤍",
-      "اجعلها جزءًا من يومك — الأجر يتجدد بإذن الله 🤍",
-      "﴿إِنَّ هَٰذَا الْقُرْآنَ يَهْدِي لِلَّتِي هِيَ أَقْوَمُ﴾",
-      "شاركها لتصل الحسنة إلى غيرك ✨",
-      "دقائق هادئة مع كتاب الله 🤍",
-    ],
-    _hash: ["قرآن", "آيات_القرآن", "ترتيل", "رياحين_القرآن", "islamic", "quran", "شورتس", "اسلاميات"],
-    generate(platform, m) {
-      const day = Math.floor(Date.now() / 86400000);
-      const note = this._notes[day % this._notes.length];
-      const verses = m.from === m.to ? `آية ${m.from}` : `الآيات ${m.from}–${m.to}`;
-      const rec = m.reciter ? ` بصوت ${m.reciter}` : "";
-      const base = `سورة ${m.surah} ${verses}${rec}`;
-      const tagsBy = {
-        youtube: ["قرآن", "سورة " + (m.surah || ""), "ترتيل", "شورتس"],
-        instagram: this._hash.slice(0, 8),
-        facebook: this._hash.slice(0, 6),
-        tiktok: ["قرآن", "اسلاميات", "ترتيل", "tiktok", "quran"],
-        x: ["قرآن", "islamic"],
-      };
-      const hashtags = (tagsBy[platform] || this._hash).map(t => "#" + t).join(" ");
-      const caption = `${base} 🤍\n\n${note}\n\nلا تنسَ المتابعة لتصلك تلاوات يومية 🤍`;
-      const titleMap = {
-        youtube: `${base} | تلاوة مرتّلة`.slice(0, 100),
-        facebook: base.slice(0, 200),
-        instagram: base.slice(0, 120),
-        tiktok: `${base} 🤍`.slice(0, 150),
-        x: `${base} 🤍`.slice(0, 240),
-      };
-      return { title: titleMap[platform] || base, caption, hashtags, note };
-    },
-  };
-
-  /* ---------- منطق الحساب ---------- */
-  async function loadConnections() {
-    try {
-      const t = await QRAuth.token(); if (!t) { conns = []; return; }
-      const r = await fetch("/api/social?op=list", { headers: { Authorization: "Bearer " + t } });
-      const j = await r.json();
-      conns = j.connections || [];
-    } catch { conns = []; }
-  }
-  async function loadQueue() {
-    try {
-      const u = QRAuth.user(); if (!u) { queue = []; return; }
-      queue = await sb(`/rest/v1/publish_queue?user_id=eq.${u.id}&order=publish_at.desc&limit=50`);
-      if (!Array.isArray(queue)) queue = [];
-    } catch { queue = []; }
-  }
-  async function loadAuto() {
-    try {
-      const t = await QRAuth.token(); if (!t) return null;
-      const r = await fetch("/api/autopilot", { headers: { Authorization: "Bearer " + t } });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "تعذّر تحميل لوحة الأتمتة");
-      autoData = j;
-      return j;
-    } catch { autoData = null; return null; }
-  }
-  async function saveAuto(obj) {
-    const t = await QRAuth.token(); if (!t) throw new Error("سجّل الدخول أولًا");
-    const r = await fetch("/api/autopilot", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", ...obj }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || "تعذّر حفظ الإعدادات");
-    if (autoData) autoData.config = j.config;
-    return j.config;
-  }
-  function cairoClockLabel() {
-    const now = new Date();
-    const cairo = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 4, 15)));
-    return `${cairo} بتوقيت القاهرة`;
-  }
-
-
-  /* ---------- الرسم ---------- */
-  function statusBadge(r) {
-    const map = {
-      scheduled: ["🕐 مجدولة", "sch"], publishing: ["⏳ تُنشر…", "sch"],
-      published: ["✅ منشورة", "ok"], failed: ["⚠️ فشلت", "err"], draft: ["✏️ مسودة", "sch"],
-    };
-    const [txt, cls] = map[r.status] || [r.status, "sch"];
-    return `<span class="qbadge ${cls}">${txt}</span>`;
-  }
-
-  function renderChannels() {
-    const wrap = $id("acctChannels"); if (!wrap) return;
-    wrap.innerHTML = Object.entries(PLATFORMS).map(([k, p]) => {
-      const c = conns.find(x => x.platform === k);
-      const igAttached = k === "instagram" && !c && conns.find(x => x.platform === "facebook")?.extra?.ig;
-      const linked = !!c;
-      const sub = linked
-        ? (k === "facebook" && c.extra?.pages?.length ? esc(c.account_name + " · " + c.extra.pages.length + " صفحة") : esc(c.account_name))
-        : (igAttached ? "متاح عبر ربط فيسبوك" : "غير مرتبطة");
-      return `<div class="chan-card ${linked ? "on" : ""}">
-        <div class="chan-ic">${p.icon}</div>
-        <div class="chan-info">
-          <b>${p.name}</b>
-          <small class="${linked ? "ok" : ""}">${linked ? "✓ " + sub : sub}</small>
-        </div>
-        ${linked
-          ? `<button class="btn btn-ghost btn-sm" data-disc="${c.id}">فك الربط</button>`
-          : `<button class="btn btn-em btn-sm" data-conn="${k}">اربط</button>`}
-      </div>`;
-    }).join("");
-    wrap.querySelectorAll("[data-conn]").forEach(b => b.onclick = async () => {
-      const k = b.dataset.conn;
-      const t = await QRAuth.token();
-      if (!t) { openLogin(); return; }
-      const pk = k === "facebook" ? "meta" : k;
-      location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
-    });
-    wrap.querySelectorAll("[data-disc]").forEach(b => b.onclick = async () => {
-      const t = await QRAuth.token();
-      await fetch("/api/social?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
-      toast("تم فك الربط");
-      refreshAccount();
-    });
-  }
-
-  function renderQueue() {
-    const wrap = $id("acctQueue"); if (!wrap) return;
-    if (!queue.length) { wrap.innerHTML = `<div class="hint">لا مهام بعد — أنشئ فيديو ثم اضغط «جدولة للنشر»، أو أضف ملفًا من هنا.</div>`; return; }
-    wrap.innerHTML = queue.map(r => {
-      const p = PLATFORMS[r.platform] || { name: r.platform, icon: "•" };
-      const d = new Date(r.publish_at);
-      const when = isNaN(d) ? "" : d.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
-      const canAct = r.status === "scheduled" || r.status === "failed";
-      return `<div class="qrow">
-        <span class="qic">${p.icon}</span>
-        <div class="qinfo">
-          <b>${esc(r.title || "ريلز")}</b>
-          <small>${p.name} · ${when}${r.error ? ` · <i class="qerr">${esc(r.error.slice(0, 90))}</i>` : ""}${r.external_url ? ` · <a href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</small>
-        </div>
-        ${statusBadge(r)}
-        <div class="qacts">
-          ${canAct ? `<button class="btn btn-gold btn-sm" data-pub="${r.id}">انشر الآن</button>` : ""}
-          <button class="btn btn-ghost btn-sm" data-del="${r.id}">حذف</button>
-        </div>
-      </div>`;
-    }).join("");
-    wrap.querySelectorAll("[data-pub]").forEach(b => b.onclick = () => publishNow(b.dataset.pub, b));
-    wrap.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
-      const u = QRAuth.user();
-      await sb(`/rest/v1/publish_queue?id=eq.${b.dataset.del}&user_id=eq.${u.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
-      toast("حُذفت المهمة");
-      refreshAccount();
-    });
-  }
-
-  async function publishNow(id, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = "…"; }
-    try {
-      const t = await QRAuth.token();
-      const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
-      const j = await r.json().catch(() => ({}));
-      if (j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
-    } catch (e) { toast(String(e.message || e), "err"); }
-    refreshAccount();
-  }
-
-  async function renderAuto() {
-    const wrap = $id("acctAuto"); if (!wrap) return;
-    if (!QRAuth.user()) { wrap.innerHTML = `<h2>🤖 لوحة الأتمتة</h2><p class="hint">سجّل الدخول، ثم اربط قناة YouTube لإدارة الإنشاء والنشر التلقائي.</p>`; return; }
-    const data = await loadAuto();
-    const a = data?.config || { enabled: false, template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate" } };
-    const t = a.template && typeof a.template === "object" ? a.template : {};
-    const connected = !!data?.connected || conns.some(x => x.platform === "youtube");
-    const runs = Array.isArray(data?.runs) ? data.runs : [];
-    const modes = { mix: "تنويع كل المقاطع", famous: "آيات وسور مشهورة", sequential: "التدرّج حسب ترتيب السور" };
-    const backgrounds = {
-      rotate: "خلفية مختلفة بالتناوب", "bg-mosque-night": "مسجد ليلاً", "bg-starry-desert": "سماء النجوم",
-      "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "أشعة الغابة", "bg-geometric-islamic": "زخرفة إسلامية",
-      "bg-mountains-dawn": "جبال الفجر", "bg-mosque-silhouette": "ظلال مسجد", "bg-arabesque-dark": "أرابيسك داكن",
-      "bg-heavenly-clouds": "غيوم نورانية", "grad-emerald": "زمردي", "grad-gold": "ذهبي", "grad-dawn": "فجر وردي", "grad-night": "ليل أزرق",
-    };
-    const runStatus = { rendering: ["🎬 يُنشأ", "sch"], queued: ["🕐 جاهز للنشر", "sch"], published: ["✅ نُشر", "ok"], failed: ["⚠️ تعذّر", "err"] };
-    const runRows = runs.length ? runs.map(r => {
-      const [label, cls] = runStatus[r.status] || [esc(r.status || "—"), "sch"];
-      const date = r.created_at ? new Date(r.created_at).toLocaleString("ar-EG", { timeZone: "Africa/Cairo", dateStyle: "medium", timeStyle: "short" }) : "";
-      return `<div class="auto-run"><div><b>${esc(r.title || "فيديو قرآن")}</b><small>${date}${r.reciter ? ` · ${esc(r.reciter)}` : ""}${r.error ? ` · <span class="qerr">${esc(r.error.slice(0, 120))}</span>` : ""}</small></div><span class="qbadge ${cls}">${label}</span>${r.external_url ? `<a class="btn btn-ghost btn-sm" href="${esc(r.external_url)}" target="_blank" rel="noopener">فتح ↗</a>` : ""}</div>`;
-    }).join("") : `<p class="hint">لا توجد عمليات إنشاء بعد.</p>`;
-
-    wrap.innerHTML = `
-      <div class="auto-head"><div><h2>🤖 لوحة الأتمتة</h2><p class="hint" style="margin:4px 0">إنشاء الفيديو من المولّد ثم رفعه علنًا إلى قناتك على YouTube.</p></div>
-        <label class="switch" title="تشغيل أو إيقاف النشر اليومي"><input type="checkbox" id="autoOn" ${a.enabled ? "checked" : ""} ${connected ? "" : "disabled"}><i></i></label>
-      </div>
-      ${!connected ? `<div class="auto-warning">اربط قناة YouTube من بطاقة «ربط المنصات» أولًا، ثم فعّل الأتمتة.</div>` : `<div class="auto-health"><span class="auto-dot ${a.enabled ? "on" : ""}"></span><b>${a.enabled ? "الأتمتة مفعّلة" : "الأتمتة متوقفة"}</b><span>· ${esc(data?.channel || "قناة YouTube المرتبطة")}</span></div>`}
-      <div class="auto-grid">
-        <div class="f-group"><label for="autoContent">محتوى المقاطع</label><select id="autoContent" style="width:100%">${Object.entries(modes).map(([k,v]) => `<option value="${k}" ${t.content_mode === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
-        <div class="f-group"><label>القارئ</label><div class="auto-static">التناوب بين القراء المتاحين</div></div>
-        <div class="f-group"><label for="autoBg">الخلفية</label><select id="autoBg" style="width:100%">${Object.entries(backgrounds).map(([k,v]) => `<option value="${k}" ${(t.background || "rotate") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
-        <div class="f-group"><label>قناة النشر</label><div class="auto-static">🎬 YouTube · عام تلقائيًا</div></div>
-      </div>
-      <div class="auto-schedule"><b>🗓️ الموعد:</b> يوميًا، الهدف ${cairoClockLabel()}. <span>قد يتفاوت التنفيذ حتى نحو ساعة على خطة الاستضافة الحالية، ويتغير التوقيت المحلي مع التوقيت الصيفي.</span></div>
-      <div class="auto-actions"><button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button><button class="btn btn-ghost" id="autoRun" ${connected ? "" : "disabled"}>أنشئ وانشر الآن</button></div>
-      <p class="hint auto-note">سيُنشأ الفيديو تلقائيًا بخلفية عمودية 9:16 وصيغة WebM/MP4 بحسب دعم محرّك الموقع، مع التناوب بين القراء، ثم يُرفع علنًا دون مراجعة. استخدم الإيقاف لإيقاف الدورات القادمة. تحقّق من أذونات إعادة نشر ملفات التلاوة قبل تفعيل النشر العام.</p>
-      <div class="auto-history-head"><b>سجل الإنشاء والنشر</b><small>${runs.length} من آخر العمليات</small></div><div class="auto-runs">${runRows}</div>`;
-
-    const save = $id("autoSave");
-    save.onclick = async () => {
-      save.disabled = true;
-      try {
-        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
-        toast($id("autoOn").checked ? "تم حفظ لوحة الأتمتة وتفعيل النشر اليومي 🤖" : "تم حفظ الإعدادات وإيقاف النشر اليومي");
-        await refreshAccount();
-      } catch (e) { toast(e.message || "تعذّر الحفظ", "err"); save.disabled = false; }
-    };
-    const run = $id("autoRun");
-    run.onclick = async () => {
-      if (!window.confirm("سيُنشأ فيديو قرآني ويُنشر علنًا الآن على قناة YouTube المرتبطة. هل تريد المتابعة؟")) return;
-      run.disabled = true; run.textContent = "جارٍ إنشاء الفيديو ورفعه…";
-      try {
-        await saveAuto({ enabled: $id("autoOn").checked, template: { content_mode: $id("autoContent").value, reciter_mode: "rotate", background: $id("autoBg").value, privacy: "public" } });
-        const token = await QRAuth.token();
-        const r = await fetch("/api/autopilot", { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ action: "run" }) });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) throw new Error(j.error || "تعذّر إنشاء الفيديو أو نشره");
-        toast("تم إنشاء الفيديو ونشره ✓");
-      } catch (e) { toast(e.message || "تعذّر التنفيذ", "err"); }
-      await refreshAccount();
-    };
-  }
-
-
-  function renderAuthCard() {
-    const wrap = $id("acctAuth"); if (!wrap) return;
-    const u = QRAuth.user();
-    if (u) {
-      wrap.innerHTML = `<div class="card acct-user">
-        <div class="avatar">${esc((u.name || u.email || "?").charAt(0).toUpperCase())}</div>
-        <div><b>${esc(u.name || u.email || "حسابي")}</b><br><small class="hint">${esc(u.email || "")}</small></div>
-        <div style="margin-inline-start:auto;display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" id="acctLogout">خروج</button>
-        </div>
-      </div>`;
-      $id("acctLogout").onclick = () => { QRAuth.signOut().then(() => { toast("تم تسجيل الخروج"); refreshAccount(); }); };
-    } else {
-      wrap.innerHTML = `<div class="card acct-login">
-        <h3>🔑 سجّل لتبدأ الأتمتة</h3>
-        <p class="hint">حساب واحد يفتح: حفظ الفيديوهات، الربط بالمنصات، جدولة النشر، والأتمتة اليومية. الموقع يبقى يعمل للجميع بلا تسجيل.</p>
-        <div class="login-row">
-          <input type="email" id="acctEmail" placeholder="بريدك الإلكتروني" dir="ltr">
-          <button class="btn btn-gold" id="acctMagic">أرسل رابط الدخول</button>
-        </div>
-        <button class="btn btn-em w100" id="acctGoogle">G المتابعة بجوجل</button>
-        <p class="hint center" style="margin-top:8px">لا كلمات مرور — يصلك رابط سحري لبريدك أو الدخول بحساب جوجل.</p>
-      </div>`;
-      $id("acctMagic").onclick = async () => {
-        const em = ($id("acctEmail").value || "").trim();
-        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return toast("أدخل بريدًا صحيحًا", "err");
-        try { await QRAuth.magicLink(em); toast("✓ أرسلنا رابط الدخول — تفقد بريدك"); }
-        catch (e) { toast(e.message, "err"); }
-      };
-      $id("acctGoogle").onclick = () => QRAuth.google();
+module.exports = async (req, res) => {
+  const uid = await getUserId(req);
+  if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
+  try {
+    if (req.method === "GET") {
+      const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
+      const runs = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&select=id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at,article_id,article_title&order=created_at.desc&limit=12`);
+      const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
+      const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
+      const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
+      
+      return json(res, 200, {
+        config: config ? { ...config, template: JSON.parse(config.template || "{}") } : { enabled: false, at_utc: "04:15:00", platforms: ["youtube"], template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" } },
+        runs: Array.isArray(runs) ? runs : [],
+        connected: connectedPlatforms.length > 0,
+        platforms: connectedPlatforms,
+        channel: channelNames || "لا توجد قنوات مرتبطة",
+        reciters: require("../lib/autopilot").RECITERS,
+      });
     }
-  }
 
-  function renderNotice() {
-    const wrap = $id("acctNotice"); if (!wrap) return;
-    const h = location.hash || "";
-    const mSetup = h.match(/setup=(\w+)/), mLinked = h.match(/linked=(\w+)/);
-    if (mSetup && SETUP_TEXT[mSetup[1]]) {
-      const s = SETUP_TEXT[mSetup[1]];
-      wrap.hidden = false;
-      wrap.innerHTML = `<b>⚙️ هذه المنصة تحتاج إعدادًا أولًا (مرة واحدة، مطوّر الموقع فقط):</b>
-        <ol class="setup-list">
-          <li>أنشئ التطبيق لدى: ${s.where}</li>
-          <li>سجّل رابط إعادة التوجيه: <code>${location.origin}${s.redirect}</code></li>
-          <li>أضِف المتغيرات في Vercel: <code>${s.env}</code></li>
-          <li>أعد النشر — وسيختفي هذا التنبيه.</li>
-        </ol>`;
-      history.replaceState(null, "", location.pathname + "#/account");
-    } else if (mLinked) {
-      wrap.hidden = true;
-      const k = mLinked[1];
-      if (k.endsWith("_err")) toast("تعذّر إتمام الربط — تأكد من الموافقة على الصلاحيات", "err");
-      else if (k !== "undefined") toast("تم الربط بنجاح 🎉");
-      history.replaceState(null, "", location.pathname + "#/account");
-    } else wrap.hidden = true;
-  }
+    if (req.method !== "POST") return json(res, 405, { error: "method" });
+    const body = await readBody(req);
 
-  async function refreshAccount() {
-    renderNotice();
-    renderAuthCard();
-    const u = QRAuth.user();
-    if (u) { await loadConnections(); await loadQueue(); }
-    renderChannels(); renderQueue(); renderAuto();
-    // بطاقة المهمة الجديدة
-    const ns = $id("btnNewSched");
-    if (ns) ns.onclick = () => $id("schedFile").click();
-  }
-
-  /* ---------- نافذة الجدولة ---------- */
-  function selMeta() {
-    try {
-      const reciterName = (typeof RECITERS !== "undefined" && typeof Selection !== "undefined")
-        ? (RECITERS.find(r => r.folder === Selection.reciter) || {}).n || "" : "";
-      let surahName = "";
-      try { if (typeof Quran !== "undefined" && typeof Selection !== "undefined") surahName = Quran.shortName(Selection.surah); } catch {}
-      return {
-        surah: surahName || "القرآن",
-        from: typeof Selection !== "undefined" ? Selection.from : 1,
-        to: typeof Selection !== "undefined" ? Selection.to : 1,
-        reciter: reciterName,
-      };
-    } catch { return { surah: "القرآن", from: 1, to: 30, reciter: "" }; }
-  }
-
-  function openSchedule(path, blob) {
-    schedPath = path || ""; schedBlob = blob || null;
-    const modal = $id("schedOverlay");
-    const def = PostGen.generate("youtube", selMeta());
-    $id("schedTitle").value = def.title;
-    $id("schedCaption").value = def.caption;
-    $id("schedTags").value = def.hashtags;
-    const d = new Date(Date.now() + 3600e3);
-    d.setSeconds(0, 0);
-    $id("schedWhen").value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    $id("schedFileLabel").textContent = schedPath ? "✓ الفيديو جاهز (سيُرفع تلقائيًا عند الحفظ)" : "";
-    modal.hidden = false;
-  }
-  async function submitSchedule() {
-    const checked = [...document.querySelectorAll(".schedPlat:checked")].map(x => x.value);
-    if (!checked.length) return toast("اختر منصة واحدة على الأقل", "err");
-    const when = $id("schedWhen").value;
-    if (!when) return toast("حدد وقت النشر", "err");
-    const title = ($id("schedTitle").value || "ريلز قرآن").trim();
-    const caption = ($id("schedCaption").value || "").trim();
-    const hashtags = ($id("schedTags").value || "").trim();
-    try {
-      const u = QRAuth.user(); if (!u) { $id("schedOverlay").hidden = true; return openLogin(); }
-      let path = schedPath;
-      if (!path && schedBlob) {
-        path = await uploadVideo(schedBlob, "scheduled.mp4");
-      } else if (!path) { return toast("لا يوجد فيديو", "err"); }
-      const publish_at = new Date(when).toISOString();
-      const rows = checked.map(p => ({
-        user_id: u.id, platform: p, video_path: path, video_name: "reel.mp4",
-        title: title.slice(0, 120), caption: caption.slice(0, 4000), hashtags: hashtags.slice(0, 500),
-        status: "scheduled", publish_at,
-      }));
-      await sb(`/rest/v1/publish_queue`, { method: "POST", headers: restHeaders(), body: JSON.stringify(rows) });
-      $id("schedOverlay").hidden = true;
-      const past = new Date(publish_at) <= Date.now();
-      toast(past ? "تمت الجدولة — ستُنشر خلال دقائق" : `مجدولة على ${checked.length} منصة ✓`);
-      if (QRAuth.user()) { await loadQueue(); renderQueue(); }
-    } catch (e) { toast(String(e.message || e), "err"); }
-  }
-
-  function openLogin() { $id("loginOverlay").hidden = false; }
-
-  function wireGlobals() {
-    const b = $id("btnSchedule"); // من نافذة نتيجة الإنشاء — يُربط في creator
-    const sf = $id("schedFile");
-    if (sf) sf.onchange = async () => {
-      const f = sf.files?.[0]; if (!f) return;
-      if (!QRAuth.user()) { openLogin(); sf.value = ""; return; }
-      try {
-        toast("جارٍ رفع الفيديو إلى حسابك…");
-        const path = await uploadVideo(f, f.name);
-        openSchedule(path, null);
-        $id("schedFileLabel").textContent = "✓ تم رفع الفيديو: " + f.name;
-      } catch (e) { toast(String(e.message || e), "err"); }
-      sf.value = "";
-    };
-    const ss = $id("schedSubmit"); if (ss) ss.onclick = submitSchedule;
-    const sc = $id("schedCancel"); if (sc) sc.onclick = () => ($id("schedOverlay").hidden = true);
-    const gen = $id("schedGen");
-    if (gen) gen.onclick = () => {
-      const list = [...document.querySelectorAll(".schedPlat:checked")].map(x => x.value);
-      const p = list[0] || "youtube";
-      const g = PostGen.generate(p, selMeta());
-      $id("schedTitle").value = g.title; $id("schedCaption").value = g.caption; $id("schedTags").value = g.hashtags;
-      toast("تم توليد بوست مناسب للمنصة ✨");
-    };
-    const lb = $id("loginSubmit");
-    if (lb) lb.onclick = async () => {
-      const em = ($id("loginEmail").value || "").trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return toast("أدخل بريدًا صحيحًا", "err");
-      try { await QRAuth.magicLink(em); $id("loginOverlay").hidden = true; toast("✓ أرسلنا رابط الدخول إلى بريدك"); }
-      catch (e) { toast(e.message, "err"); }
-    };
-    const lg = $id("loginGoogle"); if (lg) lg.onclick = () => QRAuth.google();
-    document.querySelectorAll(".overlay .close-x").forEach(x => {
-      if (!x.dataset.wired) { x.dataset.wired = "1"; x.onclick = () => x.closest(".overlay").hidden = true; }
-    });
-    const ab = $id("authBtn");
-    if (ab) ab.onclick = () => { const u = QRAuth.user(); u ? Router.go("#/account") : openLogin(); };
-  }
-
-  function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-
-  return {
-    PLATFORMS, PostGen,
-    uploadVideo, openSchedule, refreshAccount, wireGlobals, openLogin,
-    async scheduleFromExport(blob, name) {
-      if (!QRAuth.user()) { window._schedPending = { blob, name }; openLogin(); return; }
-      try {
-        toast("جارٍ الحفظ في حسابك…");
-        const path = await uploadVideo(blob, name);
-        openSchedule(path, null);
-      } catch (e) { toast(String(e.message || e), "err"); }
-    },
-    async afterLogin() {
-      if (window._schedPending) {
-        const { blob, name } = window._schedPending; window._schedPending = null;
-        try { const path = await uploadVideo(blob, name); openSchedule(path, null); } catch (e) { toast(String(e.message || e), "err"); }
+    // دعم التوازي (run_all) وتعدد القنوات والمقالات
+    if (body.action === "save") {
+      const templateInput = body.template && typeof body.template === "object" ? body.template : {};
+      const content_mode = templateInput.content_mode || "mix";
+      const background = templateInput.background || "rotate";
+      const enabled = body.enabled === true;
+      const platforms = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : ["youtube"];
+      
+      if (enabled) {
+        const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&platform=in.(${platforms.map(p => `'${p}'`).join(',')})&select=id&limit=1`);
+        if (!Array.isArray(connected) || connected.length === 0) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تفعيل النشر الآلي" });
       }
-      refreshAccount();
-    },
-  };
-})();
+      
+      const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
+      const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify({ user_id: uid, enabled, at_utc: "04:15:00", platforms, template, updated_at: new Date().toISOString() }),
+      });
+      const config = Array.isArray(saved) ? saved[0] : saved;
+      return json(res, 200, { ok: true, config: { ...config, template: JSON.parse(config.template || "{}") } });
+    }
+
+    if (body.action === "run") {
+      const active = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&status=eq.rendering&select=id&limit=1`);
+      if (Array.isArray(active) && active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
+      
+      const result = await renderAuto(uid, { runType: "manual" });
+      return json(res, result.ok ? 200 : 502, result);
+    }
+
+    // دعم التوازي (run_all)
+    if (body.action === "run_all") {
+      const active = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&status=eq.rendering&select=id&limit=1`);
+      if (Array.isArray(active) && active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
+      
+      const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
+      const platforms = (config?.platforms || ["youtube"]).filter(p => PLATFORMS[p]);
+      if (platforms.length === 0) return json(res, 409, { error: "لا توجد قنوات مرتبطة لتشغيل التوازي" });
+      
+      // تشغيل التوازي (Promise.all)
+      const results = await Promise.all(platforms.map(platform => 
+        renderAuto(uid, { runType: "manual", config: { ...config, platforms: [platform] } })
+      ));
+      
+      const ok = results.every(r => r.ok);
+      return json(res, ok ? 200 : 502, { ok, results });
+    }
+
+    // دعم توليد البوست من المقالات
+    if (body.action === "article_random") {
+      const article = await PostGen.article();
+      if (!article) return json(res, 404, { error: "لا توجد مقالات متاحة" });
+      
+      const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
+      const result = await renderAuto(uid, { runType: "manual", config, article });
+      return json(res, result.ok ? 200 : 502, { ...result, article_id: article.id, article_title: article.title });
+    }
+
+    // جدول النشر (تعدد القنوات والتوازي)
+    if (body.action === "schedule") {
+      const { title, time, platforms, article_id } = body;
+      if (!title || !time || !Array.isArray(platforms) || platforms.length === 0) return json(res, 400, { error: "بيانات الجدولة غير مكتملة" });
+      
+      const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&platform=in.(${platforms.map(p => `'${p}'`).join(',')})&select=id&limit=1`);
+      if (!Array.isArray(connected) || connected.length === 0) return json(res, 409, { error: "اربط القنوات أولًا قبل الجدولة" });
+      
+      const article = article_id ? await PostGen.articleById(article_id) : null;
+      const result = await renderQueue(uid, { title, time, platforms, article });
+      return json(res, result.ok ? 200 : 502, result);
+    }
+
+    return json(res, 400, { error: "إجراء غير معروف" });
+  } catch (error) {
+    return json(res, 500, { error: String(error?.message || error).slice(0, 300) });
+  }
+};
+
+// واجهة العميل (تحديثات التوازي وتعدد القنوات والمقالات)
+window.PublishApp = {
+  PLATFORMS: ALL_PLATFORMS,
+  PLATFORMS_MAP: PLATFORMS,
+  cairoClockLabel,
+  
+  async init() {
+    const uid = await window.AuthApp.getUserId();
+    if (!uid) {
+      window.location.hash = "/";
+      return;
+    }
+    
+    // تحميل البيانات
+    const res = await fetch("/api/publish", { method: "GET", headers: { Authorization: `Bearer ${await window.AuthApp.getToken()}` } });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || "خطأ في تحميل البيانات");
+      return;
+    }
+    
+    this.renderAccount(data);
+    this.bindEvents(uid);
+  },
+
+  renderAccount(data) {
+    const { config, runs, connected, platforms, channel, reciters } = data;
+    
+    // بطاقة الإجراءات السريعة
+    const quickActions = document.getElementById("acctQuickActions");
+    if (quickActions) {
+      quickActions.hidden = false;
+      quickActions.innerHTML = `
+        <h2>⚡ إجراءات سريعة</h2>
+        <div class="row gap-lg">
+          <button class="btn btn-gold" id="quickGenArticle">توليد من مقال (10,000 مقال)</button>
+          <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
+        </div>
+      `;
+    }
+
+    // بطاقة الربط (تعدد القنوات)
+    const acctPlatforms = document.getElementById("acctPlatforms");
+    if (acctPlatforms) {
+      acctPlatforms.innerHTML = ALL_PLATFORMS.map(p => `
+        <div class="f-group" style="flex:1">
+          <label>${PLATFORMS[p] || p}</label>
+          <input type="checkbox" id="plat-${p}" ${platforms.includes(p) ? 'checked' : ''} data-platform="${p}" style="width:100%">
+        </div>
+      `).join("");
+    }
+
+    // جدول النشر
+    const acctQueue = document.getElementById("acctQueue");
+    if (acctQueue) {
+      const platformSelect = `
+        <div class="row gap-sm wrap" id="schedPlatforms">
+          ${ALL_PLATFORMS.map(p => `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p}"> ${PLATFORMS[p] || p}</label></div>`).join("")}
+        </div>
+      `;
+      acctQueue.querySelector("#schedPlatforms").innerHTML = platformSelect;
+      
+      const queueList = document.getElementById("queueList");
+      if (queueList && Array.isArray(runs)) {
+        queueList.innerHTML = runs.map(r => `
+          <div class="auto-run ${r.status}">
+            <div class="auto-run-head">
+              <span class="auto-run-title">${r.title || `سورة ${r.recipe_key?.split(':')[0]}`}</span>
+              <span class="auto-run-date">${cairoClockLabel(r.created_at)}</span>
+            </div>
+            <div class="auto-run-body">
+              <span class="auto-run-reciter">${r.reciter || "غير معروف"}</span>
+              <span class="auto-run-status">${r.status === 'published' ? '✅ منشور' : r.status === 'rendering' ? '⏳ قيد الإنشاء' : '❌ فشل'}</span>
+              ${r.article_title ? `<span class="auto-run-article">📚 مقال: ${r.article_title}</span>` : ''}
+            </div>
+            ${r.external_url ? `<div class="auto-run-url"><a href="${r.external_url}" target="_blank">🔗 رابط النشر</a></div>` : ''}
+            ${r.error ? `<div class="auto-run-error">⚠️ ${r.error}</div>` : ''}
+          </div>
+        `).join("");
+      }
+    }
+
+    // لوحة الأتمتة (تعدد القنوات والتوازي والمقالات)
+    const acctAuto = document.getElementById("acctAuto");
+    if (acctAuto) {
+      acctAuto.innerHTML = `
+        <h2>⚙️ لوحة الأتمتة اليومية</h2>
+        <div class="row gap-lg">
+          <div class="f-group" style="flex:1">
+            <label>الحالة</label>
+            <div class="status-badge ${config.enabled ? 'active' : 'inactive'}">${config.enabled ? '✅ مفعلة' : '❌ معطلة'}</div>
+          </div>
+          <div class="f-group" style="flex:1">
+            <label>الوقت (القاهرة)</label>
+            <div class="status-badge">${cairoClockLabel("04:15:00")}</div>
+          </div>
+          <div class="f-group" style="flex:1">
+            <label>المنصات</label>
+            <div class="status-badge">${channel || 'لا توجد قنوات'}</div>
+          </div>
+        </div>
+        <div class="row gap-lg" style="margin-top:12px">
+          <button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button>
+          <button class="btn btn-em" id="autoRun">تشغيل الآن</button>
+          <button class="btn btn-em" id="autoRunAll">تشغيل التوازي (الكل)</button>
+          <button class="btn btn-gold" id="autoGenArticle">توليد من مقال (10,000 مقال)</button>
+        </div>
+        
+        <!-- بطاقة المقال (دعم 10,000 مقال) -->
+        <div id="acctArticles" class="card" style="margin-top:18px;display:none">
+          <h2>📚 مكتبة المقالات (10,000 مقال)</h2>
+          <div class="row gap-lg" id="articleCards">
+            <!-- سيتم ملؤها بواسطة JavaScript (نمط .article-card) -->
+          </div>
+        </div>
+      `;
+    }
+
+    // ربط الأحداث
+    this.bindEvents(uid);
+  },
+
+  bindEvents(uid) {
+    // حفظ الإعدادات
+    document.getElementById("autoSave")?.addEventListener("click", async () => {
+      const platforms = ALL_PLATFORMS.filter(p => document.getElementById(`plat-${p}`)?.checked);
+      const template = {
+        content_mode: document.getElementById("selContentMode")?.value || "mix",
+        background: document.getElementById("selBackground")?.value || "rotate",
+        privacy: "public"
+      };
+      
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "save", enabled: true, platforms, template })
+      });
+      const data = await res.json();
+      if (res.ok) alert("تم حفظ الإعدادات بنجاح!");
+      else alert(data.error || "خطأ في الحفظ");
+    });
+
+    // تشغيل الآن
+    document.getElementById("autoRun")?.addEventListener("click", async () => {
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "run" })
+      });
+      const data = await res.json();
+      if (res.ok) alert("تم بدء الإنشاء! تحقق من لوحة الأتمتة.");
+      else alert(data.error || "خطأ في التشغيل");
+    });
+
+    // تشغيل التوازي (run_all)
+    document.getElementById("autoRunAll")?.addEventListener("click", async () => {
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "run_all" })
+      });
+      const data = await res.json();
+      if (res.ok) alert(`تم بدء الإنشاء المتوازي! النتائج: ${data.results.map(r => r.ok ? '✅' : '❌').join(", ")}`);
+      else alert(data.error || "خطأ في التشغيل المتوازي");
+    });
+
+    // توليد من مقال (10,000 مقال)
+    document.getElementById("autoGenArticle")?.addEventListener("click", async () => {
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "article_random" })
+      });
+      const data = await res.json();
+      if (res.ok) alert(`تم توليد البوست من المقال: ${data.article_title} | الرابط: ${data.url}`);
+      else alert(data.error || "خطأ في توليد المقال");
+    });
+
+    // زر الإجراءات السريعة (توليد من مقال)
+    document.getElementById("quickGenArticle")?.addEventListener("click", () => document.getElementById("autoGenArticle")?.click());
+    
+    // زر الإجراءات السريعة (توازي)
+    document.getElementById("quickRunAll")?.addEventListener("click", () => document.getElementById("autoRunAll")?.click());
+
+    // جدول النشر (حفظ)
+    document.getElementById("schedSave")?.addEventListener("click", async () => {
+      const title = document.getElementById("schedTitle")?.value;
+      const time = document.getElementById("schedTime")?.value;
+      const platforms = ALL_PLATFORMS.filter(p => document.querySelector(`#schedPlatforms input[data-platform="${p}"]`)?.checked);
+      
+      if (!title || !time || platforms.length === 0) {
+        alert("يرجى ملء العنوان والوقت واختيار المنصات");
+        return;
+      }
+      
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "schedule", title, time, platforms })
+      });
+      const data = await res.json();
+      if (res.ok) alert("تمت الجدولة بنجاح!");
+      else alert(data.error || "خطأ في الجدولة");
+    });
+  }
+};
+
+// التشغيل التلقائي عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.location.hash === "#/account") {
+    window.PublishApp.init();
+  }
+});
