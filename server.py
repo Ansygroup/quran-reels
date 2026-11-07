@@ -162,6 +162,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def handle_gw(self, parsed, head=False):
         """Mirror of api/gw.js — dispatcher للعمليات (بلا اعتمادات محلية)."""
         op = (urllib.parse.parse_qs(parsed.query).get("op") or [""])[0]
+        if op == "version":
+            body = json.dumps({
+                "ok": True,
+                "service": "quran-reels",
+                "sha": os.environ.get("VERCEL_GIT_COMMIT_SHA", ""),
+                "sha_short": os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:7],
+                "ref": os.environ.get("VERCEL_GIT_COMMIT_REF", ""),
+                "env": "local",
+            }).encode("utf-8")
+            return self._send(body, "application/json; charset=utf-8")
         if op == "contact" and self.command == "POST":
             return self.handle_contact()
         ctype = "application/json; charset=utf-8"

@@ -89,6 +89,10 @@ async function call(handler, url, method = 'GET', headers = {}, body) {
   r = await call(gw, '/api/publish', 'POST', {}, {});
   chk('gw old path /api/publish -> 401', r.statusCode === 401, r.statusCode);
 
+  r = await call(gw, '/api/gw?op=version');
+  let v = null; try { v = JSON.parse(r.body.toString()); } catch {}
+  chk('gw version -> 200 json with sha field', r.statusCode === 200 && v && typeof v.sha === 'string' && v.service === 'quran-reels', r.statusCode + ' ' + (r.body && r.body.toString().slice(0, 120)));
+
   r = await call(gw, '/api/gw?op=contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
   chk('gw contact bad email -> 400', r.statusCode === 400, r.statusCode);
 

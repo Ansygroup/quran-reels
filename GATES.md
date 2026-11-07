@@ -44,3 +44,9 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: مجموع الدوال ≤ 12 (المستهدف ≤ 9) + لا وجود لـ api/app-config.js + كل rewrite/cron يشير إلى دالة موجودة
   EVIDENCE: 2026-11-07 — كانت 13 (12 ملف api + middleware) فرفض Vercel النشر 4 مرات (exceeded_serverless_functions_per_deployment)؛ بعد دمج المسارات في api/gw.js صارت 9.
   NOTE: تجاوز الحد يُفشل الرفع بعد نجاح البناء (الخطأ في إيميل Vercel عنوانه «Build error») وتظل النسخة القديمة مخدومة — فشل صامت. لا تُعِد api/app-config.js (rewrite إلى /api/ip?mode=config يكفي).
+
+- [ ] G9: Production serves the latest commit (no silent stale deploy)
+  CHECK: npm run verify:deploy
+  EXPECT: ✓ الإنتاج يخدم آخر كوميت (آخر main) — وإن اختلف فالمخرَج يشرح السبب
+  HOW: /api/gw?op=version يكشف VERCEL_GIT_COMMIT_SHA، والسكربت يقارنه بـgit ls-remote origin main
+  NOTE: يُشغَّل بعد كل push إلى main؛ التباعد > 0 يعني أن آخر نشرة فشلت (وإلا لما تباعدت).

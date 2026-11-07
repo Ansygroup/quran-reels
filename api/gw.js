@@ -26,12 +26,28 @@ const social = require("./_social");
 const publish = require("./_publish");
 const contact = require("./_contact");
 
+/* إصدار النشرة الحالية — يكشف «هل الإنتاج يخدم آخر كوميت؟»
+ * (فشل الرفع بعد نجاح البناء يترك نسخة قديمة مخدومة بلا أي تنبيه) */
+function version(req, res) {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA || "";
+  return json(res, 200, {
+    ok: true,
+    service: "quran-reels",
+    sha,
+    sha_short: sha.slice(0, 7),
+    ref: process.env.VERCEL_GIT_COMMIT_REF || "",
+    env: process.env.VERCEL_ENV || "local",
+    now: new Date().toISOString(),
+  });
+}
+
 const ROUTES = {
   start,
   list: social,
   disconnect: social,
   publish,
   contact,
+  version,
 };
 
 module.exports = async (req, res) => {

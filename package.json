@@ -12,6 +12,7 @@
     "test": "node tests/run.js",
     "pretest": "node tests/functions_limit.js",
     "test:limits": "node tests/functions_limit.js",
+    "verify:deploy": "node scripts/check_deploy.js",
     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
     "test:api": "node tests/api_test.js",
     "test:smoke": "node tests/tools_smoke.js",

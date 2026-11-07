@@ -134,10 +134,10 @@ if (!fs.existsSync(gw)) {
 } else {
   const src = fs.readFileSync(gw, "utf8");
   const block = (src.match(/const ROUTES = \{([\s\S]*?)\n\};/) || [, ""])[1];
-  const missing = ["start", "list", "disconnect", "publish", "contact"]
+  const missing = ["start", "list", "disconnect", "publish", "contact", "version"]
     .filter((op) => !new RegExp(`(^|[\\s,{])${op}\\s*[,:]`, "m").test(block));
   if (missing.length) fail(`api/gw.js لا يوزّع: ${missing.join(", ")}`);
-  else ok("api/gw.js يوزّع start/list/disconnect/publish/contact");
+  else ok("api/gw.js يوزّع start/list/disconnect/publish/contact/version");
 }
 
 /* ---------------- النتيجة ---------------- */
