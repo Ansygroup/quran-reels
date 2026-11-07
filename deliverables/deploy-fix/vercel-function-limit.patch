@@ -1,0 +1,542 @@
+diff --git a/GATES.md b/GATES.md
+index 06def7ab..5a3cce48 100644
+--- a/GATES.md
++++ b/GATES.md
+@@ -37,4 +37,10 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
+ - [ ] G7: Git committed (no uncommitted changes)
+   CHECK: git status --short | wc -l | xargs -I{} echo "uncommitted: {}"
+   EXPECT: uncommitted: 0
+-  EVIDENCE: pending
+\ No newline at end of file
++  EVIDENCE: pending
++
++- [ ] G8: Vercel function count within Hobby limit (12/deployment, middleware counts)
++  CHECK: node tests/functions_limit.js
++  EXPECT: مجموع الدوال ≤ 12 (المستهدف ≤ 9) + لا وجود لـ api/app-config.js + كل rewrite/cron يشير إلى دالة موجودة
++  EVIDENCE: 2026-11-07 — كانت 13 (12 ملف api + middleware) فرفض Vercel النشر 4 مرات (exceeded_serverless_functions_per_deployment)؛ بعد دمج المسارات في api/gw.js صارت 9.
++  NOTE: تجاوز الحد يُفشل الرفع بعد نجاح البناء (الخطأ في إيميل Vercel عنوانه «Build error») وتظل النسخة القديمة مخدومة — فشل صامت. لا تُعِد api/app-config.js (rewrite إلى /api/ip?mode=config يكفي).
+\ No newline at end of file
+diff --git a/README.md b/README.md
+index 14bb5e0c..14152a55 100644
+--- a/README.md
++++ b/README.md
+@@ -127,7 +127,9 @@ npx vercel -Q "$PWD/.vcfg" deploy --prod --yes --scope ansygroups-projects
+ - **التخزين**: فيديوهات الجدولة تُرفع إلى Supabase Storage bucket `reels` (عام — لحاجة المنصات لجلب الرابط) بحدّ 50MB/ملف؛ حدّ الـ1GB المجاني يكفي مئات الريلز.
+ - **الأمان**: التوكنات تُشفَّر AES-256-GCM بمفتاح `TOKEN_ENC_KEY` (خادم فقط)، JWTs تُتحقق ES256 عبر JWKS، الجداول محمية RLS بملكية المستخدم، ولا تظهر أي توكنات في الاستجابات.
+ - **`.env.secrets`** في جذر المشروع (مُستبعد من الرفع): نسخة محلية من `TOKEN_ENC_KEY` و`CRON_SECRET` — فقدانهما يعني إعادة ربط المنصات (لا ضرر).
+-- **حدّ Vercel**: خطة Hobby تسمح بـ12 دالة/نشرة — المجموع الحالي **11**. عند الإضافة ادمج المسارات (نمط `api/x.js` + استعلامات `?op=` كما هو هنا).
++- **حدّ Vercel**: خطة Hobby تسمح بـ**12 دالة/نشرة**، و`middleware.js` يُحسب منها — المجموع الحالي **9** (8 في `api/` + middleware). تجاوز الحد يُفشل النشر **بعد** نجاح البناء، فتظل النسخة القديمة مخدومة (فشل صامت — حدث فعلًا 2026‑11‑07).
++- **نمط المسارات**: المسارات الرقيقة مجمّعة في دالة توزيع واحدة **`api/gw.js`** تُفرّق بـ`?op=` (`start` · `list` · `disconnect` · `publish` · `contact`)، والمنطق في وحدات تبدأ بـ`_` (`api/_*.js`) — وVercel **لا يحسبها دوالًا**. الروابط القديمة `/api/oauth`, `/api/social`, `/api/publish`, `/api/contact` تبقى عاملة عبر `rewrites` في `vercel.json` (مهم لأن `/api/oauth/callback` مسجّل عند المزوّدين ولأن نسخ العميل القديمة تبقى في الـService Worker).
++- **حاجز آلي**: `npm test` يشغّل أولًا `tests/functions_limit.js` (`npm run test:limits`) الذي يفشل إن صار عدد الدوال > 12 أو أُعيد `api/app-config.js` أو أشار rewrite/cron إلى دالة غير موجودة. **أي endpoint جديد = ضعه في `api/gw.js` أو ملف يبدأ بـ`_`.**
+ - **واقع المنصات** (بصدق): رفع يوتيوب مباشر (كوتا ~6 فيديو/يوم افتراضيًا، تُرفع بطلب) · إنستغرام يتطلب حساب Business + مراجعة تطبيق Meta · تيك توك مراجعة تطبيق (وضع الاختبار ينشر للمنشئين فقط) · X قد يتطلب خطة API مدفوعة لرفع الفيديو. كل ذلك أطراف خارجية — الكود جاهز ويعمل فور منح الموافقة.
+ - **الباقات** (مجاني/برو/مدى الحياة) معروضة كواجهة — الدفع الإلكتروني خطوة قادمة عند طلبك.
+ 
+@@ -158,7 +160,7 @@ node correctness_test.js                                 # صحة الحسابا
+ - **السجلّ الرسمي MCP (كمل#24د — منشور ✓)**: `app.vercel.quran-reels-tau/quran-reels-mcp@1.0.0` في **registry.modelcontextprotocol.io** (status=active) بمصادقة HTTP عبر `/.well-known/mcp-registry-auth` (Ed25519 — بلا حساب ولا متصفح)، والـ`remotes` تشير إلى `https://quran-reels-tau.vercel.app/api/mcp` — يُستهلك منه **GitHub MCP Registry** وكل العملاء الراغبون في السجلّ الرسمي · إعادة النشر: `mcp-publisher publish`.
+ - **الدفعة الكبرى (كمل#12 — «كلهم»)**: **58 صفحة جديدة** عبر `scripts/build_k12.js` = قسم إنجليزي `/en/` (6 صفحات مزدوجة اللغة مع `hreflang` على 6 أزواج عربي↔إنجليزي) + **فهرس القرّاء و47 صفحة قارئ** (`/ar/reciters/` + `/ar/reciter/<slug>/`) بأزرار `/?r=<folder>` تفتح المولّد مُهيّأً بصوت القارئ (تعريب عميق في `applyDeepLink`/`handlePending` + وسيط اختياري في أداة MCP `create_reel`) + **صفحات الثقة** (`/about` · `/terms` · `/privacy` · `/contact` بنموذج يعمل على RPC دفاعي `submit_contact` بجدول RLS بلا قراءة) · فواتير موحّدة بالروابط الثقة في كل الصفحات · Sitemap **12→70** · llms.txt محدّث · W3C **70 صفحة 0/0** · مختبر `tests/pages12_test.js` **21/21** · IndexNow **70@200**.
+ - **المدونة والموسمية (كمل#13)**: **`scripts/build_blog.js`** → فهرس `/blog/` + **8 مقالات** على كلمات الأصل الحقيقية (٣٠ فكرة · هل توجد أداة مجانية؟ · جدول مقارنة مع quranreels.tech/tashghil/quranvideomaker ·7 أخطاء · الجدولة والأتمتة · **خطة رمضان1448** أم القرى:1 رمضان≈8 فبراير2027 · محتوى الجمعة · أول فيديو في5 دقائق) — كل مقال بـ`Article`+`BreadcrumbList`+`FAQPage` JSON-LD و`<time>` وقراءة معلنة · رابط «مقالات» في فواتير الموقع كلّه (قوالب×3 + الجذر + الثابتة) · Sitemap **70→79** · llms.txt قسم المدونة · W3C **79×0/0** · مختبر `tests/blog_test.js` **12/12** (يشمل فحص CJK وروابط داخلية حيّة ومسارات sitemap الدقيقة) · IndexNow **79@200**.
+-- **المراقبة + كلمة-بكلمة + الحزمة + المؤجَّل (كمل#14 — «كلهم»)**: أسلوب **«كلمة-بكلمة»** الرابع في صانع الريلز (`reel.js _drawWords`: إبراز الكلمة الجارية بقرص ذهبي موزون بالحروف على زمن التلاوة الحقيقي — صوت مفكّك أو تقدير — مع مطابقة سطور `_fitAyah` حرفيًا، واختبار S3 في run.js) · **مراقبة أسبوعية**: `npm run monitor` (`scripts/monitor_site.js` + `lib/monitor.js` — كل مداخل sitemap بحالة 200 + robots/llms/علامة GSC/تذييل المدونة + **diff منافسين** بقوائم جديدة/محذوفة + استعلام Bing RSS للفهرسة وتقرير Markdown يومي في `docs/monitor/`) **+ Vercel Cron** إثنين 06:30UTC (`/api/cron/monitor`) · **بريد تأكيد التواصل**: `api/contact.js` يمرّ على RPC ثم يرسل تأكيدًا للمراسل ونسخة للمسؤول عبر `lib/mailer.js` (Resend، بلا مفتاح = no-op) مع مسار احتياطي مباشر في النموذج · **عيب OAuth مُصحَّح**: `redirect_uri` للمنصات الأربع كانت لمسارات غير موجودة → موحَّد على `/api/oauth/callback` · **حزمة اقتباسات خارجية** `docs/backlinks.md` (ورقة حقائق +8 أهداف بروابطهم +3 قوالب رسائل + خطة أسبوعية) · محاضر الإعداد: `docs/{github,domain,oauth,payments,smtp}-setup.md` + مسودة `sql/credits-draft.sql` (غير مُطبَّقة) + **`scripts/rebase_url.js`** لتبديل النطاق بأمر واحد بعد ضبط DNS · مختبر pages12 **21→24**.
++- **المراقبة + كلمة-بكلمة + الحزمة + المؤجَّل (كمل#14 — «كلهم»)**: أسلوب **«كلمة-بكلمة»** الرابع في صانع الريلز (`reel.js _drawWords`: إبراز الكلمة الجارية بقرص ذهبي موزون بالحروف على زمن التلاوة الحقيقي — صوت مفكّك أو تقدير — مع مطابقة سطور `_fitAyah` حرفيًا، واختبار S3 في run.js) · **مراقبة أسبوعية**: `npm run monitor` (`scripts/monitor_site.js` + `lib/monitor.js` — كل مداخل sitemap بحالة 200 + robots/llms/علامة GSC/تذييل المدونة + **diff منافسين** بقوائم جديدة/محذوفة + استعلام Bing RSS للفهرسة وتقرير Markdown يومي في `docs/monitor/`) **+ Vercel Cron** إثنين 06:30UTC (`/api/cron/monitor`) · **بريد تأكيد التواصل**: `/api/gw?op=contact` (منطقه في `api/_contact.js`) يمرّ على RPC ثم يرسل تأكيدًا للمراسل ونسخة للمسؤول عبر `lib/mailer.js` (Resend، بلا مفتاح = no-op) مع مسار احتياطي مباشر في النموذج · **عيب OAuth مُصحَّح**: `redirect_uri` للمنصات الأربع كانت لمسارات غير موجودة → موحَّد على `/api/oauth/callback` · **حزمة اقتباسات خارجية** `docs/backlinks.md` (ورقة حقائق +8 أهداف بروابطهم +3 قوالب رسائل + خطة أسبوعية) · محاضر الإعداد: `docs/{github,domain,oauth,payments,smtp}-setup.md` + مسودة `sql/credits-draft.sql` (غير مُطبَّقة) + **`scripts/rebase_url.js`** لتبديل النطاق بأمر واحد بعد ضبط DNS · مختبر pages12 **21→24**.
+ - **GSC وسم التحقق (كمل#15)**: الرمز `IHmoe5QFrC77PbZdh2O0MeZFLIKwg-saA50td32AcQo` مثبَّت الآن في **79/79 صفحات** — أُضيفت الناقصة الأربع (`ar/quran-video-maker` · `ar/islamic-tools` · `ar/prayer-times` · `ar/qibla-direction`) بنفس موضع القالب · المراقبة تفحص الآن **مطابقة القيمة الدقيقة** لا مجرد الوجود (`lib/monitor EXPECTED_VERIF`) · اختبار دائم في pages12 (`GSC token exact on home`) · الخطوة التالية: GSC → Verify → سجل Sitemap (79) → طلب الفهرسة · **ملف التحقق `googleb789508316de731f.html`** (أسلوب رفع الملف — 53 بايت حرفيًا في الجذر) مع حارس في pages12 (**24→25**).
+ - **صفحات المنصّات (كمل#17)**: `quran-video-instagram` · `quran-video-whatsapp` — **بنصّ الأصل الحرفي** (عنوانهما ووصفهما مأخوذان من صفحتيهما المنشورتين في quranreels.tech) + `quran-video-facebook` **بكلماتنا** (الأصل لا يملك صفحة فيسبوك — تحقّقت من خريطته الـ90) — كل صفحة بـ`WebPage`+`FAQPage` JSON-LD وروابط متقاطعة (تيك توك ↔ المنصّات) · **إصلاح رابط ميّت**: `/ar/quran-reels-for-dawah/` كان في صفحة الترجمة ولا وجود له ← استُبدل بستاتس واتساب · Sitemap **79→82** · llms.txt +3 · W3C **5 صفحات معدَّلة 0/0** · pages12 **25→27** (يشمل جولة 82 رابطًا self-canonical) · IndexNow **200×3** · monitor 82/82.
+ - **صفحات الموسم والفئات (كمل#18)**: **21 صفحة جديدة** — سلسلة **«كم باقي»** (hub + رمضان2027/الفطر/الأضحى/عرفة/رجب/شعبان/الجمعة: تواريخ أم القرى **بنصّ الأصل** مع تدرّج «قد يختلف يومًا بالرؤية» + **عدّاد حيّ `id="kbc"`** داخل كل صفحة، والجمعة يحسب نفسها أسبوعيًا في المتصفح) + **التهنئة بالاسم** (hub + عيدان + جمعة + رمضان — عناوين الأصل مع وصف مُكيَّف لإهدائنا أسفل الفيديو بدل «بطاقة الافتتاح» التي ليست عندنا) + **7 فئات أدوات** (`islamic-tools/{prayer-and-place,quran-discovery,quran-learning,dhikr,hadith-and-learning,calculators-and-tracking,family-and-life}` بعناوين ووصفات الأصل وأدواتنا موزّعة) + **`/ar/quran-word-highlight/` بكلماتنا** (slug الأصل معطّل 404 فملكِلناه) · إشارات الميزة: **سؤال FAQ الجذر الـ16** في `data.js` (يعيد بناء run.js) + **صف في جدول مقارنة المدونة** (مع تصريح صريح بأن للمنافس أيضًا «كلمة بكلمة») + llms · **build_lp 9→30** · Sitemap **82→103** · pages12 **27→29** (فحص الكلمة المفتاحية + فحص العدّاد) · run.js **87/0** · blog **12/12** · correctness30 · smoke32 · mcp28 · interact32 · W3C **23×0/0** (validator.nu) · **Lighthouse 91/98** (الرئيسية/المصصّم — بلا انحدار عن خط الأساس مع تشتّت طبيعي 79–95، وأُضيف `preload` لـ`style.css` لتقليل render-blocking) · IndexNow **21@200/202** · monitor **103/103**.
+diff --git a/api/contact.js b/api/_contact.js
+similarity index 96%
+rename from api/contact.js
+rename to api/_contact.js
+index 32793ac6..f6d2044a 100644
+--- a/api/contact.js
++++ b/api/_contact.js
+@@ -1,5 +1,6 @@
+ /* «تواصل» عبر الخادم: يستخدم RPC submit_contact الذي يتحقق من المدخلات
+  * ويحدّ المعدل، ثم يرسل تأكيدًا بالبريد إن كان RESEND_API_KEY مضبوطًا.
++ * يُخدَم عبر /api/gw?op=contact (والرابط القديم /api/contact عبر rewrite).
+  */
+ const { json } = require("../lib/oauth");
+ const { sendMail } = require("../lib/mailer");
+diff --git a/api/oauth.js b/api/_oauth_start.js
+similarity index 70%
+rename from api/oauth.js
+rename to api/_oauth_start.js
+index 6be5857e..515af132 100644
+--- a/api/oauth.js
++++ b/api/_oauth_start.js
+@@ -1,4 +1,5 @@
+-/* بدء ربط OAuth — /api/oauth?op=start&p=<platform>&t=<access_token> */
++/* بدء ربط OAuth — يُخدَم عبر /api/gw?op=start&p=<platform>&t=<access_token>
++ * (والرابط القديم /api/oauth?op=start يعمل عبر rewrite في vercel.json) */
+ const { handleStart, json } = require("../lib/oauth");
+ 
+ module.exports = async (req, res) => {
+diff --git a/api/publish.js b/api/_publish.js
+similarity index 93%
+rename from api/publish.js
+rename to api/_publish.js
+index 2846a432..157134f0 100644
+--- a/api/publish.js
++++ b/api/_publish.js
+@@ -1,4 +1,5 @@
+-/* نشر فوري أو إضافة مهمة جدولة — بجلسة المستخدم */
++/* نشر فوري أو إضافة مهمة جدولة — بجلسة المستخدم (يُخدَم عبر /api/gw?op=publish،
++ * والرابط القديم /api/publish يعمل عبر rewrite في vercel.json) */
+ const { getUserId } = require("../lib/sess");
+ const { q, q1 } = require("../lib/db");
+ const { publishRow } = require("../lib/publish");
+diff --git a/api/social.js b/api/_social.js
+similarity index 66%
+rename from api/social.js
+rename to api/_social.js
+index db88c1ef..e21eec21 100644
+--- a/api/social.js
++++ b/api/_social.js
+@@ -1,4 +1,5 @@
+-/* مسار اجتماعي موحّد: list | disconnect */
++/* مسار اجتماعي موحّد: list | disconnect — يُخدَم عبر /api/gw?op=list|disconnect
++ * (والرابط القديم /api/social?op=… يعمل عبر rewrite في vercel.json) */
+ const { json } = require("../lib/oauth");
+ const LIST = require("../lib/soc_list");
+ const DISC = require("../lib/soc_disconnect");
+diff --git a/api/gw.js b/api/gw.js
+new file mode 100644
+index 00000000..60b1999a
+--- /dev/null
++++ b/api/gw.js
+@@ -0,0 +1,52 @@
++/* ============================================================
++ * بوابة واحدة (Dispatcher) لمسارات الربط الاجتماعي والنشر والتواصل
++ * ------------------------------------------------------------
++ * السبب: خطة Vercel Hobby تسمح بـ12 دالة/نشرة كحد أقصى (middleware يُحسب
++ * ضمنها). تجاوز الحد يُفشل النشر بعد نجاح البناء، فتظل النسخة القديمة
++ * مخدومة على الموقع — فشل صامت. لذلك تجمّع المسارات الرقيقة هنا.
++ *
++ * التوزيع عبر ?op= :
++ *   /api/gw?op=start&p=<platform>&t=<token>   بدء ربط OAuth
++ *   /api/gw?op=list                           قائمة المنصات المرتبطة
++ *   /api/gw?op=disconnect                     فك ربط منصة
++ *   /api/gw?op=publish                        نشر فوري/جدولة
++ *   /api/gw?op=contact                        نموذج «تواصل»
++ *
++ * المسارات القديمة تبقى عاملة عبر rewrites في vercel.json (حتى لا تنكسر
++ * نسخ العميل المخزّنة في الـ Service Worker):
++ *   /api/oauth → /api/gw · /api/social → /api/gw
++ *   /api/publish → /api/gw?op=publish · /api/contact → /api/gw?op=contact
++ *
++ * ملاحظة: الملفات المبدوءة بـ _ (api/_*.js) وحدات فقط وليست دوالًا عند Vercel.
++ * ============================================================ */
++const { json } = require("../lib/oauth");
++
++const start = require("./_oauth_start");
++const social = require("./_social");
++const publish = require("./_publish");
++const contact = require("./_contact");
++
++const ROUTES = {
++  start,
++  list: social,
++  disconnect: social,
++  publish,
++  contact,
++};
++
++module.exports = async (req, res) => {
++  let url = null;
++  try { url = new URL(req.url || "/", "http://local"); } catch {}
++
++  let op = (url && url.searchParams.get("op")) || "";
++  // احتياط: إن وصل الطلب كما هو على مسار قديم (بلا rewrite) نستنتج العملية منه
++  if (!op && url) {
++    const p = url.pathname;
++    if (p === "/api/publish") op = "publish";
++    else if (p === "/api/contact") op = "contact";
++  }
++
++  const handler = ROUTES[op];
++  if (!handler) return json(res, 404, { error: "unknown op", ops: Object.keys(ROUTES) });
++  return handler(req, res);
++};
+diff --git a/docs/smtp-setup.md b/docs/smtp-setup.md
+index ce404417..c293e1cc 100644
+--- a/docs/smtp-setup.md
++++ b/docs/smtp-setup.md
+@@ -1,6 +1,6 @@
+ # SMTP / البريد (كمل#14)
+ 
+-**الكود منجَز**: `lib/mailer.js` (Resend HTTP — بلا اعتماديات) + استدعاءه من `api/contact.js`:
++**الكود منجَز**: `lib/mailer.js` (Resend HTTP — بلا اعتماديات) + استدعاءه من `api/_contact.js` (يُخدَم عبر `/api/gw?op=contact`؛ والرابط القديم `/api/contact` يعمل عبر rewrite):
+ 
+ - عند وصول رسالة تواصل → **تأكيد للمراسل** + **نسخة للمسؤول** (إن ضبط `ADMIN_EMAIL`).
+ - بلا مفتاح: no-op صامت — كل شيء يعمل كما قبل (لا اختبار ينكسر).
+diff --git a/package.json b/package.json
+index 27c10158..a6284c05 100644
+--- a/package.json
++++ b/package.json
+@@ -10,6 +10,8 @@
+   },
+   "scripts": {
+     "test": "node tests/run.js",
++    "pretest": "node tests/functions_limit.js",
++    "test:limits": "node tests/functions_limit.js",
+     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
+     "test:api": "node tests/api_test.js",
+     "test:smoke": "node tests/tools_smoke.js",
+diff --git a/public/js/publish.js b/public/js/publish.js
+index 12437445..4441cbc2 100644
+--- a/public/js/publish.js
++++ b/public/js/publish.js
+@@ -88,7 +88,7 @@ const QRPublish = (() => {
+   async function loadConnections() {
+     try {
+       const t = await QRAuth.token(); if (!t) { conns = []; return; }
+-      const r = await fetch("/api/social?op=list", { headers: { Authorization: "Bearer " + t } });
++      const r = await fetch("/api/gw?op=list", { headers: { Authorization: "Bearer " + t } });
+       const j = await r.json();
+       conns = j.connections || [];
+     } catch { conns = []; }
+@@ -164,11 +164,11 @@ const QRPublish = (() => {
+       const t = await QRAuth.token();
+       if (!t) { openLogin(); return; }
+       const pk = k === "facebook" ? "meta" : k;
+-      location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
++      location.href = `/api/gw?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
+     });
+     wrap.querySelectorAll("[data-disc]").forEach(b => b.onclick = async () => {
+       const t = await QRAuth.token();
+-      await fetch("/api/social?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
++      await fetch("/api/gw?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
+       toast("تم فك الربط");
+       refreshAccount();
+     });
+@@ -208,7 +208,7 @@ const QRPublish = (() => {
+     if (btn) { btn.disabled = true; btn.textContent = "…"; }
+     try {
+       const t = await QRAuth.token();
+-      const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
++      const r = await fetch("/api/gw?op=publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
+       const j = await r.json().catch(() => ({}));
+       if (j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
+     } catch (e) { toast(String(e.message || e), "err"); }
+diff --git a/public/sw.js b/public/sw.js
+index c2995c1b..a386c342 100644
+--- a/public/sw.js
++++ b/public/sw.js
+@@ -7,7 +7,7 @@ self.lary = ""
+ importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
+ 
+ /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
+-const CACHE = "qr-v7";
++const CACHE = "qr-v8";
+ const SHELL = [
+   "/",
+   "/css/style.css?v=3",
+diff --git a/server.py b/server.py
+index 258f1e53..67877c5d 100644
+--- a/server.py
++++ b/server.py
+@@ -113,6 +113,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
+             return self.handle_ip()
+         if parsed.path.startswith("/api/app-config"):
+             return self.handle_config()
++        if parsed.path == "/api/gw":
++            return self.handle_gw(parsed, head=False)
+         # static with gzip
+         rel = urllib.parse.unquote(parsed.path)
+         if rel == "/" or rel == "":
+@@ -153,8 +155,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
+         parsed = urllib.parse.urlparse(self.path)
+         if parsed.path.startswith("/api/contact"):
+             return self.handle_contact()
++        if parsed.path == "/api/gw":
++            return self.handle_gw(parsed, head=False)
+         self.send_error(404, "not found")
+ 
++    def handle_gw(self, parsed, head=False):
++        """Mirror of api/gw.js — dispatcher للعمليات (بلا اعتمادات محلية)."""
++        op = (urllib.parse.parse_qs(parsed.query).get("op") or [""])[0]
++        if op == "contact" and self.command == "POST":
++            return self.handle_contact()
++        ctype = "application/json; charset=utf-8"
++        if op in ("start", "list", "disconnect", "publish"):
++            body = json.dumps({"error": "unauthorized"}).encode("utf-8")
++            return self._send(body, ctype, status=401)
++        body = json.dumps({"error": "unknown op", "ops": ["start", "list", "disconnect", "publish", "contact"]}).encode("utf-8")
++        return self._send(body, ctype, status=404)
++
+     def handle_contact(self):
+         """Mirror of api/contact.js validation (كمل#14) — no local Supabase creds."""
+         import re
+diff --git a/tests/api_test.js b/tests/api_test.js
+index c9c6a0a0..afdee179 100644
+--- a/tests/api_test.js
++++ b/tests/api_test.js
+@@ -1,5 +1,8 @@
+-const proxy = require('/home/user/quran-reels/api/proxy.js');
+-const ip = require('/home/user/quran-reels/api/ip.js');
++const path = require('path');
++const API = p => path.join(__dirname, '..', 'api', p);
++const proxy = require(API('proxy.js'));
++const ip = require(API('ip.js'));
++const gw = require(API('gw.js'));
+ 
+ function mockRes() {
+   const res = { statusCode: 200, headers: {}, body: null };
+@@ -7,9 +10,9 @@ function mockRes() {
+   res.end = (b) => { res.body = b === undefined ? Buffer.alloc(0) : (Buffer.isBuffer(b) ? b : Buffer.from(String(b))); };
+   return res;
+ }
+-async function call(handler, url, method = 'GET', headers = {}) {
++async function call(handler, url, method = 'GET', headers = {}, body) {
+   const res = mockRes();
+-  const out = handler({ url, method, headers }, res);
++  const out = handler({ url, method, headers, body }, res);
+   if (out && typeof out.then === 'function') await out;
+   for (let i = 0; i < 800 && res.body === null; i += 50) await new Promise(r => setTimeout(r, 50));
+   return res;
+@@ -70,6 +73,28 @@ async function call(handler, url, method = 'GET', headers = {}) {
+   let c = null; try { c = JSON.parse(r.body.toString()); } catch {}
+   chk('config -> 200 object with supabase', r.statusCode === 200 && c && c.supabase && typeof c.supabase.url === 'string', r.body && r.body.toString());
+ 
++  // ---- بوابة api/gw.js: توزيع العمليات + بقاء المسارات القديمة عاملة (بلا شبكة) ----
++  r = await call(gw, '/api/gw?op=nonexistent');
++  chk('gw unknown op -> 404', r.statusCode === 404, r.statusCode);
++
++  r = await call(gw, '/api/gw?op=start&p=youtube&t=invalid');
++  chk('gw oauth start guest -> 401', r.statusCode === 401, r.statusCode);
++
++  r = await call(gw, '/api/gw?op=list');
++  chk('gw social list guest -> 401', r.statusCode === 401, r.statusCode);
++
++  r = await call(gw, '/api/gw?op=publish', 'POST');
++  chk('gw publish guest -> 401', r.statusCode === 401, r.statusCode);
++
++  r = await call(gw, '/api/publish', 'POST', {}, {});
++  chk('gw old path /api/publish -> 401', r.statusCode === 401, r.statusCode);
++
++  r = await call(gw, '/api/gw?op=contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
++  chk('gw contact bad email -> 400', r.statusCode === 400, r.statusCode);
++
++  r = await call(gw, '/api/contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
++  chk('gw old path /api/contact bad email -> 400', r.statusCode === 400, r.statusCode);
++
+   console.log(errs.length ? 'ERRORS ' + errs.length + ': ' + JSON.stringify(errs) : 'ALL OK (0 errors)');
+   process.exit(errs.length ? 1 : 0);
+ })();
+diff --git a/tests/functions_limit.js b/tests/functions_limit.js
+new file mode 100644
+index 00000000..1d86ad67
+--- /dev/null
++++ b/tests/functions_limit.js
+@@ -0,0 +1,150 @@
++#!/usr/bin/env node
++/* ============================================================
++ * حاجز عدد الدوال في Vercel — خطة Hobby تسمح بـ12 دالة لكل نشرة.
++ * ------------------------------------------------------------
++ * لماذا هذا الملف؟ لأن تجاوز الحد لا يُفشل البناء، بل يُفشل الرفع بعد نجاحه
++ * (exceeded_serverless_functions_per_deployment) فتظل النسخة القديمة مخدومة
++ * على الموقع — فشل صامت لا يتنبّه له أحد. حدث فعلًا في 2026-11-07.
++ *
++ * القاعدة:
++ *   عدد الدوال = ملفات api/**‎.js التي لا تبدأ بـ _  +  middleware.js (يُحسب)
++ *   يجب أن يكون ≤ 12، وننبّه إن وصل 12 (بلا هامش).
++ *
++ * الملفات المبدوءة بـ _ وحدات مساعدة فقط (Vercel لا يحوّلها إلى دوال)
++ * وتُستدعى من دالة التوزيع api/gw.js.
++ *
++ * التشغيل: node tests/functions_limit.js  (ويُشغَّل تلقائيًا قبل npm test)
++ * ============================================================ */
++const fs = require("fs");
++const path = require("path");
++
++const ROOT = path.join(__dirname, "..");
++const LIMIT = 12;
++const NO_HEADROOM = 12;
++
++const errs = [];
++const warns = [];
++const ok = (m) => console.log("OK   " + m);
++const fail = (m) => { errs.push(m); console.log("FAIL " + m); };
++const warn = (m) => { warns.push(m); console.log("WARN " + m); };
++
++const rel = (p) => path.relative(ROOT, p).split(path.sep).join("/");
++
++function walk(dir, out = []) {
++  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
++    const p = dir + path.sep + e.name;
++    if (e.isDirectory()) {
++      if (e.name === "node_modules" || e.name.startsWith(".")) continue;
++      walk(p, out);
++    } else if (/\.(js|cjs|mjs|ts)$/.test(e.name)) {
++      out.push(p);
++    }
++  }
++  return out;
++}
++
++/* رسم مسار الملف إلى المسار العام: api/a/b.js → /api/a/b */
++function routeOf(file) {
++  const r = rel(file).replace(/\.(js|cjs|mjs|ts)$/, "");
++  return "/" + r.replace(/\/index$/, "");
++}
++
++/* ---------------- 1) عدد الدوال ---------------- */
++const apiDir = path.join(ROOT, "api");
++let files = [];
++if (fs.existsSync(apiDir)) files = walk(apiDir);
++
++const fns = files.filter((f) => !path.basename(f).startsWith("_"));
++const helpers = files.filter((f) => path.basename(f).startsWith("_"));
++const middleware = fs.existsSync(path.join(ROOT, "middleware.js")) ? 1 : 0;
++const total = fns.length + middleware;
++
++console.log(`دوال api/: ${fns.length}  ·  وحدات مساعدة (_): ${helpers.length}  ·  middleware: ${middleware}  →  المجموع: ${total}/${LIMIT}`);
++fns.forEach((f) => console.log("     · " + rel(f)));
++
++if (total > LIMIT) {
++  fail(`تجاوز حد Vercel Hobby: ${total} > ${LIMIT} — النشر سيُرفض. ادمج المسارات في api/gw.js (نمط ?op=) أو انقل الوحدة إلى ملف يبدأ بـ _`);
++} else {
++  ok(`العدد داخل الحد (${total} ≤ ${LIMIT})`);
++}
++if (total >= NO_HEADROOM && total <= LIMIT) {
++  warn(`بلا هامش: ${total}/${LIMIT} — أي دالة جديدة تُفشل النشر. الأفضل الإبقاء على ≤ 9`);
++}
++
++/* ---------------- 2) منع عودة api/app-config.js ---------------- */
++if (fs.existsSync(path.join(apiDir, "app-config.js"))) {
++  fail("api/app-config.js موجود — إنه مكرر لوظيفة /api/ip?mode=config ويزيد العدّاد بلا داعٍ. احذفه واترك rewrite في vercel.json");
++} else {
++  ok("api/app-config.js غير موجود (يُخدَم عبر rewrite إلى /api/ip?mode=config)");
++}
++
++/* ---------------- 3) سلامة vercel.json ---------------- */
++let cfg = null;
++try {
++  cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
++  ok("vercel.json صالح (JSON)");
++} catch (e) {
++  fail("vercel.json غير صالح: " + e.message);
++}
++
++if (cfg) {
++  const rewrites = Array.isArray(cfg.rewrites) ? cfg.rewrites : [];
++  const byDest = (d) => rewrites.find((r) => (r.destination || "").startsWith(d));
++
++  if (!byDest("/api/ip?mode=config") || !rewrites.some((r) => r.source === "/api/app-config")) {
++    fail("rewrite /api/app-config → /api/ip?mode=config مفقود (العميل يعتمد عليه)");
++  } else {
++    ok("rewrite /api/app-config → /api/ip?mode=config موجود");
++  }
++
++  /* كل دالة مذكورة في functions يجب أن يكون ملفها موجودًا */
++  for (const key of Object.keys(cfg.functions || {})) {
++    if (!fs.existsSync(path.join(ROOT, key))) fail(`functions يشير إلى ملف غير موجود: ${key}`);
++  }
++  ok(`فحص functions: ${Object.keys(cfg.functions || {}).length} مدخلًا`);
++
++  /* كل rewrite إلى /api/... يجب أن يصل إلى دالة موجودة */
++  for (const r of rewrites) {
++    const dest = String(r.destination || "");
++    if (!dest.startsWith("/api/")) continue;
++    const file = path.join(ROOT, dest.split("?")[0].replace(/^\//, "") + ".js");
++    if (!fs.existsSync(file)) fail(`rewrite ${r.source} → ${dest}: الدالة ${rel(file)} غير موجودة`);
++  }
++  ok("فحص rewrites: كل الأهداف دوال موجودة");
++
++  /* المسارات العامة التي لا يجوز أن تنكسر (مسجّلة عند مزوّدي OAuth/العميل) */
++  const publicPaths = new Set(fns.map(routeOf).concat(rewrites.map((r) => r.source)));
++  for (const p of ["/api/oauth", "/api/oauth/callback", "/api/social", "/api/publish", "/api/contact", "/api/app-config", "/api/ip", "/api/mcp"]) {
++    if (!publicPaths.has(p)) fail(`المسار ${p} غير مخدوم (لا دالة ولا rewrite) — قد تكسر عميلًا قائمًا`);
++  }
++  ok("جميع المسارات العامة مخدومة (دالة أو rewrite)");
++
++  /* المجدولات يجب أن تشير إلى دوال موجودة */
++  for (const c of cfg.crons || []) {
++    const file = path.join(ROOT, String(c.path).split("?")[0].replace(/^\//, "") + ".js");
++    if (!fs.existsSync(file)) fail(`cron ${c.path}: الدالة ${rel(file)} غير موجودة`);
++  }
++  ok(`فحص crons: ${(cfg.crons || []).length} مجدولًا`);
++}
++
++/* ---------------- 4) api/gw.js موجود ويوزّع ---------------- */
++const gw = path.join(apiDir, "gw.js");
++if (!fs.existsSync(gw)) {
++  fail("api/gw.js مفقود — دالة التوزيع التي تُبقي عدد الدوال منخفضًا");
++} else {
++  const src = fs.readFileSync(gw, "utf8");
++  const block = (src.match(/const ROUTES = \{([\s\S]*?)\n\};/) || [, ""])[1];
++  const missing = ["start", "list", "disconnect", "publish", "contact"]
++    .filter((op) => !new RegExp(`(^|[\\s,{])${op}\\s*[,:]`, "m").test(block));
++  if (missing.length) fail(`api/gw.js لا يوزّع: ${missing.join(", ")}`);
++  else ok("api/gw.js يوزّع start/list/disconnect/publish/contact");
++}
++
++/* ---------------- النتيجة ---------------- */
++console.log("\n==== ERRORS (" + errs.length + ") ====");
++if (errs.length) {
++  errs.forEach((e) => console.log(" - " + e));
++  console.log("\nاقرأ سبب الحاجز في أعلى tests/functions_limit.js");
++  process.exit(1);
++}
++console.log("لا أخطاء — النشر لن يُرفض بسبب عدد الدوال ✓" + (warns.length ? ` (تنبيهات: ${warns.length})` : ""));
+diff --git a/tests/run.js b/tests/run.js
+index 58e75dab..88d670f6 100644
+--- a/tests/run.js
++++ b/tests/run.js
+@@ -413,6 +413,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
+         chk("S9 oauth start rejects guest (401)", st === 401, String(st));
+         const rList = await page.request.get(BASE + "/api/social?op=list");
+         chk("S9 social list unauthorized (401)", rList.status() === 401, String(rList.status()));
++        // المسارات القانونية الجديدة (دالة التوزيع api/gw.js) — والقديمة أعلاه تتحقق عبر rewrites
++        const rGwList = await page.request.get(BASE + "/api/gw?op=list");
++        chk("S9 gw social list unauthorized (401)", rGwList.status() === 401, String(rGwList.status()));
++        const rGwPub = await page.request.post(BASE + "/api/gw?op=publish", { data: {} });
++        chk("S9 gw publish unauthorized (401)", rGwPub.status() === 401, String(rGwPub.status()));
++        const rGwBad = await page.request.get(BASE + "/api/gw?op=nope", { maxRedirects: 0 });
++        chk("S9 gw unknown op (404)", rGwBad.status() === 404, String(rGwBad.status()));
+       }
+     } catch (e) {
+       chk("S9 account section", false, String(e && e.message ? e.message : e).slice(0, 140));
+diff --git a/vercel.json b/vercel.json
+index 95da336e..9883fb36 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -58,6 +58,22 @@
+       "source": "/api/app-config",
+       "destination": "/api/ip?mode=config"
+     },
++    {
++      "source": "/api/oauth",
++      "destination": "/api/gw"
++    },
++    {
++      "source": "/api/social",
++      "destination": "/api/gw"
++    },
++    {
++      "source": "/api/publish",
++      "destination": "/api/gw?op=publish"
++    },
++    {
++      "source": "/api/contact",
++      "destination": "/api/gw?op=contact"
++    },
+     {
+       "source": "/proxy",
+       "destination": "/api/proxy"
+@@ -257,7 +273,7 @@
+     "api/ip.js": {
+       "maxDuration": 15
+     },
+-    "api/publish.js": {
++    "api/gw.js": {
+       "maxDuration": 60
+     },
+     "api/cron/publish.js": {
+@@ -267,9 +283,6 @@
+     "api/cron/monitor.js": {
+       "maxDuration": 120
+     },
+-    "api/oauth.js": {
+-      "maxDuration": 30
+-    },
+     "api/oauth/callback.js": {
+       "maxDuration": 30
+     },
