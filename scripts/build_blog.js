@@ -1,5 +1,6 @@
 /* كمل#13 — المدونة والموسمية: /blog/ (فهرس) + 8 مقالات على كلمات المنافسين الحقيقية.
  * الاستخدام: node scripts/build_blog.js   → public/blog/<slug>/index.html */
+const { hdrNav } = require("./site_nav.js");
 const fs = require("fs");
 const path = require("path");
 
@@ -56,7 +57,7 @@ const STYLE = `
   .callout b{color:var(--gold-3)}
 `;
 
-const FOOT = `<span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>`;
+const FOOT = `<span>© 2026 قرآن ريلز — <a href="/" style="color:var(--gold-3)">الصفحة الرئيسية</a> · <a href="/ar/quran-video-maker/" style="color:var(--gold-3)">صانع الفيديو</a> · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/articles/" style="color:var(--gold-3)">المكتبة</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/ar/islamic-tools/" style="color:var(--gold-3)">الأدوات</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>`;
 
 function articlePage(a) {
   const loc = ORIGIN + "/blog/" + a.slug + "/";
@@ -100,17 +101,8 @@ function articlePage(a) {
 ${a.faq.map(([q, x]) => `{"@type":"Question","name":${JSON.stringify(q)},"acceptedAnswer":{"@type":"Answer","text":${JSON.stringify(x)}}}`).join(",\n")}
 ]}
 </script>${extraLd}
-<script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
-<script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
-<!-- Google Tag Manager -->
-<script async src="https://www.googletagmanager.com/gtm.js?id=GTM-M2P3KJ57"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());</script>
-<!-- End Google Tag Manager -->
 </head>
 <body>
-<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M2P3KJ57" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
 <header class="site-header">
   <div class="container header-in">
@@ -118,6 +110,7 @@ ${a.faq.map(([q, x]) => `{"@type":"Question","name":${JSON.stringify(q)},"accept
       <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
       <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
     </a>
+    ${hdrNav("ar")}
     <a class="btn btn-em" href="/#/">🎬 ابدأ الآن</a>
   </div>
 </header>
@@ -184,8 +177,6 @@ function hubPage(articles) {
 ${articles.map(a => `{"@type":"BlogPosting","headline":${JSON.stringify(a.title)},"url":"${ORIGIN}/blog/${a.slug}/","datePublished":"${PUB}","author":{"@type":"Organization","name":"قرآن ريلز"}}`).join(",\n")}
 ]}
 </script>
-<script src="https://quge5.com/88/tag.min.js" data-zone="305778" async data-cfasync="false"></script>
-<script>(function(s){s.dataset.zone='12191623',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
 </head>
 <body>
 <div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
@@ -195,6 +186,7 @@ ${articles.map(a => `{"@type":"BlogPosting","headline":${JSON.stringify(a.title)
       <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
       <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
     </a>
+    ${hdrNav("ar")}
     <a class="btn btn-em" href="/#/">🎬 ابدأ الآن</a>
   </div>
 </header>

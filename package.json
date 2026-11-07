@@ -5,9 +5,8 @@
   "dependencies": {
     "pg": "^8.13.1",
     "playwright": "^1.64.1",
-    "@sparticuz/chromium": "^153.0.0",
-    "playwright-core": "^1.49.0",
-    "puppeteer-core": "^23.0.0"
+    "@sparticuz/chromium": "153.0.0",
+    "playwright-core": "1.64.1"
   },
   "scripts": {
     "test": "node tests/run.js",
@@ -18,6 +17,8 @@
     "test:correct": "node tests/correctness_test.js",
     "monitor": "node scripts/monitor_site.js",
     "test:firefox": "SKIP_EXPORT=1 PW_BROWSER=firefox node tests/run.js",
-    "test:webkit": "SKIP_EXPORT=1 PW_BROWSER=webkit node tests/run.js"
+    "test:webkit": "SKIP_EXPORT=1 PW_BROWSER=webkit node tests/run.js",
+    "build:content": "node scripts/gen_engine.js && node scripts/build_posts.js && node scripts/build_posts_en.js && node scripts/inject_monetag.js && node scripts/fix_internal_links.js && node scripts/build_sitemap.js && node scripts/gen_llms_full.js",
+    "test:autopilot": "node tests/autopilot_unit.js"
   }
 }

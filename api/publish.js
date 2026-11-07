@@ -13,11 +13,6 @@ module.exports = async (req, res) => {
   let b = {};
   try { b = JSON.parse((await new Promise(r => { let d = ""; req.on("data", c => d += c); req.on("end", () => r(d)); })) || "{}"); } catch {}
 
-  if (b.autopilot) {
-    const { runAutopilot } = require("../lib/autopilot");
-    const out = await runAutopilot(uid);
-    return json(res, out.ok ? 200 : 502, out);
-  }
   if (b.queue_id) {
     const row = await q1(`select * from publish_queue where id=$1 and user_id=$2`, [b.queue_id, uid]);
     if (!row) return json(res, 404, { error: "المهمة غير موجودة" });

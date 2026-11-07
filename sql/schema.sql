@@ -19,6 +19,32 @@ create table if not exists public.autopilot (
 );
 alter table public.autopilot enable row level security;
 
+-- Private history for generated/published autopilot videos.
+create table if not exists public.autopilot_runs (
+  id uuid default gen_random_uuid() not null,
+  user_id uuid not null,
+  run_key text not null,
+  run_type text not null,
+  run_date date not null,
+  status text default 'rendering'::text not null,
+  recipe_key text,
+  reciter text,
+  title text,
+  video_path text,
+  publish_queue_id uuid,
+  external_url text,
+  error text,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone default now() not null,
+  updated_at timestamp with time zone default now() not null,
+  constraint autopilot_runs_pkey primary key (id),
+  constraint autopilot_runs_run_key_key unique (run_key),
+  constraint autopilot_runs_run_type_check check (run_type = ANY (ARRAY['daily'::text, 'manual'::text])),
+  constraint autopilot_runs_status_check check (status = ANY (ARRAY['rendering'::text, 'queued'::text, 'published'::text, 'failed'::text]))
+);
+alter table public.autopilot_runs enable row level security;
+
 create table if not exists public.khatma_plans (
   plan_id text not null,
   plan jsonb not null,
@@ -34,6 +60,17 @@ create table if not exists public.khatma_progress (
   updated_at timestamp with time zone default now() not null
 );
 alter table public.khatma_progress enable row level security;
+
+create table if not exists public.contact_messages (
+  id uuid default gen_random_uuid() not null,
+  name text not null check (char_length(name) >= 1 and char_length(name) <= 120),
+  email text not null check (email ~* '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$'),
+  message text not null check (char_length(message) >= 1 and char_length(message) <= 5000),
+  user_agent text,
+  created_at timestamp with time zone default now() not null,
+  constraint contact_messages_pkey primary key (id)
+);
+alter table public.contact_messages enable row level security;
 
 create table if not exists public.publish_queue (
   id uuid default gen_random_uuid() not null,
@@ -71,16 +108,49 @@ alter table public.social_connections enable row level security;
 
 -- ---------- الفهارس ----------
 CREATE UNIQUE INDEX autopilot_pkey ON public.autopilot USING btree (user_id);
+CREATE INDEX autopilot_runs_user_created_idx ON public.autopilot_runs USING btree (user_id, created_at DESC);
 CREATE UNIQUE INDEX khatma_plans_pkey ON public.khatma_plans USING btree (plan_id);
 CREATE UNIQUE INDEX khatma_progress_pkey ON public.khatma_progress USING btree (plan_id, member);
 CREATE UNIQUE INDEX publish_queue_pkey ON public.publish_queue USING btree (id);
 CREATE UNIQUE INDEX social_connections_pkey ON public.social_connections USING btree (id);
 CREATE UNIQUE INDEX social_connections_user_id_platform_account_id_key ON public.social_connections USING btree (user_id, platform, account_id);
 
+-- ---------- RPC للتواصل: لا توجد كتابة مباشرة من anon/authenticated ----------
+CREATE OR REPLACE FUNCTION public.submit_contact(
+  p_name text, p_email text, p_message text, p_user_agent text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+begin
+  if p_name is null or char_length(btrim(p_name)) < 1 or char_length(p_name) > 120 then
+    raise exception 'bad_name';
+  end if;
+  if p_email is null or p_email !~* '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' or char_length(p_email) > 200 then
+    raise exception 'bad_email';
+  end if;
+  if p_message is null or char_length(btrim(p_message)) < 1 or char_length(p_message) > 5000 then
+    raise exception 'bad_message';
+  end if;
+  if (select count(*) from contact_messages c
+      where c.email = lower(p_email) and c.created_at > now() - interval '1 day') >= 5 then
+    raise exception 'rate_limited';
+  end if;
+  insert into contact_messages (name, email, message, user_agent)
+  values (btrim(p_name), lower(btrim(p_email)), btrim(p_message), left(coalesce(p_user_agent, ''), 300));
+  return jsonb_build_object('ok', true);
+end
+$function$;
+
 -- ---------- لا توجد مفاتيح خارجية ----------
 
 -- ---------- السياسات (RLS) ----------
 create policy "ap own" on public.autopilot for ALL to authenticated using ((user_id = auth.uid())) with check ((user_id = auth.uid()));
+grant select on public.autopilot_runs to authenticated;
+create policy "autopilot runs own read" on public.autopilot_runs for SELECT to authenticated using ((user_id = auth.uid()));
+-- contact_messages is writable only through the SECURITY DEFINER submit_contact RPC,
+-- which validates fields and enforces per-email daily limits; no direct anon INSERT policy.
 create policy "anon read plans" on public.khatma_plans for SELECT to public using (true);
 create policy "anon update plans" on public.khatma_plans for UPDATE to public using (true) with check (true);
 create policy "anon write plans" on public.khatma_plans for INSERT to public with check (true);
