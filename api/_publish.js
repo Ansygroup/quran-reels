@@ -1,4 +1,5 @@
-/* نشر فوري أو إضافة مهمة جدولة — بجلسة المستخدم */
+/* نشر فوري أو إضافة مهمة جدولة — بجلسة المستخدم (يُخدَم عبر /api/gw?op=publish،
+ * والرابط القديم /api/publish يعمل عبر rewrite في vercel.json) */
 const { getUserId } = require("../lib/sess");
 const { q, q1 } = require("../lib/db");
 const { publishRow } = require("../lib/publish");

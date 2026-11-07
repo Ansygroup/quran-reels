@@ -1,4 +1,5 @@
-/* بدء ربط OAuth — /api/oauth?op=start&p=<platform>&t=<access_token> */
+/* بدء ربط OAuth — يُخدَم عبر /api/gw?op=start&p=<platform>&t=<access_token>
+ * (والرابط القديم /api/oauth?op=start يعمل عبر rewrite في vercel.json) */
 const { handleStart, json } = require("../lib/oauth");
 
 module.exports = async (req, res) => {

@@ -88,7 +88,7 @@ const QRPublish = (() => {
   async function loadConnections() {
     try {
       const t = await QRAuth.token(); if (!t) { conns = []; return; }
-      const r = await fetch("/api/social?op=list", { headers: { Authorization: "Bearer " + t } });
+      const r = await fetch("/api/gw?op=list", { headers: { Authorization: "Bearer " + t } });
       const j = await r.json();
       conns = j.connections || [];
     } catch { conns = []; }
@@ -164,11 +164,11 @@ const QRPublish = (() => {
       const t = await QRAuth.token();
       if (!t) { openLogin(); return; }
       const pk = k === "facebook" ? "meta" : k;
-      location.href = `/api/oauth?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
+      location.href = `/api/gw?op=start&p=${pk}&t=${encodeURIComponent(t)}`;
     });
     wrap.querySelectorAll("[data-disc]").forEach(b => b.onclick = async () => {
       const t = await QRAuth.token();
-      await fetch("/api/social?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
+      await fetch("/api/gw?op=disconnect", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ id: b.dataset.disc }) });
       toast("تم فك الربط");
       refreshAccount();
     });
@@ -208,7 +208,7 @@ const QRPublish = (() => {
     if (btn) { btn.disabled = true; btn.textContent = "…"; }
     try {
       const t = await QRAuth.token();
-      const r = await fetch("/api/publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
+      const r = await fetch("/api/gw?op=publish", { method: "POST", headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify({ queue_id: id }) });
       const j = await r.json().catch(() => ({}));
       if (j.ok) toast("تم النشر بنجاح 🎉"); else toast(j.error || "تعذّر النشر — راجع ربط المنصة", "err");
     } catch (e) { toast(String(e.message || e), "err"); }

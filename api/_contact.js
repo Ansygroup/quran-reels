@@ -1,5 +1,6 @@
 /* «تواصل» عبر الخادم: يستخدم RPC submit_contact الذي يتحقق من المدخلات
  * ويحدّ المعدل، ثم يرسل تأكيدًا بالبريد إن كان RESEND_API_KEY مضبوطًا.
+ * يُخدَم عبر /api/gw?op=contact (والرابط القديم /api/contact عبر rewrite).
  */
 const { json } = require("../lib/oauth");
 const { sendMail } = require("../lib/mailer");
