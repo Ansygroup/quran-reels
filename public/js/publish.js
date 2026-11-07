@@ -21,6 +21,22 @@ const PLATFORMS = {
 };
 const ALL_PLATFORMS = Object.keys(PLATFORMS);
 
+/* ============================================================
+ * الربط عبر OAuth — كان غائبًا عن الواجهة بالكامل
+ * ------------------------------------------------------------
+ * الخادم كان يملك المسارات الأربعة جاهزة (op=start/list/disconnect في
+ * api/gw.js) لكن لا يوجد زر واحد في أي صفحة يستدعيها، فلم يكن ممكنًا
+ * ربط أي قناة من الموقع إطلاقًا. هنا نبني رابط البدء ونعرض حالة كل منصة.
+ * facebook وinstagram يتشاركان تطبيق Meta واحد، و/أو يُقبل الاسمان أيضًا.
+ * ============================================================ */
+const CONNECT_PLATFORM = { youtube: "youtube", facebook: "meta", instagram: "meta", tiktok: "tiktok", x: "x" };
+
+function connectPath(platform, token) {
+  const prov = CONNECT_PLATFORM[String(platform || "").toLowerCase()];
+  if (!prov || !token) return null;
+  return `/api/gw?op=start&p=${prov}&t=${encodeURIComponent(token)}`;
+}
+
 /* توقيت القاهرة — يقبل تاريخًا/وقتًا كاملًا أو "HH:MM(:SS)" ويُعيد نصًا عربيًا */
 function cairoClockLabel(v) {
   try {
@@ -52,6 +68,8 @@ window.PublishApp = {
   PLATFORMS: ALL_PLATFORMS,
   PLATFORMS_MAP: PLATFORMS,
   cairoClockLabel,
+  connectPath,
+  CONNECT_PLATFORM,
   
   async init() {
     const uid = await window.AuthApp.getUserId();
@@ -81,6 +99,9 @@ window.PublishApp = {
     
     this.renderAccount(data);
     this.bindEvents(uid);
+    // حالة الربط الحقيقية — تُقرأ من op=list (الخادم لا يرسل التوكنات أبدًا)
+    await this.renderConnections(await window.AuthApp.getToken());
+    this.reportLinkedFlag();
   },
 
   renderAccount(data = {}) {
@@ -192,7 +213,121 @@ window.PublishApp = {
 
   },
 
+
+  /* قائمة الحسابات المرتبطة + أزرار ربط/فك ربط لكل منصة */
+  async renderConnections(token) {
+    const card = document.getElementById("acctAccounts");
+    const wrap = document.getElementById("acctAccountsList");
+    if (!card || !wrap) return;
+    card.hidden = false;
+    wrap.innerHTML = '<p class="hint">جارٍ تحميل الحسابات المرتبطة…</p>';
+
+    let conns = [];
+    try {
+      const res = await fetch("/api/gw?op=list", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => ({}));
+      conns = Array.isArray(data.connections) ? data.connections : [];
+    } catch { /* لا نُسقط الصفحة إن فشل الطلب */ }
+    this.connections = conns;
+
+    const row = (p) => {
+      const mine = conns.filter((c) => c.platform === p.key);
+      const prov = CONNECT_PLATFORM[p.key];
+      const head = `<b style="min-width:96px">${p.name}</b>`;
+      if (mine.length) {
+        return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${head}
+          ${mine.map((c) => `<span style="color:#7ee0a2">✅ ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
+            <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>`).join("")}
+          ${prov ? `<button class="btn btn-ghost" data-connect="${p.key}">➕ إضافة حساب</button>` : ""}
+        </div>`;
+      }
+      if (!prov) {
+        return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
+          ${head}<span class="hint">قريبًا — لا يوجد ربط/نشر لهذه المنصة بعد</span>
+        </div>`;
+      }
+      return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
+        ${head}<span class="hint">غير مرتبط</span>
+        <button class="btn btn-em" data-connect="${p.key}">🔗 اربط من ${p.name}</button>
+      </div>`;
+    };
+
+    wrap.innerHTML = this.available.map(row).join("");
+    return conns;
+  },
+
+  /* رسالة العودة من المزوّد: /#/account?linked=youtube | linked=youtube_err | linked=err */
+  reportLinkedFlag() {
+    try {
+      const m = String(window.location.hash || "").match(/[?&]linked=([a-z_]+)/i);
+      if (!m) return;
+      const flag = m[1].toLowerCase();
+      const ok = Boolean(CONNECT_PLATFORM[flag]) && !/_err$/.test(flag) && flag !== "err";
+      const label = PLATFORMS[flag] || (flag === "meta" ? "فيسبوك/إنستغرام" : flag);
+      const notice = document.getElementById("acctNotice");
+      const msg = ok
+        ? `✅ تم ربط ${label} بنجاح — يمكنك الآن اختياره في الأتمتة أو جدولة فيديو عليه.`
+        : `⚠️ لم يكتمل ربط ${label}. أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة.`;
+      if (notice) { notice.style.display = "block"; notice.textContent = msg; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
+      if (typeof toast === "function") toast(msg);
+      // تنظيف الرابط حتى لا تتكرر الرسالة عند كل تحديث
+      try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
+    } catch { /* تجاهل */ }
+  },
+
+  /* ربط/فك ربط — مستمع واحد مفوَّض (الأزرار تُعاد بناؤها بعد كل تحديث) */
+  wireConnections() {
+    if (this._connWired) return;
+    const wrap = document.getElementById("acctAccountsList");
+    if (!wrap) return;
+    this._connWired = true;
+    wrap.addEventListener("click", async (e) => {
+      const btnC = e.target.closest("[data-connect]");
+      const btnD = e.target.closest("[data-unlink]");
+      if (btnC) {
+        const url = connectPath(btnC.dataset.connect, await window.AuthApp.getToken());
+        if (!url) { if (typeof toast === "function") toast("سجّل الدخول أولًا لربط القناة", "err"); return; }
+        btnC.disabled = true;
+        btnC.textContent = "⏳ جارٍ التحويل…";
+        window.location.href = url; // الخادم يحوّل بدوره إلى المزوّد (302)
+        return;
+      }
+      if (btnD) {
+        const id = btnD.dataset.unlink;
+        if (!id || !confirm("فك ربط هذا الحساب؟ ستُحذف التوكنات فورًا.")) return;
+        btnD.disabled = true;
+        try {
+          const res = await fetch("/api/gw?op=disconnect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+            body: JSON.stringify({ id }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "تعذّر فك الربط");
+          if (typeof toast === "function") toast("✓ تم فك الربط");
+          await this.renderConnections(await window.AuthApp.getToken());
+        } catch (error) {
+          if (typeof toast === "function") toast(String(error?.message || error).slice(0, 120), "err");
+          btnD.disabled = false;
+        }
+      }
+    });
+  },
+
+  /* تحديث الحساب من أماكن أخرى (app.js ينادي QRPublish.refreshAccount) */
+  refreshAccount() { return this.init(); },
+  afterLogin() { return this.init(); },
+  wireGlobals() { /* لا شيء مطلوب الآن — تُبقي النداء آمنًا */ },
+  /* جدولة من صانع الريلز بعد التصدير: تحتاج رفع الفيديو إلى التخزين أولًا */
+  scheduleFromExport() {
+    const msg = "لجدولة فيديو مُصدَّر: اربط قناة أولًا من «حسابي»، ثم استخدم «جدولة للنشر» بعد التصدير.";
+    if (typeof toast === "function") toast(msg);
+    else alert(msg);
+  },
+
   bindEvents() {
+    this.wireConnections();
     // حفظ الإعدادات
     document.getElementById("autoSave")?.addEventListener("click", async () => {
       const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map(i => i.dataset.platform);
@@ -380,7 +515,14 @@ window.QRAuthUI = (function () {
 // التشغيل التلقائي عند تحميل الصفحة
 function bootAccount() {
   window.QRAuthUI?.wire();
-  if (window.location.hash === "#/account") window.PublishApp.init();
+  /* كان الشرط يساوي #/account حرفيًا، فلا تعمل صفحة الحساب عند العودة من
+   * المزوّد (#/account?linked=youtube) ولا عند أي بارامتر — فلا تُعرض القنوات. */
+  if (/^#\/account(\?|$)/.test(window.location.hash || "")) window.PublishApp.init();
 }
 document.addEventListener("DOMContentLoaded", bootAccount);
 window.addEventListener("hashchange", bootAccount);
+
+/* app.js و creator.js ينادون QRPublish (refreshAccount · afterLogin · wireGlobals ·
+ * scheduleFromExport) بينما هذا الملف يعرّف PublishApp — فكانت النداءات الثلاثة
+ * تُتجاهل بصمت (typeof QRPublish === "undefined") ولا تُهيّأ صفحة الحساب أبدًا. */
+window.QRPublish = window.PublishApp;
