@@ -82,3 +82,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/functions_limit.js && node scripts/smoke_prod.js
   EXPECT: ‏0 أخطاء في الحاجز (لا require لـ chromium/playwright/sharp أعلى ملفات api/ أو lib/) · كل مسار عام يعيد JSON (200/401/405) لا 500 FUNCTION\_INVOCATION\_FAILED
   EVIDENCE: 2026-11-07 — النشر «success» و`/api/autopilot` و`/api/cron/publish` تعيدان 500 على كل طلب؛ السبب `require("@sparticuz/chromium")` (ESM خالص) في أعلى `lib/autopilot.js`. لوحة الحساب معطّلة والكرون اليومي يفشل بصمت.
+
+- [ ] G13: الصفحة الرئيسية موقع لا صفحة حساب
+  CHECK: node tests/homepage_test.js
+  EXPECT: ‏10 فحوص — العروض الخمسة · واجهة الصانع (selSurah/selReciter) · السكربتات التسعة · حاويات لوحة الحساب · المعرّفات التي يقرأها publish.js · لا معرّفات مكرّرة · style.css ≥400 سطر بأصنافها · عنوان الموقع
+  EVIDENCE: 2026-11-07 — وصل main ملف index.html بـ123 سطرًا (صفحة حساب بلا صانع وبلا سكربتات data/core/quran/reel) وstyle.css بـ55 سطرًا، فصار الجذر / بلا منتج ولا تنسيق، وخط الأتمتة الذي يفتح /?s=… وينتظر Creator لا يولّد شيئًا.

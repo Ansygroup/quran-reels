@@ -10,11 +10,12 @@
   },
   "scripts": {
     "test": "node tests/run.js",
-    "pretest": "node tests/functions_limit.js && node tests/autopilot_api_test.js",
+    "pretest": "node tests/functions_limit.js && node tests/homepage_test.js && node tests/autopilot_api_test.js",
     "test:limits": "node tests/functions_limit.js",
     "verify:deploy": "node scripts/check_deploy.js",
     "test:dom": "node tests/publish_client_dom.js",
     "test:autopilot-api": "node tests/autopilot_api_test.js",
+    "test:homepage": "node tests/homepage_test.js",
     "smoke": "node scripts/smoke_prod.js",
     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
     "test:api": "node tests/api_test.js",
