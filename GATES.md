@@ -77,3 +77,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: npm run test:autopilot-api
   EXPECT: 20 فحصًا ناجحًا — قراءة محصّنة بلا أعمدة المقالات · available بقائمة publish صحيحة · مقال عشوائي بلا جدول articles · مطابقة lib/platforms ↔ lib/publish ↔ العميل
   EVIDENCE: 2026-11-07 — كانت اللوحة تقرأ أعمدة غير موجودة في القاعدة (خطر فشل كامل)، والواجهة تعرض 8 منصات بينما النشر يدعم 5، وزر «10,000 مقال» يعتمد جدولًا غير معرّف.
+
+- [ ] G12: لا تبعية ثقيلة/ESM في نطاق الوحدة + فحص دخان حقيقي
+  CHECK: node tests/functions_limit.js && node scripts/smoke_prod.js
+  EXPECT: ‏0 أخطاء في الحاجز (لا require لـ chromium/playwright/sharp أعلى ملفات api/ أو lib/) · كل مسار عام يعيد JSON (200/401/405) لا 500 FUNCTION\_INVOCATION\_FAILED
+  EVIDENCE: 2026-11-07 — النشر «success» و`/api/autopilot` و`/api/cron/publish` تعيدان 500 على كل طلب؛ السبب `require("@sparticuz/chromium")` (ESM خالص) في أعلى `lib/autopilot.js`. لوحة الحساب معطّلة والكرون اليومي يفشل بصمت.

@@ -192,6 +192,33 @@ if (serverish.length) {
   ok(`لا كود خادم في public/ (${clientScripts.length} ملف JS)`);
 }
 
+/* ---------------- 6) لا حزم ثقيلة/ESM في نطاق الوحدة داخل دوال الخادم ----------------
+ * حدث فعلًا (2026-11-07): `require("@sparticuz/chromium")` في أعلى lib/autopilot.js —
+ * والحزمة ESM خالصة (`"type": "module"`، 67MB) — فكان كل استيراد لهذه الوحدة ينهار
+ * قبل معالجة الطلب: /api/autopilot و/api/cron/publish تعيدان 500
+ * FUNCTION_INVOCATION_FAILED على كل طلب، ولوحة الحساب معطّلة والكرون اليومي يفشل
+ * بصمت، بينما البناء و«Vercel success» سليمان. القاعدة الآن: تُحمَّل بـawait import()
+ * داخل الدالة التي تحتاجها فقط، لا بـrequire في أعلى الملف.
+ */
+const HEAVY_ESM = ["@sparticuz/chromium", "playwright", "playwright-core", "puppeteer", "puppeteer-core", "sharp", "@napi-rs/canvas", "canvas"];
+const serverJs = [
+  ...(fs.existsSync(apiDir) ? walk(apiDir) : []),
+  ...(fs.existsSync(path.join(ROOT, "lib")) ? walk(path.join(ROOT, "lib")) : []),
+].filter((f) => f.endsWith(".js"));
+const eagerHeavy = [];
+for (const f of serverJs) {
+  const src = fs.readFileSync(f, "utf8");
+  for (const pkg of HEAVY_ESM) {
+    const re = new RegExp(`require\\(\\s*["'\`]${pkg.replace(/[/\\-]/g, (m) => "\\" + m)}["'\`]\\s*\\)`);
+    if (re.test(src)) eagerHeavy.push(`${rel(f)} → require("${pkg}")`);
+  }
+}
+if (eagerHeavy.length) {
+  fail(`حزمة ثقيلة/ESM تُحمَّل بـrequire في نطاق الوحدة (تُسقط الدالة كاملة عند الإقلاع): ${eagerHeavy.join(" · ")} — استخدم await import() داخل الدالة`);
+} else {
+  ok(`لا require لحزم ثقيلة/ESM في نطاق الوحدة (${serverJs.length} ملف خادم) — await import() فقط`);
+}
+
 /* ---------------- النتيجة ---------------- */
 console.log("\n==== ERRORS (" + errs.length + ") ====");
 if (errs.length) {

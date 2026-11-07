@@ -15,6 +15,7 @@
     "verify:deploy": "node scripts/check_deploy.js",
     "test:dom": "node tests/publish_client_dom.js",
     "test:autopilot-api": "node tests/autopilot_api_test.js",
+    "smoke": "node scripts/smoke_prod.js",
     "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
     "test:api": "node tests/api_test.js",
     "test:smoke": "node tests/tools_smoke.js",

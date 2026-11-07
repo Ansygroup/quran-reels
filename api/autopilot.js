@@ -117,7 +117,10 @@ async function accountData(uid) {
 }
 
 const handler = async (req, res) => {
-  const uid = await getUserId(req);
+  let uid = null;
+  try {
+    uid = await getUserId(req);
+  } catch { /* أي خطأ في التحقق من الجلسة = غير مسجّل، لا 500 خام من Vercel */ }
   if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
   try {
     if (req.method === "GET") return json(res, 200, await accountData(uid));
