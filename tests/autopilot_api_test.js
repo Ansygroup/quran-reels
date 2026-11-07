@@ -140,6 +140,47 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("createRun/patchRun يحاولان مجددًا بلا أعمدة المقالات",
     /hasArticleCols/.test(autoSrc) && /stripArticleCols/.test(autoSrc));
 
+  /* 10) لا اعتماد على chromium/playwright عند الإقلاع (عطل إنتاج 2026-11-07)
+   * كان require للحزمة في أعلى lib/autopilot يجعل كل دالة تستوردها تنهار قبل
+   * معالجة الطلب: /api/autopilot و/api/cron/publish → 500 FUNCTION_INVOCATION_FAILED
+   * والبناء «success». نُعيد تمثيل العطل: كل require للحزمتين يفشل، ويجب أن
+   * تُحمَّل الوحدة رغم ذلك (لأن التحميل صار بـawait import داخل renderRecipe). */
+  const { execFileSync } = require("child_process");
+  const libPath = JSON.stringify(path.join(ROOT, "lib", "autopilot.js"));
+  const childScript = `
+    const Module = require("module");
+    const orig = Module._load;
+    Module._load = function (req) {
+      if (/^(@sparticuz\\/chromium|playwright(-core)?)$/.test(req)) throw new Error("simulated missing: " + req);
+      return orig.apply(this, arguments);
+    };
+    try { require(${libPath}); console.log("LOADED"); }
+    catch (e) { console.log("THREW " + String(e.message).slice(0, 100)); }
+  `;
+  let childOut = "";
+  try {
+    childOut = execFileSync(process.execPath, ["-e", childScript], { encoding: "utf8", timeout: 60000 }).trim();
+  } catch (e) {
+    childOut = "EXEC_FAILED " + String(e.message).slice(0, 100);
+  }
+  chk("lib/autopilot يُحمَّل بلا chromium/playwright (لا انهيار إقلاع)", childOut === "LOADED", childOut);
+
+  const libAuto = require(path.join(ROOT, "lib", "autopilot.js"));
+  const libSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("الحزم الثقيلة تُحمَّل بـawait import داخل renderRecipe",
+    /await import\("@sparticuz\/chromium"\)/.test(libSrc) && /await import\("playwright-core"\)/.test(libSrc));
+  chk("لا require للحزم الثقيلة في أعلى lib/autopilot",
+    !/^const chromiumBin = require/m.test(libSrc) && !/require\("playwright-core"\)/.test(libSrc));
+
+  let friendly = true, why = "";
+  try {
+    await libAuto.__test.renderDeps();
+  } catch (e) {
+    friendly = e && e.code === "RENDER_DEPS_UNAVAILABLE" && /محرّك المتصفح/.test(String(e.message));
+    why = String(e && e.message).slice(0, 120);
+  }
+  chk("تعذّر تحميل محرّك المتصفح يعطي خطأ مفهومًا لا انهيارًا", friendly, why);
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
