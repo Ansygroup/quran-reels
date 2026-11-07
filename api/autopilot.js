@@ -137,8 +137,11 @@ const handler = async (req, res) => {
       const platforms = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : ["youtube"];
       
       if (enabled) {
-        const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&platform=in.(${platforms.map(p => `'${p}'`).join(',')})&select=id&limit=1`);
-        if (!Array.isArray(connected) || connected.length === 0) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تفعيل النشر الآلي" });
+        /* نفس عطل الاقتباس المفرد في in.(…) — كان يرفض التفعيل بـ409 رغم
+         * أن القناة مربوطة. نقارن في JavaScript. */
+        const connectedRows = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=platform`);
+        const connectedKeys = Array.isArray(connectedRows) ? connectedRows.map(r => r.platform) : [];
+        if (!platforms.some(p => connectedKeys.includes(p))) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تفعيل النشر الآلي" });
       }
       
       const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };

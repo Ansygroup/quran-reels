@@ -199,6 +199,22 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     stErr ? String(stErr.message).slice(0, 80) : JSON.stringify(st).slice(0, 120));
   chk("renderSelfTest يحمل مسار التنفيذ أو رسالة خطأ", Boolean(st && (st.executable_path || st.error)));
 
+  /* 13) عطل in.('…') — كان يجعل كل تشغيل يفشل بـ«اربط القنوات أولًا» رغم الربط */
+  const libSrc3 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const apiSrc3 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
+  chk("لا فلترة in. باقتباس مفرد (لا تطابق أي صف في PostgREST)",
+    !/=in\.\('/.test(libSrc3) && !/=in\.\('/.test(apiSrc3),
+    "ما زال هناك in.('…') في lib/autopilot.js أو api/autopilot.js");
+
+  setDb({ rest: async (p) => (/social_connections/.test(p) ? [{ platform: "youtube" }] : []) });
+  const hasConn = await libAuto2.__test.hasPlatformConnection("u1", ["youtube"]);
+  chk("hasPlatformConnection يعيد true لقناة مرتبطة (كانت false دائمًا)", hasConn === true, String(hasConn));
+  const hasNo = await libAuto2.__test.hasPlatformConnection("u1", ["tiktok"]);
+  chk("hasPlatformConnection يعيد false لمنصة غير مرتبطة", hasNo === false, String(hasNo));
+  setDb({ rest: async () => { throw new Error("down"); } });
+  const hasDown = await libAuto2.__test.hasPlatformConnection("u1", ["youtube"]);
+  chk("hasPlatformConnection لا يرمي عند فشل القاعدة", hasDown === false, String(hasDown));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
