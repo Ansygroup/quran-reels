@@ -59,6 +59,22 @@
       "destination": "/api/ip?mode=config"
     },
     {
+      "source": "/api/oauth",
+      "destination": "/api/gw"
+    },
+    {
+      "source": "/api/social",
+      "destination": "/api/gw"
+    },
+    {
+      "source": "/api/publish",
+      "destination": "/api/gw?op=publish"
+    },
+    {
+      "source": "/api/contact",
+      "destination": "/api/gw?op=contact"
+    },
+    {
       "source": "/proxy",
       "destination": "/api/proxy"
     }
@@ -257,7 +273,7 @@
     "api/ip.js": {
       "maxDuration": 15
     },
-    "api/publish.js": {
+    "api/gw.js": {
       "maxDuration": 60
     },
     "api/cron/publish.js": {
@@ -266,9 +282,6 @@
     },
     "api/cron/monitor.js": {
       "maxDuration": 120
-    },
-    "api/oauth.js": {
-      "maxDuration": 30
     },
     "api/oauth/callback.js": {
       "maxDuration": 30

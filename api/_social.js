@@ -1,4 +1,5 @@
-/* مسار اجتماعي موحّد: list | disconnect */
+/* مسار اجتماعي موحّد: list | disconnect — يُخدَم عبر /api/gw?op=list|disconnect
+ * (والرابط القديم /api/social?op=… يعمل عبر rewrite في vercel.json) */
 const { json } = require("../lib/oauth");
 const LIST = require("../lib/soc_list");
 const DISC = require("../lib/soc_disconnect");

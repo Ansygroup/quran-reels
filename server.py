@@ -113,6 +113,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.handle_ip()
         if parsed.path.startswith("/api/app-config"):
             return self.handle_config()
+        if parsed.path == "/api/gw":
+            return self.handle_gw(parsed, head=False)
         # static with gzip
         rel = urllib.parse.unquote(parsed.path)
         if rel == "/" or rel == "":
@@ -153,7 +155,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path.startswith("/api/contact"):
             return self.handle_contact()
+        if parsed.path == "/api/gw":
+            return self.handle_gw(parsed, head=False)
         self.send_error(404, "not found")
+
+    def handle_gw(self, parsed, head=False):
+        """Mirror of api/gw.js — dispatcher للعمليات (بلا اعتمادات محلية)."""
+        op = (urllib.parse.parse_qs(parsed.query).get("op") or [""])[0]
+        if op == "version":
+            body = json.dumps({
+                "ok": True,
+                "service": "quran-reels",
+                "sha": os.environ.get("VERCEL_GIT_COMMIT_SHA", ""),
+                "sha_short": os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:7],
+                "ref": os.environ.get("VERCEL_GIT_COMMIT_REF", ""),
+                "env": "local",
+            }).encode("utf-8")
+            return self._send(body, "application/json; charset=utf-8")
+        if op == "contact" and self.command == "POST":
+            return self.handle_contact()
+        ctype = "application/json; charset=utf-8"
+        if op in ("start", "list", "disconnect", "publish"):
+            body = json.dumps({"error": "unauthorized"}).encode("utf-8")
+            return self._send(body, ctype, status=401)
+        body = json.dumps({"error": "unknown op", "ops": ["start", "list", "disconnect", "publish", "contact"]}).encode("utf-8")
+        return self._send(body, ctype, status=404)
 
     def handle_contact(self):
         """Mirror of api/contact.js validation (كمل#14) — no local Supabase creds."""
