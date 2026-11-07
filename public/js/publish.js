@@ -107,13 +107,12 @@ window.PublishApp = {
     // جدول النشر
     const acctQueue = document.getElementById("acctQueue");
     if (acctQueue) {
-      const platformSelect = `
-        <div class="row gap-sm wrap" id="schedPlatforms">
-          ${ALL_PLATFORMS.map(p => `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p}"> ${PLATFORMS[p] || p}</label></div>`).join("")}
-        </div>
-      `;
+      // نملأ الحاوية الموجودة (#schedPlatforms) بالمدخلات فقط — بلا تكرار للمُعرّف
+      const platformInputs = ALL_PLATFORMS.map(p =>
+        `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p}"> ${PLATFORMS[p] || p}</label></div>`
+      ).join("");
       const schedWrap = acctQueue.querySelector("#schedPlatforms");
-      if (schedWrap) schedWrap.innerHTML = platformSelect;
+      if (schedWrap) schedWrap.innerHTML = platformInputs;
       
       const queueList = document.getElementById("queueList");
       if (queueList && Array.isArray(runs)) {
