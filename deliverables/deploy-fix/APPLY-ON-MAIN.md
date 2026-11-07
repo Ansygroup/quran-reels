@@ -86,6 +86,18 @@ npm run verify:deploy
 
 وكذلك رفع نسخة الكاش في `public/sw.js`: `const CACHE = "qr-v7";` → `"qr-v8"` (حتى يحصل العملاء على الـ JS الجديد).
 
+## فشلٌ ثانٍ مختلف (5 نوفمبر) — أُغلق أيضًا
+
+إيميلات 5 نوفمبر (`c8c5aa9`, `a658382`, `0efa8c1`) لم تكن عن عدد الدوال بل:
+
+```
+Configuration error
+Hobby accounts are limited to daily cron jobs.
+This cron expression (0 0,8,16 * * *) would run more than once per day.
+```
+
+السبب: جدول cron يعمل 3 مرات يوميًا. الإعداد الحالي في `vercel.json` سليم (`15 4 * * *` يوميًا و`30 6 * * 1` أسبوعيًا)، والحاجز الآن يرفض أي جدول يعمل أكثر من مرة يوميًا أو أكثر من مجدولين — فالخطأان (الدوال + المجدولات) مغطّيان.
+
 ## دروس مستفادة
 
 - لا تُعِد `api/app-config.js` أبدًا؛ الـ rewrite إلى `/api/ip?mode=config` يقوم بالمهمة.

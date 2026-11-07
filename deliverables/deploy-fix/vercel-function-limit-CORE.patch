@@ -372,10 +372,10 @@ index c9c6a0a0..cccbbfd8 100644
  })();
 diff --git a/tests/functions_limit.js b/tests/functions_limit.js
 new file mode 100644
-index 00000000..4cb3b2f6
+index 00000000..6659057a
 --- /dev/null
 +++ b/tests/functions_limit.js
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,185 @@
 +#!/usr/bin/env node
 +/* ============================================================
 + * حاجز عدد الدوال في Vercel — خطة Hobby تسمح بـ12 دالة لكل نشرة.
@@ -387,6 +387,12 @@ index 00000000..4cb3b2f6
 + * القاعدة:
 + *   عدد الدوال = ملفات api/**‎.js التي لا تبدأ بـ _  +  middleware.js (يُحسب)
 + *   يجب أن يكون ≤ 12، وننبّه إن وصل 12 (بلا هامش).
++ *
++ * ويفحص كذلك قواعد الخطة الأخرى التي تُفشل النشر بعد نجاح البناء:
++ *   • المجدولات (crons): حد أقصى 2، وكل مجدول مرة واحدة يوميًا (رفض Vercel
++ *     سابقًا الجدول 0 0,8,16 * * * بتاريخ 2026-11-05 بسبب ذلك).
++ *   • api/app-config.js محذوف (rewrite يكفي) · rewrites/crons/functions تشير
++ *     إلى دوال موجودة · المسارات العامة ما زالت مخدومة.
 + *
 + * الملفات المبدوءة بـ _ وحدات مساعدة فقط (Vercel لا يحوّلها إلى دوال)
 + * وتُستدعى من دالة التوزيع api/gw.js.
@@ -425,6 +431,27 @@ index 00000000..4cb3b2f6
 +function routeOf(file) {
 +  const r = rel(file).replace(/\.(js|cjs|mjs|ts)$/, "");
 +  return "/" + r.replace(/\/index$/, "");
++}
++
++/* ---------------- فحص جدول cron مقابل خطة Hobby ----------------
++ * Hobby: مجدولان كحد أقصى، وكل واحد يعمل مرة واحدة يوميًا كحد أقصى.
++ * لذلك يُرفض: * أو قوائم/نطاقات/خطوات في الدقيقة أو الساعة (0 0,8,16 * * * فشلت فعليًا 2026-11-05).
++ */
++function cronViolation(expr) {
++  const parts = String(expr || "").trim().split(/\s+/);
++  if (parts.length !== 5) return "الصيغة يجب أن تكون 5 حقول (دقيقة ساعة يوم-الشهر شهر يوم-الأسبوع)";
++  const names = ["الدقيقة", "الساعة", "يوم الشهر", "الشهر", "يوم الأسبوع"];
++  for (let i = 0; i < 5; i++) {
++    const f = parts[i];
++    if (!/^[0-9*,\-/]+$/.test(f)) return `${names[i]} غير مدعوم ("${f}")`;
++  }
++  if (!/^\d+$/.test(parts[0])) return `الدقيقة يجب أن تكون رقمًا ثابتًا ("${parts[0]}")`;
++  if (!/^\d+$/.test(parts[1])) return `الساعة يجب أن تكون رقمًا ثابتًا ("${parts[1]}") — "*" أو قائمة تعني تشغيلًا متعددًا في اليوم`;
++  const dom = parts[2], mon = parts[3], dow = parts[4];
++  for (const [i, f] of [[2, dom], [3, mon], [4, dow]]) {
++    if (!(f === "*" || /^\d+$/.test(f))) return `${names[i]} يجب أن يكون "*" أو رقمًا واحدًا ("${f}")`;
++  }
++  return null;
 +}
 +
 +/* ---------------- 1) عدد الدوال ---------------- */
@@ -497,12 +524,20 @@ index 00000000..4cb3b2f6
 +  }
 +  ok("جميع المسارات العامة مخدومة (دالة أو rewrite)");
 +
-+  /* المجدولات يجب أن تشير إلى دوال موجودة */
-+  for (const c of cfg.crons || []) {
++  /* المجدولات: دالة موجودة + قواعد خطة Hobby (يومي فقط، وحد أقصى 2) */
++  const crons = cfg.crons || [];
++  for (const c of crons) {
 +    const file = path.join(ROOT, String(c.path).split("?")[0].replace(/^\//, "") + ".js");
 +    if (!fs.existsSync(file)) fail(`cron ${c.path}: الدالة ${rel(file)} غير موجودة`);
 +  }
-+  ok(`فحص crons: ${(cfg.crons || []).length} مجدولًا`);
++  if (crons.length > 2) {
++    fail(`عدد المجدولات ${crons.length} > 2 — خطة Hobby تسمح بمجدولين كحد أقصى`);
++  }
++  for (const c of crons) {
++    const bad = cronViolation(c.schedule);
++    if (bad) fail(`cron ${c.path} بجدول "${c.schedule}" يخالف Hobby: ${bad}. (خطة Hobby: مجدول يومي واحد كحد أقصى — عدة مرات/يوم تحتاج Pro)`);
++  }
++  ok(`فحص crons: ${crons.length} مجدولًا (دالة موجودة + جدول مقبول على Hobby)`);
 +}
 +
 +/* ---------------- 4) api/gw.js موجود ويوزّع ---------------- */
