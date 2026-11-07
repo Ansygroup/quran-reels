@@ -4,17 +4,9 @@ const { q1, rest } = require("../lib/db");
 const { json } = require("../lib/oauth");
 const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish } = require("../lib/autopilot");
 
-// دعم جميع المنصات (تعدد القنوات)
-const PLATFORMS = {
-  youtube: "يوتيوب",
-  facebook: "فيسبوك",
-  instagram: "إنستغرام",
-  tiktok: "تيك توك",
-  x: "X",
-  linkedin: "لينكد إن",
-  telegram: "تيليجرام",
-  whatsapp: "واتساب"
-};
+// قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
+const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
+const PLATFORMS = PLATFORM_NAMES;
 
 const DEFAULTS = {
   enabled: false,
@@ -32,16 +24,80 @@ async function readBody(req) {
   try { return JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
 }
 
-// دعم توليد البوست من المقالات (10,000 مقال)
-async function articleRandom(uid) {
-  const articles = await rest(`/rest/v1/articles?select=id,title&limit=10000`);
-  if (!Array.isArray(articles) || !articles.length) return null;
-  return articles[Math.floor(Math.random() * articles.length)];
+/* دعم توليد البوست من المقالات.
+ * المصدر الأول: جدول articles في Supabase (إن وُجد).
+ * احتياطي: مكتبة المقالات المضمّنة في المستودع (posts/index*.js) — لأن الجدول غير
+ * معرّف في sql/schema.sql، فبدونه كان الزر يفشل دائمًا بـ«لا توجد مقالات متاحة».
+ */
+const ARTICLE_SOURCES = {
+  index: () => require("../posts/index"),
+  index_b: () => require("../posts/index_b"),
+  index_c: () => require("../posts/index_c"),
+  index_d: () => require("../posts/index_d"),
+  index_e: () => require("../posts/index_e"),
+  index_f: () => require("../posts/index_f"),
+  index_g: () => require("../posts/index_g"),
+  index_h: () => require("../posts/index_h"),
+  index_i: () => require("../posts/index_i"),
+  index_j: () => require("../posts/index_j"),
+};
+
+let repoArticlesCache = null;
+function repoArticles() {
+  if (repoArticlesCache) return repoArticlesCache;
+  const out = [];
+  const seen = new Set();
+  for (const [key, load] of Object.entries(ARTICLE_SOURCES)) {
+    try {
+      const list = load();
+      if (!Array.isArray(list)) continue;
+      for (const a of list) {
+        if (!a || !a.slug || !a.title || seen.has(a.slug)) continue;
+        seen.add(a.slug);
+        out.push({ id: a.slug, title: a.title, slug: a.slug, url: `/articles/${a.slug}/` });
+      }
+    } catch { /* ملف غير موجود أو تعطّل — نتخطّاه */ }
+  }
+  repoArticlesCache = out;
+  return out;
+}
+
+const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
+
+async function articleRandom() {
+  try {
+    const articles = await rest(`/rest/v1/articles?select=id,title&limit=10000`);
+    if (Array.isArray(articles) && articles.length) return pickRandom(articles);
+  } catch { /* الجدول غير موجود أو الخدمة معطّلة — نكمل بمقالات المستودع */ }
+  const local = repoArticles();
+  return local.length ? pickRandom(local) : null;
+}
+
+const RUN_COLS = "id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at";
+const RUN_COLS_ARTICLES = RUN_COLS + ",article_id,article_title";
+
+/* تاريخ التشغيل: نحاول قراءة أعمدة المقالات، وإن لم تكن مضافة في القاعدة
+ * (sql/migrations/20261107_autopilot_runs_articles.sql) نقرأ بدونها بدل أن تفشل
+ * اللوحة بالكامل برسالة «column does not exist». */
+async function loadRuns(uid) {
+  const base = `/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}`;
+  const order = "&order=created_at.desc&limit=12";
+  try {
+    const rows = await rest(`${base}&select=${RUN_COLS_ARTICLES}${order}`);
+    return { rows: Array.isArray(rows) ? rows : [], articlesColumns: true };
+  } catch {
+    try {
+      const rows = await rest(`${base}&select=${RUN_COLS}${order}`);
+      return { rows: Array.isArray(rows) ? rows : [], articlesColumns: false };
+    } catch {
+      return { rows: [], articlesColumns: false };
+    }
+  }
 }
 
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-  const runs = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&select=id,run_type,run_date,status,recipe_key,reciter,title,external_url,error,created_at,completed_at,article_id,article_title&order=created_at.desc&limit=12`);
+  const { rows: runs } = await loadRuns(uid);
   // دعم تعدد القنوات
   const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
@@ -54,10 +110,13 @@ async function accountData(uid) {
     platforms: connectedPlatforms,
     channel: channelNames || "لا توجد قنوات مرتبطة",
     reciters: RECITERS,
+    available: PLATFORM_LIST,
+    // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
+    articles: { count: repoArticles().length },
   };
 }
 
-module.exports = async (req, res) => {
+const handler = async (req, res) => {
   const uid = await getUserId(req);
   if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
   try {
@@ -134,3 +193,7 @@ module.exports = async (req, res) => {
     return json(res, 500, { error: String(error?.message || error).slice(0, 300) });
   }
 };
+
+module.exports = handler;
+/* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST };

@@ -72,3 +72,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: npm run test:dom
   EXPECT: 15 فحص DOM ناجحًا (تحميل · init · رسم السجل والأتمتة · كل زر يرسل الإجراء الصحيح)
   EVIDENCE: 2026-11-07 — كان public/js/publish.js يحتوي require/module.exports ففشل المتصفح بـ ReferenceError وتوقّفت لوحة الحساب؛ نُقل المنطق إلى api/autopilot.js الموجود أصلًا وبقي الملف عميلًا خالصًا.
+
+- [ ] G11: عقد لوحة الحساب وقوائم المنصات
+  CHECK: npm run test:autopilot-api
+  EXPECT: 20 فحصًا ناجحًا — قراءة محصّنة بلا أعمدة المقالات · available بقائمة publish صحيحة · مقال عشوائي بلا جدول articles · مطابقة lib/platforms ↔ lib/publish ↔ العميل
+  EVIDENCE: 2026-11-07 — كانت اللوحة تقرأ أعمدة غير موجودة في القاعدة (خطر فشل كامل)، والواجهة تعرض 8 منصات بينما النشر يدعم 5، وزر «10,000 مقال» يعتمد جدولًا غير معرّف.

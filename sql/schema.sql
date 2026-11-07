@@ -34,6 +34,8 @@ create table if not exists public.autopilot_runs (
   publish_queue_id uuid,
   external_url text,
   error text,
+  article_id text,
+  article_title text,
   started_at timestamp with time zone,
   completed_at timestamp with time zone,
   created_at timestamp with time zone default now() not null,

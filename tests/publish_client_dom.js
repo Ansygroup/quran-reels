@@ -40,6 +40,17 @@ const ACCOUNT = {
   platforms: ["youtube"],
   channel: "يوتيوب · قناة قرآن",
   reciters: [{ id: "a", name: "السديس" }],
+  available: [
+    { key: "youtube", name: "يوتيوب", publish: true },
+    { key: "facebook", name: "فيسبوك", publish: true },
+    { key: "instagram", name: "إنستغرام", publish: true },
+    { key: "tiktok", name: "تيك توك", publish: true },
+    { key: "x", name: "X", publish: true },
+    { key: "linkedin", name: "لينكد إن", publish: false },
+    { key: "telegram", name: "تيليجرام", publish: false },
+    { key: "whatsapp", name: "واتساب", publish: false },
+  ],
+  articles: { count: 500 },
 };
 
 const dom = new JSDOM(html, { url: "https://quran-reels.test/#/account", runScripts: "outside-only", pretendToBeVisual: true });
@@ -117,6 +128,27 @@ window.fetch = async (url, opts = {}) => {
   const badIds = idList.filter((id) => d.querySelectorAll("#" + id).length !== 1);
   if (badIds.length) fail("معرّفات مفقودة/مكررة بعد الرسم: " + badIds.join(", "));
   else ok("معرّفات DOM فريدة بعد الرسم");
+
+  // ---- المنصات: غير القابلة للنشر معطّلة ولا تُرسل مع الحفظ ----
+  const disabled = [...d.querySelectorAll("#acctPlatforms input[data-platform]")].filter((i) => i.disabled).map((i) => i.dataset.platform);
+  if (disabled.sort().join(",") !== "linkedin,telegram,whatsapp") fail("تعطيل المنصات غير المدعومة ناقص: " + disabled.join(","));
+  else ok("المنصات غير المدعومة (linkedin/telegram/whatsapp) معطّلة في الواجهة");
+
+  const saveBtn = d.getElementById("autoSave");
+  if (saveBtn) {
+    [...d.querySelectorAll("#acctPlatforms input[data-platform]")].forEach((i) => { if (!i.disabled) i.checked = true; });
+    calls.length = 0; alerts.length = 0;
+    saveBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 30));
+    const sent = (() => { try { return JSON.parse(calls[0].body).platforms || []; } catch { return []; } })();
+    if (sent.length !== 5 || sent.includes("linkedin") || sent.includes("whatsapp")) fail("الحفظ أرسل منصات غير مدعومة: " + JSON.stringify(sent));
+    else ok("الحفظ يرسل المنصات المدعومة فقط (5)");
+  }
+
+  // ---- عدّاد المقالات الحقيقي بدل «10,000» ----
+  const genBtn = d.getElementById("autoGenArticle") || d.getElementById("quickGenArticle");
+  if (!genBtn || !/(500|٥٠٠)/.test(genBtn.textContent)) fail("نص زر المقال لا يعرض العدد الحقيقي: " + (genBtn && genBtn.textContent));
+  else ok("نص زر «توليد من مقال» يعرض العدد من الخادم (500)");
 
   // ---- أزرار اللوحة: كل إجراء يجب أن يذهب إلى /api/autopilot بالاسم الصحيح ----
   const click = async (id) => {
