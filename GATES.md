@@ -51,3 +51,24 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 - **حل التعارضات (Conflict Resolution):**
   - تم دمج التحديثات مع الفرع الرئيسي (main) في الملفات المستهدفة وحل التعارضات محلياً في الفرع `arena/47e769e3-quran-reels`.
   - تم الحفاظ على التوافق مع G1-G7.
+
+---
+
+## Gates النشر (Hobby) — أُضيفت بعد حادثة 2026-11-07
+
+- [ ] G8: عدد دوال Vercel وقواعد المجدولات داخل حدود خطة Hobby
+  CHECK: node tests/functions_limit.js
+  EXPECT: مجموع الدوال ≤ 12 (المستهدف ≤ 9) · لا وجود لـ api/app-config.js · كل rewrite/cron/functions يشير إلى دالة موجودة · المجدولات ≤ 2 وبجدول يومي فقط · لا كود خادم في public/
+  EVIDENCE: 2026-11-07 — 12 ملف api + middleware = 13 → رُفض النشر 4 مرات (exceeded_serverless_functions_per_deployment)؛ بعد دمج المسارات في api/gw.js صارت 9. وفي 5 نوفمبر رُفض جدول cron يعمل 3 مرات يوميًا.
+  NOTE: تجاوز الحد يُفشل الرفع بعد نجاح البناء (عنوان الإيميل «Build error») وتظل النسخة القديمة مخدومة — فشل صامت. لا تُعِد api/app-config.js (rewrite إلى /api/ip?mode=config يكفي).
+
+- [ ] G9: الإنتاج يخدم آخر كوميت (لا نشرة قديمة صامتة)
+  CHECK: npm run verify:deploy
+  EXPECT: ✓ الإنتاج يخدم آخر كوميت على main (وإلا فالمخرَج يشرح سبب التباعد)
+  HOW: /api/gw?op=version يكشف VERCEL_GIT_COMMIT_SHA، والسكربت يقارنه بـ git ls-remote origin main
+  NOTE: يُشغَّل بعد كل push إلى main؛ تباعد > 0 يعني أن آخر نشرة فشلت.
+
+- [ ] G10: حزمة العميل آمنة للمتصفح (لا CommonJS في public/)
+  CHECK: npm run test:dom
+  EXPECT: 15 فحص DOM ناجحًا (تحميل · init · رسم السجل والأتمتة · كل زر يرسل الإجراء الصحيح)
+  EVIDENCE: 2026-11-07 — كان public/js/publish.js يحتوي require/module.exports ففشل المتصفح بـ ReferenceError وتوقّفت لوحة الحساب؛ نُقل المنطق إلى api/autopilot.js الموجود أصلًا وبقي الملف عميلًا خالصًا.
