@@ -107,3 +107,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: npm run test:connect   (ويفشل كذلك داخل npm test)
   EXPECT: في صفحة «حسابي» زر «اربط» لكل منصة لها OAuth · المنصة المرتبطة تظهر باسم قناتها مع «فك الربط» · `connectPath` يبني `/api/gw?op=start&p=…&t=…` ويحوّل instagram/facebook إلى meta · `window.QRPublish` مُعرَّف بدواله الأربع
   EVIDENCE: 2026-11-07 — المسارات الأربعة (start/list/disconnect) كانت قائمة على الخادم بينما لا زر واحد يستدعيها، و`QRPublish` غير مُعرَّف أصلًا رغم أن app.js يناديه 3 مرات، فكانت صفحة الحساب تُفتح فارغة.
+
+- [ ] G18: لا فلترة `in.('…')` في استعلامات Supabase REST (تبدو صحيحة وتطابق صفرًا)
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: صفر `=in.('` في api/ وlib/ · `hasPlatformConnection` تعيد true لقناة مربوطة وfalse لغير المرتبطة وبلا استثناء عند سقوط القاعدة
+  EVIDENCE: 2026-11-07 — الحاجز في lib/autopilot.js كان يعيد false دائمًا فيفشل كل تشغيل بـ«اربط القنوات أولًا» رغم ربط يوتيوب (تشغيل 10:39:55)، وبوابة التفعيل في api/autopilot.js كانت ترد 409 دائمًا.
