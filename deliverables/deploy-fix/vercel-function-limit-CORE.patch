@@ -56,10 +56,10 @@ index db88c1ef..e21eec21 100644
  const DISC = require("../lib/soc_disconnect");
 diff --git a/api/gw.js b/api/gw.js
 new file mode 100644
-index 00000000..60b1999a
+index 00000000..234caa73
 --- /dev/null
 +++ b/api/gw.js
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,68 @@
 +/* ============================================================
 + * بوابة واحدة (Dispatcher) لمسارات الربط الاجتماعي والنشر والتواصل
 + * ------------------------------------------------------------
@@ -88,12 +88,28 @@ index 00000000..60b1999a
 +const publish = require("./_publish");
 +const contact = require("./_contact");
 +
++/* إصدار النشرة الحالية — يكشف «هل الإنتاج يخدم آخر كوميت؟»
++ * (فشل الرفع بعد نجاح البناء يترك نسخة قديمة مخدومة بلا أي تنبيه) */
++function version(req, res) {
++  const sha = process.env.VERCEL_GIT_COMMIT_SHA || "";
++  return json(res, 200, {
++    ok: true,
++    service: "quran-reels",
++    sha,
++    sha_short: sha.slice(0, 7),
++    ref: process.env.VERCEL_GIT_COMMIT_REF || "",
++    env: process.env.VERCEL_ENV || "local",
++    now: new Date().toISOString(),
++  });
++}
++
 +const ROUTES = {
 +  start,
 +  list: social,
 +  disconnect: social,
 +  publish,
 +  contact,
++  version,
 +};
 +
 +module.exports = async (req, res) => {
@@ -125,15 +141,16 @@ index ce404417..c293e1cc 100644
  - عند وصول رسالة تواصل → **تأكيد للمراسل** + **نسخة للمسؤول** (إن ضبط `ADMIN_EMAIL`).
  - بلا مفتاح: no-op صامت — كل شيء يعمل كما قبل (لا اختبار ينكسر).
 diff --git a/package.json b/package.json
-index 27c10158..a6284c05 100644
+index 27c10158..98069865 100644
 --- a/package.json
 +++ b/package.json
-@@ -10,6 +10,8 @@
+@@ -10,6 +10,9 @@
    },
    "scripts": {
      "test": "node tests/run.js",
 +    "pretest": "node tests/functions_limit.js",
 +    "test:limits": "node tests/functions_limit.js",
++    "verify:deploy": "node scripts/check_deploy.js",
      "test:prod": "BASE=https://quran-reels-tau.vercel.app node tests/run.js",
      "test:api": "node tests/api_test.js",
      "test:smoke": "node tests/tools_smoke.js",
@@ -150,8 +167,105 @@ index c2995c1b..a386c342 100644
  const SHELL = [
    "/",
    "/css/style.css?v=3",
+diff --git a/scripts/check_deploy.js b/scripts/check_deploy.js
+new file mode 100644
+index 00000000..c6a4fedd
+--- /dev/null
++++ b/scripts/check_deploy.js
+@@ -0,0 +1,91 @@
++#!/usr/bin/env node
++/* ============================================================
++   فحص «هل الإنتاج يخدم آخر كوميت؟» — npm run verify:deploy
++   ------------------------------------------------------------
++   المشكلة التي يحلها: إذا رُفض رفع النشرة (مثل تجاوز حد دوال Vercel)
++   فالبناء ينجح ويظل الموقع يخدم نسخة قديمة بصمت — لا تنبيه ولا خطأ ظاهر.
++   هذا السكربت يقارن /api/gw?op=version على الموقع الحقيقي مع آخر كوميت
++   على الفرع (main افتراضيًا) ويخرج بـ1 عند التباعد.
++
++   الاستخدام:
++     npm run verify:deploy
++     BASE=https://quran-reels-tau.vercel.app REF=main node scripts/check_deploy.js
++     EXPECT_SHA=<sha> node scripts/check_deploy.js      # بدل ls-remote
++   ============================================================ */
++const { execFileSync } = require("child_process");
++const path = require("path");
++
++const BASE = (process.env.BASE || "https://quran-reels-tau.vercel.app").replace(/\/+$/, "");
++const REF = process.env.REF || "main";
++const EXPECT = (process.env.EXPECT_SHA || "").trim().toLowerCase();
++const REMOTE = process.env.GIT_REMOTE || "origin";
++const MAX_LAG = Number(process.env.MAX_COMMITS_BEHIND || 0); // 0 = يجب المطابقة التامة
++
++function git(args) {
++  return execFileSync("git", args, { cwd: path.join(__dirname, ".."), encoding: "utf8" }).trim();
++}
++
++function remoteSha() {
++  if (EXPECT) return EXPECT;
++  try {
++    const out = git(["ls-remote", REMOTE, REF]);
++    const line = out.split("\n").find(Boolean) || "";
++    return (line.split(/\s+/)[0] || "").toLowerCase();
++  } catch (e) {
++    return "";
++  }
++}
++
++function commitsBehind(deployedSha) {
++  try {
++    return Number(git(["rev-list", "--count", `${deployedSha}..${REMOTE}/${REF}`]));
++  } catch {
++    return null;
++  }
++}
++
++(async () => {
++  console.log(`◉ فحص النشرة: ${BASE}  ←  ${REMOTE}/${REF}`);
++  const expected = remoteSha();
++  if (!expected) {
++    console.error("✗ تعذّر تحديد كوميت الفرع (جرّب EXPECT_SHA=<sha> أو تأكد من git remote)");
++    process.exit(2);
++  }
++
++  let live = null;
++  try {
++    const r = await fetch(`${BASE}/api/gw?op=version`, { headers: { "cache-control": "no-cache" } });
++    if (!r.ok) throw new Error("HTTP " + r.status);
++    live = await r.json();
++  } catch (e) {
++    console.error(`✗ تعذّر قراءة /api/gw?op=version من الموقع: ${e.message}`);
++    console.error("  (إن كان الموقع على نسخة قديمة جدًا فالمسار غير موجود أصلًا — هذه إشارة على تأخّر النشر)");
++    process.exit(2);
++  }
++
++  const deployed = String(live.sha || "").toLowerCase();
++  console.log(`  الموقع يخدم : ${deployed ? deployed.slice(0, 7) : "(غير معروف)"}  · env=${live.env || "?"} · ref=${live.ref || "?"}`);
++  console.log(`  آخر ${REF}     : ${expected.slice(0, 7)}`);
++
++  if (!deployed) {
++    console.warn("⚠ الموقع لا يكشف الكوميت (نشرة أقدم من إضافة op=version) — نشرة جديدة مطلوبة");
++    process.exit(1);
++  }
++
++  if (deployed === expected) {
++    console.log("✓ الإنتاج يخدم آخر كوميت — لا تباعد");
++    process.exit(0);
++  }
++
++  const behind = commitsBehind(deployed);
++  const lag = behind === null ? "غير معروف" : String(behind);
++  if (behind !== null && behind <= MAX_LAG && MAX_LAG > 0) {
++    console.log(`✓ التباعد ${lag} كوميت ≤ المسموح (${MAX_LAG})`);
++    process.exit(0);
++  }
++
++  console.error(`✗ الإنتاج متأخر عن ${REF} بـ${lag} كوميت — آخر محاولة نشر فشلت على الأرجح.`);
++  console.error("  افحص لوحة Vercel (Deployments) أو إيميلات notifications@vercel.com، وشغّل:");
++  console.error("  node tests/functions_limit.js");
++  process.exit(1);
++})();
 diff --git a/server.py b/server.py
-index 258f1e53..67877c5d 100644
+index 258f1e53..1525d948 100644
 --- a/server.py
 +++ b/server.py
 @@ -113,6 +113,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
@@ -163,7 +277,7 @@ index 258f1e53..67877c5d 100644
          # static with gzip
          rel = urllib.parse.unquote(parsed.path)
          if rel == "/" or rel == "":
-@@ -153,8 +155,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
+@@ -153,8 +155,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
          parsed = urllib.parse.urlparse(self.path)
          if parsed.path.startswith("/api/contact"):
              return self.handle_contact()
@@ -174,6 +288,16 @@ index 258f1e53..67877c5d 100644
 +    def handle_gw(self, parsed, head=False):
 +        """Mirror of api/gw.js — dispatcher للعمليات (بلا اعتمادات محلية)."""
 +        op = (urllib.parse.parse_qs(parsed.query).get("op") or [""])[0]
++        if op == "version":
++            body = json.dumps({
++                "ok": True,
++                "service": "quran-reels",
++                "sha": os.environ.get("VERCEL_GIT_COMMIT_SHA", ""),
++                "sha_short": os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:7],
++                "ref": os.environ.get("VERCEL_GIT_COMMIT_REF", ""),
++                "env": "local",
++            }).encode("utf-8")
++            return self._send(body, "application/json; charset=utf-8")
 +        if op == "contact" and self.command == "POST":
 +            return self.handle_contact()
 +        ctype = "application/json; charset=utf-8"
@@ -187,7 +311,7 @@ index 258f1e53..67877c5d 100644
          """Mirror of api/contact.js validation (كمل#14) — no local Supabase creds."""
          import re
 diff --git a/tests/api_test.js b/tests/api_test.js
-index c9c6a0a0..afdee179 100644
+index c9c6a0a0..cccbbfd8 100644
 --- a/tests/api_test.js
 +++ b/tests/api_test.js
 @@ -1,5 +1,8 @@
@@ -213,7 +337,7 @@ index c9c6a0a0..afdee179 100644
    if (out && typeof out.then === 'function') await out;
    for (let i = 0; i < 800 && res.body === null; i += 50) await new Promise(r => setTimeout(r, 50));
    return res;
-@@ -70,6 +73,28 @@ async function call(handler, url, method = 'GET', headers = {}) {
+@@ -70,6 +73,32 @@ async function call(handler, url, method = 'GET', headers = {}) {
    let c = null; try { c = JSON.parse(r.body.toString()); } catch {}
    chk('config -> 200 object with supabase', r.statusCode === 200 && c && c.supabase && typeof c.supabase.url === 'string', r.body && r.body.toString());
  
@@ -233,6 +357,10 @@ index c9c6a0a0..afdee179 100644
 +  r = await call(gw, '/api/publish', 'POST', {}, {});
 +  chk('gw old path /api/publish -> 401', r.statusCode === 401, r.statusCode);
 +
++  r = await call(gw, '/api/gw?op=version');
++  let v = null; try { v = JSON.parse(r.body.toString()); } catch {}
++  chk('gw version -> 200 json with sha field', r.statusCode === 200 && v && typeof v.sha === 'string' && v.service === 'quran-reels', r.statusCode + ' ' + (r.body && r.body.toString().slice(0, 120)));
++
 +  r = await call(gw, '/api/gw?op=contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
 +  chk('gw contact bad email -> 400', r.statusCode === 400, r.statusCode);
 +
@@ -244,7 +372,7 @@ index c9c6a0a0..afdee179 100644
  })();
 diff --git a/tests/functions_limit.js b/tests/functions_limit.js
 new file mode 100644
-index 00000000..1d86ad67
+index 00000000..4cb3b2f6
 --- /dev/null
 +++ b/tests/functions_limit.js
 @@ -0,0 +1,150 @@
@@ -384,10 +512,10 @@ index 00000000..1d86ad67
 +} else {
 +  const src = fs.readFileSync(gw, "utf8");
 +  const block = (src.match(/const ROUTES = \{([\s\S]*?)\n\};/) || [, ""])[1];
-+  const missing = ["start", "list", "disconnect", "publish", "contact"]
++  const missing = ["start", "list", "disconnect", "publish", "contact", "version"]
 +    .filter((op) => !new RegExp(`(^|[\\s,{])${op}\\s*[,:]`, "m").test(block));
 +  if (missing.length) fail(`api/gw.js لا يوزّع: ${missing.join(", ")}`);
-+  else ok("api/gw.js يوزّع start/list/disconnect/publish/contact");
++  else ok("api/gw.js يوزّع start/list/disconnect/publish/contact/version");
 +}
 +
 +/* ---------------- النتيجة ---------------- */

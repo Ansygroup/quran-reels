@@ -26,6 +26,8 @@ No more than 12 Serverless Functions can be added to a Deployment on the Hobby p
 | `api/contact.js` | `api/_contact.js` — عبر `/api/gw?op=contact` |
 | 12 دالة + middleware = **13** ❌ | 8 دوال + middleware = **9** ✅ |
 
+(الرقعة تشمل أيضًا `api/gw.js?op=version` + `scripts/check_deploy.js` + الحاجز `tests/functions_limit.js`.)
+
 - `api/gw.js` = دالة توزيع واحدة تُفرّق بـ`?op=`.
 - الملفات المبدوءة بـ`_` **ليست دوالًا** عند Vercel (وحدات فقط).
 - `api/oauth/callback.js` بقي ملفًا حقيقيًا لأن رابطه مسجّل عند مزوّدي OAuth (Google/Meta/TikTok/X) ولا يجوز تغييره.
@@ -56,6 +58,20 @@ git push
 1. `git rm api/app-config.js`
 2. `git apply --3way vercel-function-limit-CORE.patch` (يطبّق **نظيفًا** على `main` — تم التحقق)
 3. تشغيل حاجز عدد الدوال
+
+### كشف «النسخة القديمة» بعد التطبيق
+
+الرقعة تضيف كاناري بلا دالة إضافية: `GET /api/gw?op=version` يعيد كوميت النشرة الحالية،
+و`npm run verify:deploy` (`scripts/check_deploy.js`) يقارنه بآخر كوميت على `main` ويخرج بـ1 عند التباعد
+— فيكشف أي فشل رفع صامت في المستقبل بدل أن تكتشفه من إيميلات Vercel.
+
+```bash
+npm run verify:deploy
+# ◉ فحص النشرة: https://quran-reels-tau.vercel.app ← origin/main
+#   الموقع يخدم : 3a18843 · env=production · ref=main
+#   آخر main    : 3a18843
+# ✓ الإنتاج يخدم آخر كوميت — لا تباعد
+```
 
 ### تعديل اختياري بعد ذلك (على `main` فقط)
 
