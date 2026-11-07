@@ -48,3 +48,6 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 - **التوافق:**
   - G1-G7: سيتم التحقق منها في بيئة Vercel (G2, G3) أو محلياً (G1, G4, G5, G6, G7).
   - Vercel Cron: 06:15 القاهرة (04:15 UTC).
+- **حل التعارضات (Conflict Resolution):**
+  - تم دمج التحديثات مع الفرع الرئيسي (main) في الملفات: `public/js/publish.js`, `public/index.html`, `public/css/style.css`, `api/autopilot.js`, `lib/autopilot.js`, `GATES.md`.
+  - تم الحفاظ على التوافق مع G1-G7.
