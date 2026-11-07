@@ -51,11 +51,29 @@ This cron expression (0 0,8,16 * * *) would run more than once per day.
   (`scripts/check_deploy.js`) يقارنه بآخر كوميت على `main` ويخرج بـ1 عند التباعد — لكشف أي فشل رفع صامت.
 - توثيق: `GATES.md` G8 (عدد الدوال والمجدولات) وG9 (الإنتاج يخدم آخر كوميت).
 
-## ملاحظة منفصلة لم تُعالج هنا
+## عيب العميل: كود خادم داخل ملف المتصفح (أُصلح)
 
-`public/js/publish.js` على `main` يحتوي **كود خادم** (يبدأ بـ`require("../lib/sess")` و`module.exports`)
-داخل مجلد يُخدَم للمتصفح، ويُحمَّل من `public/index.html` كـ`js/publish.js?v=9`.
-في المتصفح سيظهر `ReferenceError: require is not defined` وتتعطّل واجهة النشر/الحساب.
-يبدو أنه أثر حل تعارضات PR #2/#3: منطق الخادم الجديد (v9) حطّ في مسار العميل، بينما بقي
-`api/publish.js` على النسخة القديمة. يحتاج قرارًا: نقل المنطق إلى `api/` وإعادة نسخة عميل صالحة
-(أو استرجاع `public/js/publish.js` من `c0715f3`). هذا الإصلاح **لم** يُضمَّن هنا حتى لا تُلغى تعديلات PR #2/#3.
+كان `public/js/publish.js` يحتوي **كود خادم كامل** (`require("../lib/sess")` … `module.exports = async (req,res)`)
+داخل مجلد يُخدَم للمتصفح، ويُحمَّل من `public/index.html` كـ`js/publish.js?v=9`، فكان المتصفح يفشل بـ
+`ReferenceError: require is not defined` وتتعطّل لوحة الحساب بالكامل — أثر آخر من حل تعارضات PR #2/#3.
+
+**ما تم:** حُذف كود الخادم من الملف لأنه نسخة قديمة مكرّرة من `api/autopilot.js` الذي يملك أصلًا نفس
+الاستجابة (`accountData`) ونفس الإجراءات (`save` · `run` · `run_all` · `article_random`) ومعها حدود المعدّل
+وchromium ومدة 300 ثانية. وأصبح الملف عميلًا خالصًا:
+
+- يقرأ من `/api/autopilot` بدل `/api/publish` (الأخير لا يقدّم استجابة الحساب).
+- جسر مصادقة `AuthApp` → `QRAuth` (الوحدة الفعلية في `public/js/auth.js`).
+- `PLATFORMS` و`cairoClockLabel` محليّان بدل استيراد مكسور من `./core`.
+- إصلاح ثلاثة أخطاء كانت ستظهر عند التشغيل: `uid is not defined` داخل `renderAccount`، واستدعاء
+  `acctQueue.querySelector("#schedPlatforms")` بلا فحص، و`data.results.map` بلا احتياط.
+- زر «جدولة النشر» يشرح أن الجدولة تحتاج فيديو مُصدَّرًا (تُنفَّذ من صانع الريلز عبر `/api/publish`).
+- 401 → إشعار داخل الصفحة بدل `alert`، والتشغيل عند `hashchange` أيضًا لا عند التحميل فقط.
+- كاش الـService Worker: `qr-v9` ليحصل العملاء على الملف المُصلَح.
+
+**تحقّق:** `npm run test:dom` يحمّل `public/js/publish.js` داخل `index.html` الحقيقي (jsdom) مع بديل
+`QRAuth`/`fetch`، ويتأكد من: التحميل بلا أخطاء · `PublishApp.init()` · رسم سجل التشغيل ولوحة الأتمتة ·
+كل زر يرسل `POST /api/autopilot` بالإجراء الصحيح · لا طلب لأي مسار غير مدعوم. (15 فحصًا — كلها ناجحة،
+وكان الاختبار هو ما كشف خطأ `uid is not defined`.)
+
+**حاجز:** `tests/functions_limit.js` يفشل إن عاد `require(...)` أو `module.exports` إلى أي ملف تحت `public/`
+(تحقّقتُ أنه يرصد النسخة القديمة المكسورة).

@@ -10,7 +10,7 @@
  *   عدد الدوال = ملفات api/**‎.js التي لا تبدأ بـ _  +  middleware.js (يُحسب)
  *   يجب أن يكون ≤ 12، وننبّه إن وصل 12 (بلا هامش).
  *
- * ويفحص كذلك قواعد الخطة الأخرى التي تُفشل النشر بعد نجاح البناء:
+ * ويفحص كذلك قواعد الخطة الأخرى التي تُفشل النشر بعد نجاح البناء، وصحة ملفات العميل:
  *   • المجدولات (crons): حد أقصى 2، وكل مجدول مرة واحدة يوميًا (رفض Vercel
  *     سابقًا الجدول 0 0,8,16 * * * بتاريخ 2026-11-05 بسبب ذلك).
  *   • api/app-config.js محذوف (rewrite يكفي) · rewrites/crons/functions تشير
@@ -173,6 +173,23 @@ if (!fs.existsSync(gw)) {
     .filter((op) => !new RegExp(`(^|[\\s,{])${op}\\s*[,:]`, "m").test(block));
   if (missing.length) fail(`api/gw.js لا يوزّع: ${missing.join(", ")}`);
   else ok("api/gw.js يوزّع start/list/disconnect/publish/contact/version");
+}
+
+/* ---------------- 5) لا كود خادم (CommonJS) داخل مجلد العميل ----------------
+ * حدث فعلًا: منطق خادم (require/module.exports) انتهى داخل public/js/publish.js
+ * فصار المتصفح يفشل بـ ReferenceError: require is not defined وتتعطّل لوحة الحساب.
+ */
+const clientScripts = fs.existsSync(path.join(ROOT, "public"))
+  ? walk(path.join(ROOT, "public")).filter((f) => f.endsWith(".js"))
+  : [];
+const serverish = clientScripts.filter((f) => {
+  const src = fs.readFileSync(f, "utf8");
+  return /require\(\s*["'`]/.test(src) || /module\.exports\s*=/.test(src);
+});
+if (serverish.length) {
+  fail(`كود خادم داخل ملفات تُحمَّل في المتصفح: ${serverish.map(rel).join(", ")} — انقله إلى api/ أو lib/`);
+} else {
+  ok(`لا كود خادم في public/ (${clientScripts.length} ملف JS)`);
 }
 
 /* ---------------- النتيجة ---------------- */
