@@ -550,6 +550,81 @@
   </section>
 </div>
 
+<!-- ================= الفوتر ================= -->
+<footer class="footer">
+  <div class="container">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#/" style="margin-bottom:12px">
+          <span class="brand-logo"><svg viewBox="0 0 64 64" fill="none"><path d="M46 10a22 22 0 1 0 7 30A17.5 17.5 0 1 1 46 10z" fill="#1d1403"/><circle cx="49" cy="19" r="3.4" fill="#1d1403"/></svg></span>
+          <span>قرآن ريلز<small>صانع فيديو قرآن مجاني</small></span>
+        </a>
+        <p class="muted" style="font-size:.88rem;max-width:360px">منصة مجانية لصناعة المقاطع القرآنية القصيرة ونشر القرآن الكريم رقميًا — صدقة جارية على نبيّنا محمد ﷺ.</p>
+        <div class="row" style="margin-top:14px;gap:8px">
+          <span class="count-badge">47 قارئًا</span>
+          <span class="count-badge">32 أداة</span>
+          <span class="count-badge">8 لغات</span>
+        </div>
+      </div>
+      <div>
+        <h3>روابط سريعة</h3>
+        <div class="f-links">
+          <a href="#/" id="footCreate">إنشاء ريلز قرآن</a>
+          <a href="#/tools">جميع الأدوات الإسلامية</a>
+          <a href="#/tool/prayer">مواقيت الصلاة</a>
+          <a href="#/tool/qibla">اتجاه القبلة</a>
+          <a href="#/tool/adhkar">أذكار الصباح والمساء</a>
+          <a href="#/tool/zakat">حاسبة الزكاة</a>
+          <a href="#/tool/hadith">الأحاديث النبوية</a>
+          <a href="#/">الأسئلة الشائعة</a>
+          <a href="/ar/quran-video-maker/">صفحة صانع الفيديو</a>
+          <a href="/ar/islamic-tools/">دليل الأدوات (32)</a>
+          <a href="/ar/prayer-times/">مواقيت الصلاة — دليل</a>
+          <a href="/ar/qibla-direction/">اتجاه القبلة — دليل</a>
+        </div>
+      </div>
+      <div>
+        <h3>أدوات مميزة</h3>
+        <div class="f-links">
+          <a href="#/tool/asma">أسماء الله الحسنى</a>
+          <a href="#/tool/topics">آيات بالموضوع</a>
+          <a href="#/tool/khatma">خطة ختم القرآن</a>
+          <a href="#/tool/baby-names">أسماء المواليد</a>
+          <a href="#/tool/tasbeeh">المسبحة الإلكترونية</a>
+          <a href="#/tool/radio">إذاعة القرآن</a>
+          <a href="#/">سياسة الخصوصية</a>
+          <a href="#/account">حسابي والنشر التلقائي</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© <span id="year">2026</span> قرآن ريلز — جميع الحقوق موقوفة لله. النص القرآني من مصدر موثوق. · <a href="/ar/reciters/" style="color:var(--gold-3)">القرّاء</a> · <a href="/blog/" style="color:var(--gold-3)">مقالات</a> · <a href="/articles/" style="color:var(--gold-3)">المكتبة</a> · <a href="/about/" style="color:var(--gold-3)">عنّا</a> · <a href="/contact/" style="color:var(--gold-3)">تواصل</a> · <a href="/terms/" style="color:var(--gold-3)">شروط</a> · <a href="/privacy/" style="color:var(--gold-3)">خصوصية</a></span>
+      <span>﴿ إِنَّ اللَّهَ مَعَ الصَّابِرِينَ ﴾</span>
+    </div>
+  </div>
+</footer>
+
+<!-- شريط الكوكيز -->
+<div class="cookie" id="cookieBar" hidden>
+  <span>🍪 نستخدم تخزينًا محليًا بسيطًا لحفظ تفضيلاتك على جهازك فقط — لا إعلانات ولا تتبع.</span>
+  <button class="btn btn-em btn-sm" id="cookieOk">فهمت</button>
+
+<!-- ================= نافذة الدخول (تعمل من أي صفحة) ================= -->
+<div class="overlay" id="loginOverlay" hidden>
+  <div class="modal acct-login" style="position:relative;max-width:420px">
+    <button class="btn btn-ghost btn-sm close-x" id="loginClose" aria-label="إغلاق">✕</button>
+    <h3>🔑 دخول آمن</h3>
+    <p>بريدك + رابط سحري، أو حساب جوجل. لا كلمات مرور ولا بيانات تُباع.</p>
+    <div class="login-row" style="margin-top:14px">
+      <input type="email" id="loginEmail" placeholder="you@example.com" dir="ltr" autocomplete="email">
+      <button class="btn btn-gold" id="loginSubmit">أرسل الرابط</button>
+    </div>
+    <div class="or-line"><span>أو</span></div>
+    <button class="btn btn-em w100" id="loginGoogle">G المتابعة بجوجل</button>
+    <p class="hint center" style="margin-top:10px">تفقد مجلد «المزعج» إن لم يصلك البريد خلال دقيقة.</p>
+  </div>
+</div>
+
 <!-- السكربتات -->
 <script src="js/data.js?v=3" defer></script>
 <script src="js/core.js?v=3" defer></script>
@@ -558,7 +633,7 @@
 <script src="js/creator.js?v=3" defer></script>
 <script src="js/tools.js?v=3" defer></script>
   <script src="js/auth.js?v=3" defer></script>
-  <script src="js/publish.js?v=10" defer></script>
+  <script src="js/publish.js?v=11" defer></script>
   <script src="js/app.js?v=3" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "قرآن ريلز", "alternateName": "Quran Reels", "url": "https://quran-reels-tau.vercel.app/", "applicationCategory": "MultimediaApplication", "operatingSystem": "Any (web browser)", "browserRequirements": "Requires JavaScript", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EGP"}, "description": "صانع فيديو قرآن مجاني فوري: اختر الآيات والقارئ والخلفية والترجمة، شاهد معاينة حية، وصدّر MP4 عمودي 1080×1920 مباشرة داخل المتصفح — بدون طابور انتظار وبدون حدود. مع 32 أداة إسلامية.", "inLanguage": "ar", "featureList": "47 قارئًا، 114 سورة، ترجمة بـ8 لغات، 14 خلفية، معاينة حية، تصدير MP4/WebM فوري، 32 أداة إسلامية، حساب اختياري مع نشر تلقائي وجدولة للمنصات", "screenshot": "https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "هل الموقع مجاني تمامًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الإنشاء والتحميل مجاني 100% — لا اشتراك ولا بطاقة ائتمان ولا حدود يومية. كل شيء يعمل من متصفحك مباشرة."}}, {"@type": "Question", "name": "هل أحتاج تسجيل حساب أو تثبيت برنامج؟", "acceptedAnswer": {"@type": "Answer", "text": "لا — كل الأدوات والإنشاء تعمل فورًا دون تسجيل. التسجيل اختياري فقط لو أردت ميزة النشر التلقائي: تحفظ فيديوهاتك وترتبط بقنواتك وتجدول النشر من صفحة حسابي."}}, {"@type": "Question", "name": "ما صيغة وأبعاد الفيديو الناتج؟", "acceptedAnswer": {"@type": "Answer", "text": "فيديو عمودي 1080×1920 (أو 720×1280 اقتصادي) بصيغة WebM/MP4 حسب متصفحك — مناسب لتيك توك وإنستغرام ريلز ويوتيوب شورتس وحالات واتساب."}}, {"@type": "Question", "name": "هل توجد فترة انتظار أو حد يومي؟", "acceptedAnswer": {"@type": "Answer", "text": "لا. على عكس المواقع الأخرى لا توجد قوائم انتظار ولا حد لعدد الفيديوهات — أنشئ ما شئت في اللحظة نفسها."}}, {"@type": "Question", "name": "كيف يعمل إنشاء الفيديو بدون خادم؟", "acceptedAnswer": {"@type": "Answer", "text": "يُسجَّل الفيديو لحظيًا داخل متصفحك عبر Canvas + MediaRecorder مع صوت التلاوة، لذلك الخصوصية مضمونة ولا تُرفع ملفاتك إلى أي خادم."}}, {"@type": "Question", "name": "هل يمكنني استخدام صورة خلفية من جهازي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، ارفع أي صورة من جهازك وستبقى محلية 100% لا تُرسل لأي مكان."}}, {"@type": "Question", "name": "هل الترجمة متاحة بعدة لغات؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — الإنجليزية والفرنسية والتركية والإندونيسية والأردية والإسبانية والإيطالية بالإضافة للعربية."}}, {"@type": "Question", "name": "على أي منصات أنشر الفيديو؟", "acceptedAnswer": {"@type": "Answer", "text": "تيك توك، إنستغرام ريلز، يوتيوب شورتس، فيسبوك، حالات واتساب، تيليجرام — وكل منصات التواصل."}}, {"@type": "Question", "name": "هل النص القرآني مضبوط بالرسم الإملائي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، يُعرض النص بالرسم العثماني المضبوط مع علامات الوقف والأرقام بالشكل الصحيح."}}, {"@type": "Question", "name": "ما المدة المثالية للريلز؟", "acceptedAnswer": {"@type": "Answer", "text": "من 15 إلى 60 ثانية هو الأنسب للتفاعل، ويُسمح بالفيديو حتى 5 دقائق لمن أراد."}}, {"@type": "Question", "name": "هل تعمل الخدمة من خارج مصر والخليج؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الموقع يعمل من أي مكان في العالم والمواقيت والأدوات تدعم الدول حسب موقعك."}}, {"@type": "Question", "name": "هل بياناتي محفوظة عندكم؟", "acceptedAnswer": {"@type": "Answer", "text": "الإنشاء والأدوات بلا حساب — ملفاتك تبقى في متصفحك. أما إن سجّلت للنشر التلقائي فيُحفظ بريدك وفيديوهاتك المجدولة في قاعدة بيانات محمية بصلاحيات، وتوكنات المنصات مشفّرة وتُحذف بضغطة «فك الربط»."}}, {"@type": "Question", "name": "هل يمكن للموقع أن ينشر فيديوهاتي تلقائيًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم. سجّل دخولك، اربط قناتك من صفحة «حسابي» بضغطة موافقة واحدة، ثم جدولة أي فيديو أو فعّل «الأتمتة» — والنشر يتم يوميًا 06:15 بتوقيت القاهرة مع كتابة البوست والعناوين والوسوم تلقائيًا."}}, {"@type": "Question", "name": "كيف أربط قناتي بيوتيوب أو المنصات؟", "acceptedAnswer": {"@type": "Answer", "text": "من صفحة «حسابي والنشر التلقائي» اضغط «اربط» أمام المنصة، توافق مرة واحدة على الصلاحيات، ويظهر الحساب مرتبطًا بعدها. يمكنك فك الربط في أي لحظة بضغطة."}}, {"@type": "Question", "name": "هل ربط حساباتي آمن؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — ربط رسمي عبر OAuth من المنصات نفسها (لا نرى كلمة مرورك أبدًا)، والتوكنات تُخزَّن مشفّرة AES-256 على الخادم فقط، ولا تظهر في أي استجابة، وتُحذف فورًا عند فك الربط."}}]}</script>

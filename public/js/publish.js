@@ -56,7 +56,13 @@ window.PublishApp = {
   async init() {
     const uid = await window.AuthApp.getUserId();
     if (!uid) {
-      window.location.hash = "/";
+      // لا نُخرج المستخدم من الصفحة: نفتح نافذة الدخول ونوضّح المطلوب.
+      window.QRAuthUI?.open();
+      const notice = document.getElementById("acctNotice");
+      if (notice) {
+        notice.style.display = "block";
+        notice.textContent = "سجّل الدخول لعرض لوحة النشر والأتمتة — بريدك + رابط سحري، أو جوجل.";
+      }
       return;
     }
     
@@ -77,8 +83,14 @@ window.PublishApp = {
     this.bindEvents(uid);
   },
 
-  renderAccount(data) {
-    const { config, runs, connected, platforms, channel, reciters } = data;
+  renderAccount(data = {}) {
+    // قيم افتراضية: بيانات ناقصة لا تُسقط الصفحة كلها (كانت الاستجابة {} كافية للانهيار)
+    const config = data.config || {};
+    const runs = Array.isArray(data.runs) ? data.runs : [];
+    const connected = Boolean(data.connected);
+    const platforms = Array.isArray(data.platforms) ? data.platforms : [];
+    const channel = data.channel || "لا توجد قنوات مرتبطة";
+    const reciters = Array.isArray(data.reciters) ? data.reciters : [];
     const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
     const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
@@ -259,8 +271,86 @@ window.PublishApp = {
   }
 };
 
+
+/* ============================================================
+ * واجهة الدخول — الربط الذي كان مفقودًا
+ * ------------------------------------------------------------
+ * كانت الصفحة تعرض زر «دخول» (#authBtn) بلا أي مستمع نقر، ونافذة الدخول
+ * (#loginOverlay) غير موجودة في الماركب بعد استبدال صفحة الحساب القديمة.
+ * فكان الضغط على «دخول» لا يفعل شيئًا. هنا يُربط الزر بالنافذة، والنافذة
+ * بـQRAuth (رابط سحري + جوجل) الموجود فعلًا في public/js/auth.js.
+ * ============================================================ */
+window.QRAuthUI = (function () {
+  const $ = (id) => document.getElementById(id);
+  let wired = false;
+
+  function open() {
+    const o = $("loginOverlay");
+    if (!o) return;
+    o.hidden = false;
+    setTimeout(() => { try { $("loginEmail")?.focus(); } catch {} }, 40);
+  }
+  function close() { const o = $("loginOverlay"); if (o) o.hidden = true; }
+  function isOpen() { const o = $("loginOverlay"); return Boolean(o && !o.hidden); }
+
+  async function submitEmail() {
+    const input = $("loginEmail"), btn = $("loginSubmit");
+    const em = (input?.value || "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) {
+      if (typeof toast === "function") toast("اكتب بريدًا صحيحًا أولًا", "err");
+      try { input?.focus(); } catch {}
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = "جارٍ الإرسال…"; }
+    try {
+      await QRAuth.magicLink(em);
+      if (typeof toast === "function") toast("✓ أرسلنا رابط الدخول — تفقد بريدك");
+      close();
+    } catch (error) {
+      if (typeof toast === "function") toast(String(error?.message || "تعذّر إرسال الرابط").slice(0, 120), "err");
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "أرسل الرابط"; }
+    }
+  }
+
+  function wire() {
+    if (wired) return;
+    wired = true;
+
+    $("authBtn")?.addEventListener("click", () => {
+      let u = null;
+      try { u = QRAuth.user(); } catch {}
+      if (u) window.location.hash = "#/account";
+      else open();
+    });
+
+    $("loginSubmit")?.addEventListener("click", submitEmail);
+    $("loginEmail")?.addEventListener("keydown", (e) => { if (e.key === "Enter") submitEmail(); });
+    $("loginGoogle")?.addEventListener("click", () => { try { QRAuth.google(); } catch {} });
+    $("loginClose")?.addEventListener("click", close);
+    $("loginOverlay")?.addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) close(); });
+
+    try {
+      QRAuth.on((u) => {
+        const b = $("authBtn");
+        if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
+        if (u) {
+          close();
+          if (window.location.hash === "#/account") window.PublishApp.init();
+        }
+      });
+      const b = $("authBtn");
+      if (b) b.textContent = QRAuth.user() ? "🟢 حسابي" : "🔑 دخول";
+    } catch {}
+  }
+
+  return { wire, open, close, isOpen, submitEmail };
+})();
+
 // التشغيل التلقائي عند تحميل الصفحة
 function bootAccount() {
+  window.QRAuthUI?.wire();
   if (window.location.hash === "#/account") window.PublishApp.init();
 }
 document.addEventListener("DOMContentLoaded", bootAccount);
