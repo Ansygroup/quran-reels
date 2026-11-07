@@ -112,6 +112,12 @@ window.fetch = async (url, opts = {}) => {
   if (!/يوتيوب/.test((d.getElementById("acctAuto") || {}).textContent || "")) fail("اسم القناة/المنصة لم يظهر");
   else ok("اسم القناة المرتبطة ظهر");
 
+  // ---- لا تكرار ولا فقدان لمعرّفات DOM بعد الرسم (رسم الحاوية داخل نفسها) ----
+  const idList = ["acctQueue", "schedPlatforms", "schedTitle", "schedTime", "schedSave", "acctAuto", "queueList", "acctQuickActions", "acctPlatforms"];
+  const badIds = idList.filter((id) => d.querySelectorAll("#" + id).length !== 1);
+  if (badIds.length) fail("معرّفات مفقودة/مكررة بعد الرسم: " + badIds.join(", "));
+  else ok("معرّفات DOM فريدة بعد الرسم");
+
   // ---- أزرار اللوحة: كل إجراء يجب أن يذهب إلى /api/autopilot بالاسم الصحيح ----
   const click = async (id) => {
     const el = d.getElementById(id);
