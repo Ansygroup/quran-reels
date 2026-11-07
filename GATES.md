@@ -41,7 +41,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 
 - [ ] G8: Vercel function count within Hobby limit (12/deployment, middleware counts)
   CHECK: node tests/functions_limit.js
-  EXPECT: مجموع الدوال ≤ 12 (المستهدف ≤ 9) + لا وجود لـ api/app-config.js + كل rewrite/cron يشير إلى دالة موجودة
+  EXPECT: مجموع الدوال ≤ 12 (المستهدف ≤ 9) + لا وجود لـ api/app-config.js + كل rewrite/cron يشير إلى دالة موجودة + المجدولات ≤ 2 ويومية فقط (Hobby)
   EVIDENCE: 2026-11-07 — كانت 13 (12 ملف api + middleware) فرفض Vercel النشر 4 مرات (exceeded_serverless_functions_per_deployment)؛ بعد دمج المسارات في api/gw.js صارت 9.
   NOTE: تجاوز الحد يُفشل الرفع بعد نجاح البناء (الخطأ في إيميل Vercel عنوانه «Build error») وتظل النسخة القديمة مخدومة — فشل صامت. لا تُعِد api/app-config.js (rewrite إلى /api/ip?mode=config يكفي).
 
