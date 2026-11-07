@@ -79,6 +79,12 @@ window.PublishApp = {
 
   renderAccount(data) {
     const { config, runs, connected, platforms, channel, reciters } = data;
+    const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
+    const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
+    // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
+    this.available = Array.isArray(data.available) && data.available.length
+      ? data.available
+      : ALL_PLATFORMS.map((k) => ({ key: k, name: PLATFORMS[k] || k, publish: true }));
     
     // بطاقة الإجراءات السريعة
     const quickActions = document.getElementById("acctQuickActions");
@@ -87,7 +93,7 @@ window.PublishApp = {
       quickActions.innerHTML = `
         <h2>⚡ إجراءات سريعة</h2>
         <div class="row gap-lg">
-          <button class="btn btn-gold" id="quickGenArticle">توليد من مقال (10,000 مقال)</button>
+          <button class="btn btn-gold" id="quickGenArticle">${articleLabel}</button>
           <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
         </div>
       `;
@@ -96,10 +102,11 @@ window.PublishApp = {
     // بطاقة الربط (تعدد القنوات)
     const acctPlatforms = document.getElementById("acctPlatforms");
     if (acctPlatforms) {
-      acctPlatforms.innerHTML = ALL_PLATFORMS.map(p => `
+      acctPlatforms.innerHTML = this.available.map(p => `
         <div class="f-group" style="flex:1">
-          <label>${PLATFORMS[p] || p}</label>
-          <input type="checkbox" id="plat-${p}" ${platforms.includes(p) ? 'checked' : ''} data-platform="${p}" style="width:100%">
+          <label>${p.name}${p.publish ? "" : " <small>(قريبًا)</small>"}</label>
+          <input type="checkbox" id="plat-${p.key}" ${platforms.includes(p.key) ? 'checked' : ''} data-platform="${p.key}"
+            ${p.publish ? "" : 'disabled title="لا يوجد ربط/نشر لهذه المنصة بعد"'} style="width:100%">
         </div>
       `).join("");
     }
@@ -108,8 +115,8 @@ window.PublishApp = {
     const acctQueue = document.getElementById("acctQueue");
     if (acctQueue) {
       // نملأ الحاوية الموجودة (#schedPlatforms) بالمدخلات فقط — بلا تكرار للمُعرّف
-      const platformInputs = ALL_PLATFORMS.map(p =>
-        `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p}"> ${PLATFORMS[p] || p}</label></div>`
+      const platformInputs = this.available.map(p =>
+        `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p.key}" ${p.publish ? "" : "disabled"}> ${p.name}</label></div>`
       ).join("");
       const schedWrap = acctQueue.querySelector("#schedPlatforms");
       if (schedWrap) schedWrap.innerHTML = platformInputs;
@@ -157,12 +164,12 @@ window.PublishApp = {
           <button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button>
           <button class="btn btn-em" id="autoRun">تشغيل الآن</button>
           <button class="btn btn-em" id="autoRunAll">تشغيل التوازي (الكل)</button>
-          <button class="btn btn-gold" id="autoGenArticle">توليد من مقال (10,000 مقال)</button>
+          <button class="btn btn-gold" id="autoGenArticle">${articleLabel}</button>
         </div>
         
         <!-- بطاقة المقال (دعم 10,000 مقال) -->
         <div id="acctArticles" class="card" style="margin-top:18px;display:none">
-          <h2>📚 مكتبة المقالات (10,000 مقال)</h2>
+          <h2>📚 مكتبة المقالات${articleCount ? ` (${articleCount.toLocaleString("ar-EG")})` : ""}</h2>
           <div class="row gap-lg" id="articleCards">
             <!-- سيتم ملؤها بواسطة JavaScript (نمط .article-card) -->
           </div>
@@ -175,7 +182,7 @@ window.PublishApp = {
   bindEvents() {
     // حفظ الإعدادات
     document.getElementById("autoSave")?.addEventListener("click", async () => {
-      const platforms = ALL_PLATFORMS.filter(p => document.getElementById(`plat-${p}`)?.checked);
+      const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map(i => i.dataset.platform);
       const template = {
         content_mode: document.getElementById("selContentMode")?.value || "mix",
         background: document.getElementById("selBackground")?.value || "rotate",
@@ -238,7 +245,7 @@ window.PublishApp = {
     document.getElementById("schedSave")?.addEventListener("click", async () => {
       const title = document.getElementById("schedTitle")?.value;
       const time = document.getElementById("schedTime")?.value;
-      const platforms = ALL_PLATFORMS.filter(p => document.querySelector(`#schedPlatforms input[data-platform="${p}"]`)?.checked);
+      const platforms = [...document.querySelectorAll("#schedPlatforms input[data-platform]:checked:not(:disabled)")].map(i => i.dataset.platform);
       
       if (!title || !time || platforms.length === 0) {
         alert("يرجى ملء العنوان والوقت واختيار المنصات");

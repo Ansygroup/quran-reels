@@ -1,0 +1,149 @@
+#!/usr/bin/env node
+/* ============================================================
+ * اختبارات خادم لوحة الحساب (api/autopilot.js) + توحيد قوائم المنصات
+ * ------------------------------------------------------------
+ * يعمل بلا شبكة وبلا قاعدة بيانات: يستبدل lib/db ويعطّل اعتماديات chromium.
+ * يغطي:
+ *   1) قراءة تاريخ التشغيل عند غياب أعمدة المقالات (كانت تُفشل اللوحة كاملة).
+ *   2) استجابة accountData (config/runs/connected/platforms/available/reciters).
+ *   3) توليد المقال العشوائي عند غياب جدول articles (احتياطي من posts/).
+ *   4) مطابقة قائمة المنصات بين lib/platforms و lib/publish و العميل.
+ *
+ * التشغيل: node tests/autopilot_api_test.js
+ * ============================================================ */
+const path = require("path");
+const fs = require("fs");
+const Module = require("module");
+
+const ROOT = path.join(__dirname, "..");
+let pass = 0;
+const errs = [];
+const ok = (m) => { pass++; console.log("OK   " + m); };
+const fail = (m) => { errs.push(m); console.log("FAIL " + m); };
+const chk = (name, cond, extra = "") => (cond ? ok(name) : fail(name + (extra ? " :: " + extra : "")));
+
+/* ---------------- بدائل الاعتماديات الثقيلة (chromium) ---------------- */
+const STUBS = {
+  "@sparticuz/chromium": { default: { executablePath: async () => "/bin/true", args: [], headless: true } },
+  "playwright-core": { chromium: { launch: async () => ({ newPage: async () => ({}), close: async () => {} }) } },
+  playwright: {},
+};
+const origLoad = Module._load;
+Module._load = function (request, parent, isMain) {
+  if (Object.prototype.hasOwnProperty.call(STUBS, request)) return STUBS[request];
+  return origLoad.apply(this, arguments);
+};
+
+/* ---------------- بديل lib/db ----------------
+ * الوحدة تلتقط الدوال عند التحميل (const { q1, rest } = require(…))، لذا نمرّر
+ * الاستدعاءات إلى كائن تنفيذ قابل للتبديل بدل إعادة إسناد الخصائص لاحقًا. */
+const dbPath = require.resolve(path.join(ROOT, "lib", "db.js"));
+const impl = { q: async () => [], q1: async () => null, rest: async () => [] };
+const dbStub = {
+  q: (...a) => impl.q(...a),
+  q1: (...a) => impl.q1(...a),
+  rest: (...a) => impl.rest(...a),
+};
+require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: dbStub };
+const setDb = (o) => Object.assign(impl, o);
+
+const api = require(path.join(ROOT, "api", "autopilot.js"));
+const T = api.__test;
+const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
+
+(async () => {
+  chk("api/autopilot يصدّر __test للاختبارات", Boolean(T && T.accountData && T.loadRuns && T.articleRandom));
+
+  /* 1) غياب أعمدة المقالات → نجاح بالقراءة الاحتياطية */
+  const queries = [];
+  setDb({
+    rest: async (p) => {
+      queries.push(p);
+      if (/article_id/.test(p)) {
+        throw new Error("Supabase REST 400 on /rest/v1/autopilot_runs: column autopilot_runs.article_id does not exist");
+      }
+      if (/autopilot_runs/.test(p)) return [{ id: "r1", status: "published", title: "سورة الكوثر" }];
+      return [];
+    },
+  });
+  let out = await T.loadRuns("u1");
+  chk("غياب أعمدة المقالات لا يُسقط القراءة", out.rows.length === 1 && out.articlesColumns === false, JSON.stringify(out));
+  chk("الاستعلام الاحتياطي لا يطلب أعمدة المقالات", Boolean(queries[1]) && !/article_id/.test(queries[1]), queries[1] || "لا استعلام ثانٍ");
+
+  /* 2) نجاح كامل → الأعمدة موجودة */
+  queries.length = 0;
+  setDb({ rest: async (p) => { queries.push(p); return [{ id: "r1", article_id: "a1", article_title: "مقال" }]; } });
+  out = await T.loadRuns("u1");
+  chk("قراءة كاملة عند وجود الأعمدة", out.articlesColumns === true && out.rows.length === 1, JSON.stringify(out));
+
+  /* 3) فشل كل الاستعلامات → مصفوفة فارغة بلا استثناء */
+  setDb({ rest: async () => { throw new Error("boom"); } });
+  let threw = false;
+  try { out = await T.loadRuns("u1"); } catch { threw = true; }
+  chk("فشل كل القراءات يعطي قائمة فارغة بلا استثناء", !threw && Array.isArray(out.rows) && out.rows.length === 0);
+
+  /* 4) accountData: العقد الكامل */
+  setDb({
+    q1: async () => null,
+    rest: async (p) => {
+      if (/social_connections/.test(p)) return [{ id: "c1", platform: "youtube", account_name: "قناة قرآن" }];
+      if (/autopilot_runs/.test(p)) return [{ id: "r1", status: "published", title: "سورة" }];
+      return [];
+    },
+  });
+  const data = await T.accountData("u1");
+  const keys = ["config", "runs", "connected", "platforms", "channel", "reciters", "available"];
+  chk("accountData يعيد كل مفاتيح العقد", keys.every((k) => k in data), Object.keys(data).join(","));
+  chk("config افتراضي عند عدم وجود صف", Boolean(data.config) && data.config.enabled === false, JSON.stringify(data.config));
+  chk("connected/platforms من social_connections", data.connected === true && data.platforms.includes("youtube"), JSON.stringify(data.platforms));
+  chk("available = 8 منصات (5 قابلة للنشر)",
+    Array.isArray(data.available) && data.available.length === 8 && data.available.filter((p) => p.publish).length === 5,
+    JSON.stringify(data.available.map((p) => p.key + ":" + p.publish)));
+  chk("channel يحتوي اسم القناة", /يوتيوب/.test(data.channel) && /قناة قرآن/.test(data.channel), data.channel);
+
+  /* 5) المقال العشوائي: احتياطي من المستودع عند غياب الجدول */
+  setDb({ rest: async () => { throw new Error("Supabase REST 404 on /rest/v1/articles: relation does not exist"); } });
+  const art = await T.articleRandom();
+  chk("article_random يعمل بلا جدول articles", Boolean(art && art.id && art.title && art.url), JSON.stringify(art));
+  const local = T.repoArticles();
+  chk("مكتبة المقالات المضمّنة غير فارغة", local.length >= 500, String(local.length));
+  chk("مفاتيح المقال فريدة في المكتبة", new Set(local.map((a) => a.id)).size === local.length,
+    String(local.length - new Set(local.map((a) => a.id)).size) + " مكرّر");
+
+  setDb({ rest: async () => [{ id: "db-1", title: "من القاعدة" }] });
+  const art2 = await T.articleRandom();
+  chk("يفضّل جدول articles عندما يوجد", Boolean(art2) && art2.id === "db-1", JSON.stringify(art2));
+
+  /* 6) مطابقة المنصات: lib/platforms ↔ lib/publish dispatch */
+  const publishSrc = fs.readFileSync(path.join(ROOT, "lib", "publish.js"), "utf8");
+  const dispatchable = [...publishSrc.matchAll(/case "([a-z]+)":/g)].map((m) => m[1]);
+  const missing = libPlatforms.PUBLISHABLE.filter((p) => !dispatchable.includes(p));
+  const extra = dispatchable.filter((p) => !libPlatforms.PUBLISHABLE.includes(p));
+  chk("كل منصة publish:true لها حالة نشر في lib/publish", missing.length === 0, missing.join(","));
+  chk("لا منصة تُنشر بلا إعلانها في lib/platforms", extra.length === 0, extra.join(","));
+
+  /* 7) مطابقة أسماء المنصات في العميل مع المصدر الواحد */
+  const clientSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  const block = (clientSrc.match(/const PLATFORMS = \{([\s\S]*?)\n\};/) || [, ""])[1];
+  const clientMap = Object.fromEntries([...block.matchAll(/(\w+):\s*"([^"]*)"/g)].map((m) => [m[1], m[2]]));
+  const mismatched = Object.entries(libPlatforms.NAMES).filter(([k, v]) => clientMap[k] !== v);
+  chk("أسماء المنصات في العميل = lib/platforms (المصدر الواحد)", mismatched.length === 0,
+    mismatched.map(([k, v]) => `${k}: "${clientMap[k]}" ≠ "${v}"`).join(" · "));
+
+  /* 8) lib/autopilot يفلتر غير القابل للنشر ولا يكرّر الخريطة */
+  const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("lib/autopilot يفلتر المنصات بـ canPublish", /filter\(canPublish\)/.test(autoSrc));
+  chk("لا خريطة منصات مكرّرة في lib/autopilot", !/linkedin:\s*"لينكد إن"/.test(autoSrc),
+    "ما زالت الخريطة القديمة موجودة");
+
+  /* 9) الحماية من أعمدة ناقصة في createRun/patchRun */
+  chk("createRun/patchRun يحاولان مجددًا بلا أعمدة المقالات",
+    /hasArticleCols/.test(autoSrc) && /stripArticleCols/.test(autoSrc));
+
+  console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
+  if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
+  process.exit(errs.length ? 1 : 0);
+})().catch((e) => {
+  console.log("FAIL استثناء غير متوقع: " + (e && e.message));
+  process.exit(1);
+});
