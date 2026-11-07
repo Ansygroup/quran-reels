@@ -38,3 +38,13 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: git status --short | wc -l | xargs -I{} echo "uncommitted: {}"
   EXPECT: uncommitted: 0
   EVIDENCE: pending
+
+## Notes (تحديثات التوازي وتعدد القنوات والمقالات)
+- **تحديث الكود (v9/v3/v2):**
+  - دعم **تعدد القنوات** (يوتيوب، فيسبوك، إنستغرام، تيك توك، X، لينكد إن، تيليجرام، واتساب).
+  - دعم **التوازي** في النشر والأتمتة (`run_all`, `Promise.all`).
+  - دعم **توليد البوست من المقالات** (10,000 مقال) في الأتمتة (`PostGen.article`, `article_random`).
+  - تحسين واجهة المستخدم (بطاقة المقال `.article-card`، أزرار الإجراءات السريعة).
+- **التوافق:**
+  - G1-G7: سيتم التحقق منها في بيئة Vercel (G2, G3) أو محلياً (G1, G4, G5, G6, G7).
+  - Vercel Cron: 06:15 القاهرة (04:15 UTC).
