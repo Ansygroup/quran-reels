@@ -214,3 +214,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `dayHasPublish(user, day)` = يوجد صفّ `publish_queue` بحالة `published` لمسار `%/autopilot/<day>-%` · `catchUpDaily` يرجّع `published-cached` ويصحّح صفّ التشغيل بلا توليد ولا نشر · `backfillDaily` يتخطى اليوم بـ`already-published`
   EVIDENCE: 2026-11-12 — في القاعدة صفوف `publish_queue` منشورة لليوم نفسه مع صفّ تشغيل `failed` (نشر على منصة ونجح، وأخرى فشلت). بدون هذا الفحص كان الإنقاذ/التعويض يعيد النشر على المنصة الناجحة = منشور مكرّر.
 
+- [ ] G39: الإنقاذ لا يتخطى اليوم بسبب صفّ عالق
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `catchUpDaily` يستدعي `closeStaleRuns(20)` قبل قراءة صفوف اليوم · صفّ `rendering` أقدم من ٢٠ دقيقة يصبح `failed` فيُحكم عليه «اذهب» لا «جارٍ» · الترتيب مثبت في المصدر
+  EVIDENCE: 2026-11-12 — التشغيل الأساسي عند 04:15 يُقتل بمهلة ٣٠٠ ثانية ويبقى صفّه `rendering`؛ الإنقاذ 10:15 كان يقرأه «جارٍ» ويتخطاه، فيضيع اليوم في الحالة نفسها التي وُجد الإنقاذ لها.
+
