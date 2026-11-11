@@ -204,3 +204,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `accountData.last_daily` = آخر صفّ `run_type=daily` (اليوم، الحالة، السبب، الرابط) · `lastDaily` يرجّع null عند تعذّر القاعدة بلا إسقاط اللوحة · الواجهة ترسم `#acctLastDaily` بالنص «آخر تشغيل آلي (اليوم): ✅ منشور/⏳ قيد التوليد/⚠️ فشل — السبب · رابط» · السبب يُهرَّب (لا HTML) · النوع `render_failure` يُسمّى «محاولة توليد آلية» بدل «فحص المحرّك»
   EVIDENCE: 2026-11-12 — الفشل اليومي كان يُعرف فقط بفتح Supabase؛ الآن يظهر في بطاقة الإجراءات السريعة فورًا.
 
+- [ ] G37: فشل النشر وحده يُعاد بلا إعادة توليد
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `retryPublishFailed(user, day)` يقرأ صفوف `publish_queue` الفاشلة لمسار فيديو اليوم ويعيد `publishRow` عليها · نجاح الكل ⇒ التشغيل يُصحَّح `published` + الرابط ويُسجَّل `autopilot_daily` بلا تشغيل Chromium (`skipped: "rendered-cached"`) · نجاح جزئي ⇒ توقف (`partial-publish`) بلا إعادة توليد حتى لا يتكرر المنشور · فشل الكل ⇒ لا شيء منشور فيُسمح بإعادة التوليد · بلا صفوف فاشلة ⇒ لا نداء نشر
+  EVIDENCE: 2026-11-12 — أي فشل في النشر (توكن يوتيوب مثلًا) كان يعني إعادة توليد ٥ دقائق داخل ميزانية ٣٠٠ ثانية، وخطر نشر المقطع مرتين على المنصات التي نجحت.
+
