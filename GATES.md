@@ -194,3 +194,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `createRun(..., reuseFailed)` يستكمل الصفّ الفاشل (status→rendering، error→null) فقط إن لم يكن قد نُشر منه شيء (`external_url`/`publish_queue_id` فارغان) · المنشور أو المنشور جزئيًا يبقى `duplicate` (لا منشور مكرّر) · `runWithRetry` يمرّر رقم المحاولة · التشغيل اليومي والإنقاذ يمرّران `reuseFailed: n > 1`
   EVIDENCE: 2026-11-12 — المحاولة الثانية كانت تجد صفّ المحاولة الأولى (failed) فترجع `duplicate:true` فتنتهي، فلم تُولّد إعادة المحاولة فيديو ولا مرة.
 
+- [ ] G35: اليوم الذي يضيع يُعوَّض تلقائيًا
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `missingDays(runs, today, lookback)` يرجع الأيام بلا نشر من الأحدث للأقدم ويتخطى أي يوم جرت محاولة تعويضه (`:backfill`) · `backfillDaily` لا يعمل قبل أن يكون اليوم منشورًا (`today-pending`) · يعوّض يومًا واحدًا بمفتاح `daily:<uid>:<day>:backfill` وبفحص نسخة قبل الرندر · `api/cron/monitor.js` يستدعي التعويض بعد ضمان اليوم فقط (`todaySettled` / `rescue-pending`)
+  EVIDENCE: 2026-11-12 — التشغيل اليومي ينتج فيديو «اليوم» فقط، فأي يوم فاشل يبقى ثقبًا دائمًا (11 نوفمبر بلا فيديو حتى بعد إصلاح المسار).
+
