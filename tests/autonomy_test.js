@@ -175,6 +175,36 @@ const mkRoute = (url) => {
   chk("فشل الفحص ⇒ لا توليد + تسجيل السبب", /if \(!pre\.ok\)/.test(src2) && /فحص النسخة المنشورة فشل/.test(src2));
   chk("الفحص اليدوي يحمل نتيجة preflight", /report\.preflight = preflight/.test(src2));
 
+  /* 9) شبكة الأمان: هل يحتاج اليوم تشغيلًا بديلًا؟ */
+  chk("منشور اليوم ⇒ لا إنقاذ", T.shouldCatchUp([{ status: "published" }]) === "published");
+  chk("قيد الإنشاء ⇒ لا نُزاحم", T.shouldCatchUp([{ status: "rendering" }]) === "running");
+  chk("فاشل فقط ⇒ إنقاذ", T.shouldCatchUp([{ status: "failed" }]) === "go");
+  chk("لا تشغيل اليوم ⇒ إنقاذ", T.shouldCatchUp([]) === "go" && T.shouldCatchUp(null) === "go");
+  chk("مزيج فاشل + منشور ⇒ لا إنقاذ (نجح اليوم)", T.shouldCatchUp([{ status: "failed" }, { status: "published" }]) === "published");
+
+  const src3 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("الإنقاذ يستخدم مفتاح تشغيل منفصل (‎:retry1)", /runKeySuffix: "retry1"/.test(src3) && /keySuffix \? `\$\{base\}:\$\{keySuffix\}` : base/.test(src3));
+  chk("الإنقاذ يفحص النسخة قبل التوليد", /const verdict = shouldCatchUp\(rows\)/.test(src3) && /const pre = await preflightPage\(\)/.test(src3));
+
+  const cron = fs.readFileSync(path.join(ROOT, "api", "cron", "monitor.js"), "utf8");
+  chk("كرون المراقبة يشغّل الإنقاذ يوميًا", /catchUpDaily\(\)/.test(cron) && /rescue/.test(cron));
+  chk("فحص الموقع الكامل يبقى الاثنين أو بـ?full=1", /getUTCDay\(\) === 1/.test(cron) && /full=1/.test(cron));
+  const vj = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
+  const mono = (vj.crons || []).find((c) => c.path === "/api/cron/monitor");
+  chk("جدولة المراقبة صارت يومية 10:15 UTC", mono && mono.schedule === "15 10 * * *", JSON.stringify(mono));
+  chk("ميزانية المراقبة 300 ثانية (تتسع لتوليد فيديو)", vj.functions && vj.functions["/api/cron/monitor.js"] && vj.functions["/api/cron/monitor.js"].maxDuration === 300);
+
+  /* 10) catchUpDaily: لا يولّد شيئًا إن كان اليوم منشورًا أو قيد الإنشاء */
+  impl.q = async (sql) => (/from autopilot where enabled/i.test(String(sql)) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "published" }] : []);
+  const cap1 = await T.catchUpDaily();
+  chk("منشور اليوم ⇒ يُتخطى بلا توليد", cap1.length === 1 && cap1[0].skipped === "published", JSON.stringify(cap1));
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r2", status: "rendering" }] : []);
+  const cap2 = await T.catchUpDaily();
+  chk("قيد الإنشاء ⇒ يُتخطى (لا نُزاحم التشغيل الجاري)", cap2.length === 1 && cap2[0].skipped === "running", JSON.stringify(cap2));
+  impl.q = async () => [];
+  chk("بلا إعدادات مُفعّلة ⇒ لا شيء", (await T.catchUpDaily()).length === 0);
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
