@@ -127,3 +127,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: `renderSelfTest({deep:true})` يُنتج تسلسل تصدير ويُعيد `{deep:true, export:{ok,pct,stage,ms}}` · لا رفع إلى التخزين ولا نشر داخل الفحص · زر «🎬 اختبار توليد فيديو» يرسل `deep:true`
   EVIDENCE: 2026-11-07 — الفحص القديم كان يكتفي بـ«المتصفح أقلع والصفحة فُتحت»، بينما الفشل الحقيقي كان في مرحلة التسجيل؛ الفحص العميق يجيب عن السؤال الصحيح بضغطة.
+
+- [ ] G22: فحص العمق يميّز «المصدر» من «الوسيط» ويقرأ التلاوة من الخادم
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: `renderSelfTest` يسجّل `audio_direct` (fetch مباشر لـ everyayah) و`audio_proxy` (عبر `/api/proxy`) و`page_errors`/`failed_requests` · `audioUrlFor` يبني `.../SSSAAA.mp3` · لا استثناء عند فشل الشبكة
+  EVIDENCE: 2026-11-11 — تعليق التصدير عند «تحضير التلاوة… 0%» يرجّح فشل تحميل الصوت؛ وطلب mp3 عبر `/api/proxy` من خارج Vercel رجع 500 بينما JSON/woff2/HTML رجعت 200، فصار الفحص يفصل السببين بضغطة.

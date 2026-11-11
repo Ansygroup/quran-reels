@@ -439,9 +439,16 @@ window.PublishApp = {
           const secs = Math.round((data.ms || 0) / 100) / 10;
           if (data.ok && deep) {
             const ex = data.export || {};
+            /* نضيف حالة التلاوة (مباشرة وعبر الوسيط) لأن «تحضير التلاوة… 0%»
+             * هو أول ما يتعطّل عند تعذّر الوصول لملف الصوت. */
+            const a = data.audio_direct || {}, ap = data.audio_proxy || {};
+            const audio = `تلاوة: ${a.ok ? "✅ " + a.status + " · " + a.ms + "ms" : "⚠️ فشل" + (a.status ? " (" + a.status + ")" : "")}`
+              + ` · عبر الوسيط: ${ap.ok ? "✅" : "⚠️" + (ap.status ? " (" + ap.status + ")" : "")}`;
+            const failed = Array.isArray(data.failed_requests) && data.failed_requests.length
+              ? ` · طلبات فاشلة: ${data.failed_requests.length}` : "";
             notice.textContent = ex.ok
-              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""}`
-              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${String(data.error || "").slice(0, 160)}`;
+              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""} · ${audio}`
+              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${audio}${failed} — ${String(data.error || "").slice(0, 140)}`;
             notice.style.color = ex.ok ? "#7ee0a2" : "#ffb4a2";
           } else {
             notice.textContent = data.ok
