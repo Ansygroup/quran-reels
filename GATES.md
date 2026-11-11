@@ -189,3 +189,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `exportError` يبني رسالة تُظهر exporting/running/count/dialog/toast/abort بلا JSON مقطوع · `err.diag` يحمل kind/last · `collectDiag` يقرأ وجود وظهور كل عنصر تصدير + حالة الصوت وسياقه + أخطاء الكونسول والطلبات الفاشلة وخطوات النقر · `recordRenderFailure` يحفظها كاملة في `system_checks.detail` (jsonb، بلا قصّ) بنوع `render_failure` · تعذّر الحفظ لا يُفشل التشغيل
   EVIDENCE: 2026-11-11 — كل تشغيلات 8–11 نوفمبر سُجّلت «page.waitForFunction: Timeout 210000ms» بلا سبب، وآخر تشغيل يدوي ترك `{"pct":"","stage":"","r` مقطوعًا عند 400 حرف. الآن سبب كل فشل كامل وقابل للقراءة.
 
+- [ ] G34: «إعادة المحاولة» كانت تُعاد بلا فعل
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `createRun(..., reuseFailed)` يستكمل الصفّ الفاشل (status→rendering، error→null) فقط إن لم يكن قد نُشر منه شيء (`external_url`/`publish_queue_id` فارغان) · المنشور أو المنشور جزئيًا يبقى `duplicate` (لا منشور مكرّر) · `runWithRetry` يمرّر رقم المحاولة · التشغيل اليومي والإنقاذ يمرّران `reuseFailed: n > 1`
+  EVIDENCE: 2026-11-12 — المحاولة الثانية كانت تجد صفّ المحاولة الأولى (failed) فترجع `duplicate:true` فتنتهي، فلم تُولّد إعادة المحاولة فيديو ولا مرة.
+

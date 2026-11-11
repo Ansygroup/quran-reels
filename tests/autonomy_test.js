@@ -137,7 +137,7 @@ const mkRoute = (url) => {
 
   /* 5) الربط في التشغيل اليومي */
   const src = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("runDailyAutopilots يستخدم الإعادة والتسجيل", src.includes("runWithRetry(() => generateAndPublish") && src.includes("recordDaily(config.user_id"));
+  chk("runDailyAutopilots يستخدم الإعادة والتسجيل", /runWithRetry\(\(n\) => generateAndPublish/.test(src) && src.includes("recordDaily(config.user_id"));
   chk("النتيجة تُرجع attempts/recorded", /attempts, recorded/.test(src));
 
   /* 6) فحص النسخة المنشورة قبل التوليد (درس النافذة المفقودة) */
@@ -262,6 +262,35 @@ const mkRoute = (url) => {
   const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   chk("renderRecipe يلتقط pageerror/console/requestfailed", /page\.on\("pageerror"/.test(autoSrc) && /page\.on\("console"/.test(autoSrc) && /page\.on\("requestfailed"/.test(autoSrc));
   chk("فشل التوليد يُسجَّل مع التشخيص", /recordRenderFailure\(userId, run, error, message\)/.test(autoSrc));
+
+  /* 12) الإعادة التلقائية كانت بلا فعل: المحاولة الثانية تصطدم بصفّها الفاشل */
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+  impl.q1 = async () => ({ id: "r-old", run_key: "daily:u1:2026-11-12", status: "failed", external_url: null, publish_queue_id: null });
+  const cr1 = await T.createRun("u1", "daily", "2026-11-12", null, "", true);
+  const patchCall = dbCalls.find((c) => /autopilot_runs\?id=eq\.r-old/.test(String(c.p)) && c.opts && c.opts.method === "PATCH");
+  const patchBody = patchCall ? JSON.parse(patchCall.opts.body) : {};
+  chk("المحاولة الثانية تستكمل الصفّ الفاشل بدل duplicate",
+    cr1.existing === false && cr1.resumed === true && cr1.run.status === "rendering", JSON.stringify(cr1).slice(0, 200));
+  chk("الاستكمال يعيد الصفّ إلى rendering ويمسح الخطأ",
+    patchBody.status === "rendering" && patchBody.error === null, JSON.stringify(patchBody));
+
+  const cr2 = await T.createRun("u1", "daily", "2026-11-12", null, "", false);
+  chk("بلا استكمال يبقى السلوك القديم (duplicate)", cr2.existing === true && cr2.run.status === "failed");
+  impl.q1 = async () => ({ id: "r-pub", status: "failed", external_url: "https://youtu.be/abc", publish_queue_id: null });
+  chk("فشل بعد نشر جزئي لا يُستكمل (لا منشور مكرّر)", (await T.createRun("u1", "daily", "2026-11-12", null, "", true)).existing === true);
+  impl.q1 = async () => ({ id: "r-done", status: "published" });
+  chk("المنشور لا يُستكمل أبدًا", (await T.createRun("u1", "daily", "2026-11-12", null, "", true)).existing === true);
+  impl.q1 = async () => null;
+
+  const seenAttempts = [];
+  const rSeen = await T.runWithRetry(async (n) => { seenAttempts.push(n); return { ok: false, error: "x" }; }, { budgetMs: 600000, clock: () => Date.now() });
+  chk("runWithRetry يمرّر رقم المحاولة (1 ثم 2)", rSeen.attempts === 2 && seenAttempts.join(",") === "1,2", seenAttempts.join(","));
+
+  const retrySrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التشغيل اليومي والإنقاذ يمرّران reuseFailed للمحاولة الثانية",
+    (retrySrc.match(/reuseFailed: n > 1/g) || []).length === 2 &&
+    /runWithRetry\(\(n\) => generateAndPublish/.test(retrySrc));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
