@@ -184,3 +184,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `shouldCatchUp` = `published` (لا شيء) / `running` (لا نُزاحم) / `go` (إنقاذ) · `catchUpDaily` يتخطى المنشور والجاري بلا توليد · الإنقاذ يُنشئ مفتاحًا منفصلًا `daily:<uid>:<date>:retry1` (لا يصطدم بصف اليوم الفاشل) · كرون المراقبة صار يوميًا `15 10 * * *` ويستدعي `catchUpDaily` أولًا، وفحص الموقع الكامل يبقى الاثنين أو `?full=1` · ميزانيته 300 ثانية
   EVIDENCE: 2026-11-11 — الخطة تسمح بكرون نشر واحد يوميًا، فأي فشل مزدوج = يوم بلا فيديو. الآن هناك محاولة إنقاذ 13:15 القاهرة.
 
+- [ ] G33: كل فشل توليد يحمل سببه الكامل (لا «غير معروف»)
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `exportError` يبني رسالة تُظهر exporting/running/count/dialog/toast/abort بلا JSON مقطوع · `err.diag` يحمل kind/last · `collectDiag` يقرأ وجود وظهور كل عنصر تصدير + حالة الصوت وسياقه + أخطاء الكونسول والطلبات الفاشلة وخطوات النقر · `recordRenderFailure` يحفظها كاملة في `system_checks.detail` (jsonb، بلا قصّ) بنوع `render_failure` · تعذّر الحفظ لا يُفشل التشغيل
+  EVIDENCE: 2026-11-11 — كل تشغيلات 8–11 نوفمبر سُجّلت «page.waitForFunction: Timeout 210000ms» بلا سبب، وآخر تشغيل يدوي ترك `{"pct":"","stage":"","r` مقطوعًا عند 400 حرف. الآن سبب كل فشل كامل وقابل للقراءة.
+

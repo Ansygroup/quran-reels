@@ -210,6 +210,59 @@ const mkRoute = (url) => {
   impl.q = async () => [];
   chk("بلا إعدادات مُفعّلة ⇒ لا شيء", (await T.catchUpDaily()).length === 0);
 
+  /* 11) تشخيص الفشل: سبب مقروء + لقطة كاملة محفوظة (لا JSON مقطوع) */
+  const lastState = { pct: "", stage: "", exporting: false, running: false, count: 0, dialog: false, toast: "حدّد آية", abort: "لا شيء محدد", result: false };
+  const errStall = T.exportError("stall", lastState, 90000);
+  chk("رسالة التوقف تحمل الحقول المفيدة بدل JSON مقطوع",
+    /exporting=false/.test(errStall.message) && /count=0/.test(errStall.message) &&
+    /toast=حدّد آية/.test(errStall.message) && /abort=لا شيء محدد/.test(errStall.message) &&
+    !/\{"pct"/.test(errStall.message), errStall.message);
+  chk("الخطأ يحمل diag.kind وdiag.last", errStall.diag && errStall.diag.kind === "stall" && errStall.diag.last.pct === "");
+  chk("رسالة التوقف لا تتجاوز 600 حرف", errStall.message.length <= 600);
+
+  const diagNoPage = await T.collectDiag(null, { errors: ["console: boom"], failed: ["x.js — net::ERR"], steps: ["click-create"] });
+  chk("collectDiag بلا صفحة يحفظ الأخطاء والخطوات", diagNoPage.errors[0] === "console: boom" && diagNoPage.failed.length === 1 && diagNoPage.steps[0] === "click-create");
+
+  const fakeDiagPage = {
+    evaluate: async () => ({
+      url: "https://example.test/?s=108",
+      present: { expPct: { exists: true, visible: false, text: "" } },
+      exporting: false,
+      abort: "",
+      count: 0,
+      toast: "",
+      dialog: false,
+      audio: [{ src: "https://everyayah.com/x.mp3", readyState: 0, paused: true, error: null }],
+      audioCtx: "suspended",
+      sw: "none",
+      scripts: ["js/creator.js?v=5"],
+    }),
+  };
+  const diagSnap = await T.collectDiag(fakeDiagPage, { errors: [], failed: [], steps: ["warm-audio"] });
+  chk("collectDiag يقرأ العناصر والصوت والسياق من الصفحة",
+    diagSnap.page && diagSnap.page.present.expPct.exists === true && diagSnap.page.audioCtx === "suspended" &&
+    diagSnap.page.audio.length === 1 && diagSnap.page.scripts[0].includes("creator.js"), JSON.stringify(diagSnap.page));
+  const diagBroken = await T.collectDiag({ evaluate: async () => { throw new Error("page closed"); } }, {});
+  chk("صفحة مغلقة لا تُسقط التشخيص", diagBroken.page && /page closed/.test(diagBroken.page.error));
+
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+  /* كما في renderRecipe: دمج لقطة الصفحة على خطأ التوقف قبل الحفظ */
+  errStall.diag = Object.assign({}, errStall.diag, diagSnap);
+  const rfOk = await T.recordRenderFailure("u1", { id: "run-9", run_key: "daily:u1:2026-11-12" }, errStall, errStall.message);
+  const rfBody = dbCalls[0] && JSON.parse(dbCalls[0].opts.body || "{}");
+  chk("الفشل يُحفظ في system_checks نوع render_failure",
+    rfOk === true && rfBody.kind === "render_failure" && rfBody.ok === false &&
+    rfBody.detail.run_key === "daily:u1:2026-11-12" && rfBody.detail.diag.kind === "stall", JSON.stringify(rfBody).slice(0, 300));
+  chk("التشخيص المحفوظ يحمل line/errors/steps كاملة", rfBody.detail.diag.last && Array.isArray(rfBody.detail.diag.errors) && Array.isArray(rfBody.detail.diag.steps));
+  impl.rest = async () => { throw new Error("db down"); };
+  chk("تعذّر حفظ التشخيص لا يُفشل التشغيل", (await T.recordRenderFailure("u1", { id: "x" }, errStall, "e")) === false);
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+
+  const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderRecipe يلتقط pageerror/console/requestfailed", /page\.on\("pageerror"/.test(autoSrc) && /page\.on\("console"/.test(autoSrc) && /page\.on\("requestfailed"/.test(autoSrc));
+  chk("فشل التوليد يُسجَّل مع التشخيص", /recordRenderFailure\(userId, run, error, message\)/.test(autoSrc));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
