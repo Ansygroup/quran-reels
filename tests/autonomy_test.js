@@ -333,6 +333,7 @@ const mkRoute = (url) => {
   impl.rest = async () => [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
   const savedFetch = global.fetch;
   global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div>' });
+  impl.q = async (sql) => (/from autopilot where enabled/i.test(String(sql)) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
   dbCalls.length = 0;
   impl.rest = async (p2, opts) => {
     if (/autopilot_runs/.test(String(p2)) && (!opts || opts.method !== "POST")) return [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
@@ -362,7 +363,7 @@ const mkRoute = (url) => {
     const s2 = String(sql);
     sqlCalls.push(s2);
     if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
-    if (/from publish_queue/i.test(s2)) return [queueRow("q1", "youtube")];
+    if (/from publish_queue/i.test(s2)) return /status='published'/i.test(s2) ? [] : [queueRow("q1", "youtube")];
     return [];
   };
   impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
@@ -377,7 +378,9 @@ const mkRoute = (url) => {
     sqlCalls.some((q) => /update autopilot_runs set status='published'/.test(String(q))));
 
   /* فشل جزئي: منصة نجحت وأخرى لا ⇒ لا إعادة توليد (كي لا يتكرر المنشور) */
-  impl.q = async (sql) => (/from publish_queue/i.test(sql) ? [queueRow("q1", "youtube"), queueRow("q2", "tiktok")] : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }] : []));
+  impl.q = async (sql) => (/from publish_queue/i.test(sql)
+    ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube"), queueRow("q2", "tiktok")])
+    : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }] : []));
   pub.calls.length = 0;
   let pubSeq = 0;
   pub.impl = async (row) => (++pubSeq === 1 ? { ok: true, url: "https://youtu.be/ok" } : { ok: false, error: "token" });
@@ -385,7 +388,9 @@ const mkRoute = (url) => {
   chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "partial-publish" && cPartial[0].ok === false, JSON.stringify(cPartial).slice(0, 240));
 
   /* فشل النشر كله ⇒ لا شيء منشور، فيجوز إعادة التوليد الكاملة */
-  impl.q = async (sql) => (/from publish_queue/i.test(sql) ? [queueRow("q1", "youtube")] : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []));
+  impl.q = async (sql) => (/from publish_queue/i.test(sql)
+    ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube")])
+    : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []));
   pub.calls.length = 0;
   pub.impl = async () => ({ ok: false, error: "token" });
   global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button>' });
@@ -400,6 +405,35 @@ const mkRoute = (url) => {
   impl.q = async () => [];
   impl.rest = async () => [];
   pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id });
+  pub.calls.length = 0;
+
+  /* 15) منع النشر المكرر: صفّ منشور في القائمة يتقدّم على حالة التشغيل */
+  impl.q = async (sql) => {
+    const s2 = String(sql);
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    if (/from publish_queue/i.test(s2) && /status='published'/i.test(s2)) return [{ id: "qp" }];
+    if (/from publish_queue/i.test(s2)) return [];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  pub.calls.length = 0;
+  const cPub = await T.catchUpDaily();
+  chk("نُشر شيء اليوم ⇒ لا توليد ولا تكرار",
+    cPub.length === 1 && cPub[0].skipped === "published-cached" && cPub[0].ok === true && pub.calls.length === 0,
+    JSON.stringify(cPub).slice(0, 240));
+
+  /* التعويض لا يعيد يومًا نُشر فيه شيء فعليًا */
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [
+    { run_date: "2026-11-12", status: "published", run_key: "daily:u1:2026-11-12" },
+    { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" },
+  ] : []);
+  const bfPub = await T.backfillDaily();
+  chk("التعويض يتخطى يومًا فيه نشر فعلي", bfPub.length === 1 && bfPub[0].skipped === "already-published" && bfPub[0].day === "2026-11-11", JSON.stringify(bfPub));
+
+  chk("dayHasPublish متاحة ومحصورة بصفوف published",
+    typeof T.dayHasPublish === "function" && /status='published'/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
+  impl.q = async () => [];
+  impl.rest = async () => [];
   pub.calls.length = 0;
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);

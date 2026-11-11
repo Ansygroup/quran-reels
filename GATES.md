@@ -209,3 +209,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `retryPublishFailed(user, day)` يقرأ صفوف `publish_queue` الفاشلة لمسار فيديو اليوم ويعيد `publishRow` عليها · نجاح الكل ⇒ التشغيل يُصحَّح `published` + الرابط ويُسجَّل `autopilot_daily` بلا تشغيل Chromium (`skipped: "rendered-cached"`) · نجاح جزئي ⇒ توقف (`partial-publish`) بلا إعادة توليد حتى لا يتكرر المنشور · فشل الكل ⇒ لا شيء منشور فيُسمح بإعادة التوليد · بلا صفوف فاشلة ⇒ لا نداء نشر
   EVIDENCE: 2026-11-12 — أي فشل في النشر (توكن يوتيوب مثلًا) كان يعني إعادة توليد ٥ دقائق داخل ميزانية ٣٠٠ ثانية، وخطر نشر المقطع مرتين على المنصات التي نجحت.
 
+- [ ] G38: لا نشر مكرر عندما ينجح النشر ويفشل صفّ التشغيل
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `dayHasPublish(user, day)` = يوجد صفّ `publish_queue` بحالة `published` لمسار `%/autopilot/<day>-%` · `catchUpDaily` يرجّع `published-cached` ويصحّح صفّ التشغيل بلا توليد ولا نشر · `backfillDaily` يتخطى اليوم بـ`already-published`
+  EVIDENCE: 2026-11-12 — في القاعدة صفوف `publish_queue` منشورة لليوم نفسه مع صفّ تشغيل `failed` (نشر على منصة ونجح، وأخرى فشلت). بدون هذا الفحص كان الإنقاذ/التعويض يعيد النشر على المنصة الناجحة = منشور مكرّر.
+
