@@ -142,3 +142,9 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/site_boot_test.js && node tests/autopilot_api_test.js
   EXPECT: `Creator.lastAbortReason` يُملأ قبل كل خروج مبكر (4 مواضع على الأقل) · `assertExportStarted` يرمي بنصه · `renderRecipe` يقيّد المدة ≤ 240s قبل الإنشاء · `window.Creator`/`window.Selection` متاحان للقراءة
   EVIDENCE: 2026-11-11 14:22 — التشغيل سجّل `{"pct":"","stage":"","running":false}` أي أن التصدير لم يبدأ أصلًا ولم تعرف الأتمتة السبب.
+
+- [ ] G25: نتيجة فحص التوليد تُحفظ (لا تعيش في المتصفح)
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: `recordSelfTest` يكتب صفًا في `system_checks` (POST `/rest/v1/system_checks`) بنوع `render_selftest[_deep]` وحالة `ok` وتفاصيل مختصرة (٣ عناصر، نصوص ≤ ٣٠٠) · فشل الكتابة يعيد `false` ولا يرمي · الـAPI يعيد `recorded` · ملف الترحيل موجود وRLS مفعّل
+  EXTRA: لوحة الحساب تحمل `last_check` (أحدث صف) وتُعرض كسطر «آخر فحص محفوظ»؛ ونص نتيجة الفحص يذكر «محفوظ ✓» أو «لم تُحفظ النتيجة».
+  EVIDENCE: 2026-11-11 — نتيجة زر «🎬 اختبار توليد فيديو» كانت تُقرأ مرة وتضيع، فيُطلب من المستخدم لصق النص؛ الآن تُقرأ من الجدول.

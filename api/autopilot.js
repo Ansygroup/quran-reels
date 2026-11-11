@@ -2,7 +2,7 @@
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json, configured } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest } = require("../lib/autopilot");
+const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
@@ -109,6 +109,14 @@ async function loadRuns(uid) {
   }
 }
 
+/* آخر نتيجة فحص محفوظة (system_checks) — اللوحة تعرضها بلا أن يضغط المستخدم شيئًا */
+async function lastSelfTest() {
+  try {
+    const rows = await rest("/rest/v1/system_checks?select=kind,ok,detail,created_at&order=created_at.desc&limit=1");
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch { return null; /* الجدول غير موجود بعد — لا نُسقط اللوحة */ }
+}
+
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
@@ -135,6 +143,8 @@ async function accountData(uid) {
     })),
     // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
     articles: { count: repoArticles().length },
+    // نتيجة آخر فحص توليد محفوظة (null إن لم يُجرَ فحص بعد)
+    last_check: await lastSelfTest(),
   };
 }
 
@@ -230,7 +240,9 @@ const handler = async (req, res) => {
     if (body.action === "selftest_render") {
       /* deep=true يُنتج فيديو قصيرًا فعليًا (بلا رفع أو نشر) — إثبات أن التسجيل يعمل */
       const report = await renderSelfTest({ deep: body.deep === true });
-      return json(res, report.ok ? 200 : 502, report);
+      /* نحفظ النتيجة حتى تُقرأ لاحقًا من قاعدة البيانات بدل لقطة شاشة */
+      const recorded = await recordSelfTest(report);
+      return json(res, report.ok ? 200 : 502, { ...report, recorded });
     }
 
     return json(res, 400, { error: "إجراء غير معروف" });
@@ -241,4 +253,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER };
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest };

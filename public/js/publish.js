@@ -114,6 +114,19 @@ window.PublishApp = {
     const reciters = Array.isArray(data.reciters) ? data.reciters : [];
     const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
     const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
+    /* آخر فحص محفوظ في القاعدة: «هل التوليد يعمل؟» يُجاب في اللوحة نفسها
+     * بدل لقطة شاشة تُنسى. النصوص من الخادم تُقصّ وتُهرَّب. */
+    const lastCheckLine = (c) => {
+      if (!c || !c.created_at) return "";
+      const when = new Date(c.created_at);
+      const stamp = Number.isNaN(when.getTime()) ? "" : when.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+      const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي" : "فحص المحرّك";
+      const why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
+      const cls = c.ok ? "hint ok" : "hint warn";
+      return `<p class="${cls}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${why} · ${stamp}</p>`;
+    };
+    this.lastCheckLine = lastCheckLine(data.last_check);
+
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
     this.available = Array.isArray(data.available) && data.available.length
       ? data.available
@@ -131,6 +144,7 @@ window.PublishApp = {
           <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
           <button class="btn btn-ghost" id="quickRenderTest">🎬 اختبار توليد فيديو</button>
         </div>
+        ${this.lastCheckLine || ""}
       `;
     }
 
@@ -446,9 +460,10 @@ window.PublishApp = {
               + ` · عبر الوسيط: ${ap.ok ? "✅" : "⚠️" + (ap.status ? " (" + ap.status + ")" : "")}`;
             const failed = Array.isArray(data.failed_requests) && data.failed_requests.length
               ? ` · طلبات فاشلة: ${data.failed_requests.length}` : "";
+            const saved = data.recorded ? " · محفوظ ✓" : " · لم تُحفظ النتيجة";
             notice.textContent = ex.ok
-              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""} · ${audio}`
-              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${audio}${failed} — ${String(data.error || "").slice(0, 140)}`;
+              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""} · ${audio}${saved}`
+              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${audio}${failed} — ${String(data.error || "").slice(0, 140)}${saved}`;
             notice.style.color = ex.ok ? "#7ee0a2" : "#ffb4a2";
           } else {
             notice.textContent = data.ok
