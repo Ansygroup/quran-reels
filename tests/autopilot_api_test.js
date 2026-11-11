@@ -402,7 +402,27 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const pubSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("اللوحة تعرض «آخر فحص محفوظ»", /acctLastCheck/.test(pubSrc) && /آخر \$\{kind\} محفوظ/.test(pubSrc));
   chk("نص الفحص يذكر هل حُفظت النتيجة", /data\.recorded \?/.test(pubSrc));
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=19/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  /* 22) آخر تشغيل آلي يصل للوحة (لا فشل صامت) */
+  setDb({
+    q1: async () => null,
+    rest: async (p2) => {
+      if (/autopilot_runs/.test(p2)) return [{ run_date: "2026-11-11", status: "failed", error: "توقّف عند «تحضير التلاوة»", external_url: null, created_at: "2026-11-11T04:30:00Z" }];
+      return [];
+    },
+  });
+  const ld = await T.lastDaily("u9");
+  chk("lastDaily يقرأ آخر تشغيل آلي", ld && ld.status === "failed" && ld.run_date === "2026-11-11", JSON.stringify(ld));
+  chk("lastDaily يستخدم run_type=daily فقط", /run_type=eq\.daily/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
+  setDb({ rest: async (p2) => (/autopilot_runs/.test(p2) ? [{ run_date: "2026-11-11", status: "published", external_url: "https://youtu.be/x", created_at: "2026-11-11T04:30:00Z" }] : []) });
+  const acct2 = await T.accountData("u9");
+  chk("accountData يحمل last_daily للوحة", Boolean(acct2.last_daily && acct2.last_daily.status === "published"), JSON.stringify(acct2.last_daily));
+  setDb({ rest: async () => { throw new Error("db down"); } });
+  chk("تعذّر قراءة التشغيل لا يُسقط اللوحة", (await T.lastDaily("u9")) === null);
+  const pubSrc2 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
+    /acctLastDaily/.test(pubSrc2) && /lastDailyLine\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
+
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=20/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

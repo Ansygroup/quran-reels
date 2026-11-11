@@ -51,6 +51,8 @@ const ACCOUNT = {
     { key: "whatsapp", name: "واتساب", publish: false },
   ],
   articles: { count: 500 },
+  /* آخر تشغيل آلي: فاشل بسبب نص يحوي وسمًا — يختبر العرض والتهريب معًا */
+  last_daily: { run_date: "2026-11-11", status: "failed", error: "توقّف عند «تحضير التلاوة» <b>x</b>", external_url: null },
 };
 
 const dom = new JSDOM(html, { url: "https://quran-reels.test/#/account", runScripts: "outside-only", pretendToBeVisual: true });
@@ -123,8 +125,17 @@ window.fetch = async (url, opts = {}) => {
   if (!/يوتيوب/.test((d.getElementById("acctAuto") || {}).textContent || "")) fail("اسم القناة/المنصة لم يظهر");
   else ok("اسم القناة المرتبطة ظهر");
 
+  // ---- سطر «آخر تشغيل آلي»: الحالة والسبب واليوم، مع تهريب النص ----
+  const dailyLine = d.getElementById("acctLastDaily");
+  if (!dailyLine) fail("سطر «آخر تشغيل آلي» لم يظهر في اللوحة");
+  else if (!/آخر تشغيل آلي \(2026-11-11\)/.test(dailyLine.textContent) || !/فشل/.test(dailyLine.textContent)) {
+    fail("سطر آخر تشغيل آلي لا يذكر اليوم/الحالة: " + dailyLine.textContent.slice(0, 120));
+  } else if (!/تحضير التلاوة/.test(dailyLine.textContent)) fail("سبب الفشل غير معروض في اللوحة");
+  else if (dailyLine.querySelector("b")) fail("نص السبب لم يُهرَّب (وسم HTML نُفّذ)");
+  else ok("سطر «آخر تشغيل آلي» يعرض اليوم والحالة والسبب مهروبًا");
+
   // ---- لا تكرار ولا فقدان لمعرّفات DOM بعد الرسم (رسم الحاوية داخل نفسها) ----
-  const idList = ["acctQueue", "schedPlatforms", "schedTitle", "schedTime", "schedSave", "acctAuto", "queueList", "acctQuickActions", "acctPlatforms"];
+  const idList = ["acctQueue", "schedPlatforms", "schedTitle", "schedTime", "schedSave", "acctAuto", "queueList", "acctQuickActions", "acctPlatforms", "acctLastDaily"];
   const badIds = idList.filter((id) => d.querySelectorAll("#" + id).length !== 1);
   if (badIds.length) fail("معرّفات مفقودة/مكررة بعد الرسم: " + badIds.join(", "));
   else ok("معرّفات DOM فريدة بعد الرسم");
@@ -195,11 +206,19 @@ window.fetch = async (url, opts = {}) => {
   if (consoleErrors.length) fail("أخطاء console غير متوقعة: " + consoleErrors.slice(0, 3).join(" | "));
   else ok("لا أخطاء console");
 
+  // ---- سطر التشغيل الآلي: حالة «منشور» + الرابط (آخر خطوة حتى لا تُفقد مستمعات الحفظ) ----
+  window.PublishApp.renderAccount({ ...ACCOUNT, last_daily: { run_date: "2026-11-11", status: "published", external_url: "https://youtu.be/ok" } });
+  const dailyOk = d.getElementById("acctLastDaily");
+  if (!dailyOk || !/منشور/.test(dailyOk.textContent)) fail("حالة «منشور» لا تظهر في سطر التشغيل الآلي");
+  else if (!dailyOk.querySelector('a[href="https://youtu.be/ok"]')) fail("رابط المنشور غير معروض");
+  else ok("سطر التشغيل الآلي يعرض «منشور» + رابط المنشور");
+
   done();
 })();
 
 function done() {
   console.log(errs.length ? `ERRORS ${errs.length}` : "ALL OK (0 errors)");
+
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
 }
