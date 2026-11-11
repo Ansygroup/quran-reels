@@ -112,3 +112,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: صفر `=in.('` في api/ وlib/ · `hasPlatformConnection` تعيد true لقناة مربوطة وfalse لغير المرتبطة وبلا استثناء عند سقوط القاعدة
   EVIDENCE: 2026-11-07 — الحاجز في lib/autopilot.js كان يعيد false دائمًا فيفشل كل تشغيل بـ«اربط القنوات أولًا» رغم ربط يوتيوب (تشغيل 10:39:55)، وبوابة التفعيل في api/autopilot.js كانت ترد 409 دائمًا.
+
+- [ ] G19: لا زر ربط لمزوّد بلا مفاتيح، ولا «مرتبط» لجلسة منتهية
+  CHECK: npm run test:connect && npm test
+  EXPECT: `accountData.available[*]` يحمل `ready` (مفاتيح المزوّد موجودة فعلًا) و`connect` · فيسبوك/إنستغرام معطّلان بلا META_APP_ID/SECRET مع سبب مكتوب · الجلسة المنتهية (`expires_at` ماضٍ) تظهر «⚠️ انتهت صلاحية الجلسة» + «إعادة الربط» · `#/account?setup=meta` تعرض رسالة تشرح المفاتيح الناقصة
+  EVIDENCE: 2026-11-07 — META_APP_ID/SECRET غير مضبوطين في Vercel، فكان زر «اربط فيسبوك» يعيد المستخدم إلى `?setup=meta` بلا تفسير؛ وجلسة يوتيوب منتهية (`expires_at` 2026-11-05) كانت تظهر «مرتبط» بينما النشر يفشل بـ`invalid_grant`.

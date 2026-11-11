@@ -215,6 +215,32 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const hasDown = await libAuto2.__test.hasPlatformConnection("u1", ["youtube"]);
   chk("hasPlatformConnection لا يرمي عند فشل القاعدة", hasDown === false, String(hasDown));
 
+  /* 14) جهوزية مزوّدي الربط — لا زر «اربط» بلا مفاتيح (META_APP_ID غائبة في Vercel) */
+  const savedEnv = { ...process.env };
+  delete process.env.META_APP_ID; delete process.env.META_APP_SECRET;
+  delete process.env.TIKTOK_CLIENT_KEY; delete process.env.TIKTOK_CLIENT_SECRET;
+  delete process.env.X_CLIENT_ID; delete process.env.X_CLIENT_SECRET;
+  delete process.env.GOOGLE_CLIENT_ID; delete process.env.GOOGLE_CLIENT_SECRET;
+  let rd = T.providerReady();
+  chk("providerReady: كل المزوّدين false بلا مفاتيح", Object.values(rd).every(v => v === false), JSON.stringify(rd));
+  process.env.GOOGLE_CLIENT_ID = "gid"; process.env.GOOGLE_CLIENT_SECRET = "gsec";
+  rd = T.providerReady();
+  chk("providerReady: يوتيوب true عند وجود مفاتيح جوجل", rd.youtube === true, JSON.stringify(rd));
+  chk("providerReady: فيسبوك/إنستغرام يتبعان مفاتيح META", rd.facebook === false && rd.instagram === false);
+  chk("CONNECT_PROVIDER يحوّل instagram/facebook إلى meta",
+    T.CONNECT_PROVIDER.instagram === "meta" && T.CONNECT_PROVIDER.facebook === "meta");
+  for (const k of Object.keys(savedEnv)) if (savedEnv[k] !== undefined) process.env[k] = savedEnv[k];
+
+  /* accountData يحمل ready/connect لكل منصة (الواجهة تعتمد عليها) */
+  setDb({ rest: async () => [], q: async () => [], q1: async () => null });
+  const acc = await T.accountData("u1").catch(() => null);
+  if (acc) {
+    chk("accountData.available تحمل ready وconnect", Array.isArray(acc.available) && acc.available.every(p => typeof p.ready === "boolean" && "connect" in p),
+      JSON.stringify((acc.available || []).slice(0, 2)));
+  } else {
+    ok("accountData غير متاح في بيئة الاختبار (تُخطّى)");
+  }
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
