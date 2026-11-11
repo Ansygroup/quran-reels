@@ -74,7 +74,7 @@ try { w.eval(bundle); } catch (e) { loadError = e; }
 
 d.dispatchEvent(new w.Event("DOMContentLoaded"));
 
-setTimeout(() => {
+setTimeout(async () => {
   chk(`كل سكربتات الصفحة محمّلة (${scripts.length})`, scripts.length >= 9 && !loadError, loadError ? String(loadError.message) : scripts.join(","));
   chk("لا استثناءات غير مُلتقطة عند الإقلاع", bootErrors.length === 0, bootErrors.join(" | "));
 
@@ -90,6 +90,22 @@ setTimeout(() => {
   chk("السنة في الفوتر تُملأ (#year)", /^\d{4}$/.test((d.getElementById("year")?.textContent || "").trim()), d.getElementById("year")?.textContent);
   chk("شريط الكوكيز موجود", Boolean(d.getElementById("cookieBar") && d.getElementById("cookieOk")));
   chk("زر الدخول ونافذته موجودان", Boolean(d.getElementById("authBtn") && d.getElementById("loginOverlay")));
+
+  /* سبب عدم بدء التصدير يُسجَّل داخل الصفحة (كان السجل يقول «غير معروف» فقط).
+   * Creator/Selection معرّفان كـ const داخل باقة السكربتات، فلا وجود لـwindow.Creator
+   * — نقرأهما عبر eval في نفس السياق. */
+  const Creator = w.Creator;
+  const Selection = w.Selection;
+  chk("Creator.lastAbortReason موجود", Boolean(Creator && typeof Creator.lastAbortReason === "string"));
+  let abortOk = false;
+  try {
+    const saved = { from: Selection.from, to: Selection.to };
+    Selection.to = Selection.from - 1; // عدّاد صفر
+    await Creator.startExport();
+    abortOk = /لم تُحدَّد آيات/.test(String(Creator.lastAbortReason || ""));
+    Selection.from = saved.from; Selection.to = saved.to;
+  } catch { abortOk = false; }
+  chk("startExport يسجّل سبب الرفض عند غياب الآيات", abortOk, String(Creator && Creator.lastAbortReason));
 
   /* الراوتر: تغيير الهاش يجب أن يبدّل العرض */
   w.location.hash = "#/tools";
