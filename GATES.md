@@ -148,3 +148,9 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `recordSelfTest` يكتب صفًا في `system_checks` (POST `/rest/v1/system_checks`) بنوع `render_selftest[_deep]` وحالة `ok` وتفاصيل مختصرة (٣ عناصر، نصوص ≤ ٣٠٠) · فشل الكتابة يعيد `false` ولا يرمي · الـAPI يعيد `recorded` · ملف الترحيل موجود وRLS مفعّل
   EXTRA: لوحة الحساب تحمل `last_check` (أحدث صف) وتُعرض كسطر «آخر فحص محفوظ»؛ ونص نتيجة الفحص يذكر «محفوظ ✓» أو «لم تُحفظ النتيجة».
   EVIDENCE: 2026-11-11 — نتيجة زر «🎬 اختبار توليد فيديو» كانت تُقرأ مرة وتضيع، فيُطلب من المستخدم لصق النص؛ الآن تُقرأ من الجدول.
+
+- [ ] G26: ربط القنوات يكتمل فعلًا (كوكي حالة OAuth يحمل الحمولة)
+  CHECK: node tests/oauth_state_test.js
+  EXPECT: كوكي `qr_<prov>_st` = `<حمولة base64url>.<HMAC>` · `readStCookie` يعيد `{n,u,r}` · التلاعب بالحمولة أو التوقيع يُرفض · بدء الربط يضبط الكوكي · العودة من جوجل تنتهي `linked=youtube` وتكتب صفًا في `social_connections` بتوكن مشفّر · كل فشل يحمل `?w=denied|no_code|state|token` والواجهة تشرحه بدل «youtube_err»
+  EVIDENCE: 2026-11-11 — كان يُخزَّن التوقيع وحده بلا الحمولة، فكان `readStCookie` يعيد `null` دائمًا ⇒ كل محاولة ربط تنتهي «لم يكتمل ربط youtube_err».
+
