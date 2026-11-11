@@ -192,7 +192,12 @@ const mkRoute = (url) => {
   const vj = JSON.parse(fs.readFileSync(path.join(ROOT, "vercel.json"), "utf8"));
   const mono = (vj.crons || []).find((c) => c.path === "/api/cron/monitor");
   chk("جدولة المراقبة صارت يومية 10:15 UTC", mono && mono.schedule === "15 10 * * *", JSON.stringify(mono));
-  chk("ميزانية المراقبة 300 ثانية (تتسع لتوليد فيديو)", vj.functions && vj.functions["/api/cron/monitor.js"] && vj.functions["/api/cron/monitor.js"].maxDuration === 300);
+  /* المفتاح يجب أن يكون نسبيًا: "/api/..." يُسقط البناء بـ[invalid_function_source] */
+  const monFn = (vj.functions || {})["api/cron/monitor.js"];
+  chk("ميزانية المراقبة 300 ثانية (تتسع لتوليد فيديو)", monFn && monFn.maxDuration === 300, JSON.stringify(monFn));
+  chk("مفتاح monitor في functions نسبي ونفس حزمة chromium",
+    !Object.keys(vj.functions || {}).some((k) => k.startsWith("/")) &&
+    monFn && /@sparticuz\/chromium/.test(String(monFn.includeFiles || "")));
 
   /* 10) catchUpDaily: لا يولّد شيئًا إن كان اليوم منشورًا أو قيد الإنشاء */
   impl.q = async (sql) => (/from autopilot where enabled/i.test(String(sql)) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
