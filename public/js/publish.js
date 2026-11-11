@@ -146,6 +146,30 @@ window.PublishApp = {
     };
     this.lastDailyLine = lastDailyLine(data.last_daily);
 
+    /* تفاصيل آخر فشل توليد: التشخيص كان يُحفظ في القاعدة ولا يراه أحد، فيبقى
+     * السبب «غير معروف» للمستخدم. هنا نعرض المرحلة ونسبة التقدّم وهل بدأ
+     * التصدير والتنبيه/سبب الإيقاف وأول أخطاء الصفحة — كلها مُهرَّبة. */
+    const diagBox = (c) => {
+      const d = c && c.kind === "render_failure" && c.detail && c.detail.diag ? c.detail.diag : null;
+      if (!d) return "";
+      const last = d.last && typeof d.last === "object" ? d.last : {};
+      const stop = d.kind === "stall" ? "توقّف بلا تقدّم" : d.kind === "timeout" ? "تجاوز المهلة" : (d.kind || "فشل");
+      const rows = [
+        ["المرحلة", `${d.stage || "غير معروفة"} (${d.pct || "0%"})`],
+        ["نوع التوقّف", stop],
+        ["بدأ التصدير؟", last.exporting === true ? "نعم" : last.exporting === false ? "لا" : "غير معروف"],
+        ["الآيات المحددة", last.count == null ? "غير معروف" : String(last.count)],
+        ["حوار مفتوح", last.dialog ? "نعم" : "لا"],
+        ["آخر تنبيه", last.toast || "—"],
+        ["سبب إيقاف الدالة", last.abort || "—"],
+      ];
+      const errs = Array.isArray(d.errors) ? d.errors.slice(0, 3).map(String) : [];
+      return `<details class="hint warn" id="acctDiag"><summary>تفاصيل آخر محاولة توليد (اضغط للعرض)</summary><ul>${
+        rows.map(([k, v]) => `<li>${esc(k)}: ${esc(v)}</li>`).join("")
+      }${errs.length ? `<li>أخطاء الصفحة: ${esc(errs.join(" | "))}</li>` : ""}</ul></details>`;
+    };
+    this.lastDiagBox = diagBox(data.last_check);
+
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
     this.available = Array.isArray(data.available) && data.available.length
       ? data.available
@@ -165,6 +189,7 @@ window.PublishApp = {
         </div>
         ${this.lastDailyLine || ""}
         ${this.lastCheckLine || ""}
+        ${this.lastDiagBox || ""}
       `;
     }
 
