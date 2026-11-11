@@ -159,3 +159,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `pickConnection` = المطلوبة ← الافتراضية ← الأحدث · `publishRow` يقرأ كل قنوات المنصة (لا `limit 1`) · `/api/gw?op=default` يصفّر افتراضية المنصة ثم يعلّم القناة (ويحترم الملكية/الطريقة) · `soc_list` يُرجع `is_default` بلا توكنات · `publish_queue.connection_id` يُحفظ ويُتحقق منه · `ensureDefault` يجعل أول قناة افتراضية بلا المساس بافتراضية موجودة · الواجهة: شارة ⭐ + «اجعلها الافتراضية» + «➕ إضافة قناة»
   EVIDENCE: 2026-11-11 — ربط قناة يوتيوب ثانية كان يحوّل هدف النشر إليها بصمت (order by updated_at desc limit 1) بلا أي اختيار.
 
+- [ ] G28: التشغيل الآلي يكمل بلا تدخّل (صوت + إعادة محاولة + تسجيل)
+  CHECK: node tests/autonomy_test.js
+  EXPECT: `installAudioRoute` يعترض `/proxy?u=` و`/api/proxy?u=` ويخدم الصوت من الخادم (200 + `audio/mpeg` + ACAO) · `fetchAudio` يقصر المضيفين على everyayah/qurango ويمنع التكرار بالكاش ويرفض الضخم والفاشل بلا استثناء · `runWithRetry` يحاول مرتين عند فشل عارض، مرة واحدة عند النجاح، ويلتزم الميزانية الزمنية · `recordDaily` يكتب `system_checks/autopilot_daily` بعدد المحاولات ولا يُفشل التشغيل · `runDailyAutopilots` يستخدم الاثنين
+  EVIDENCE: 2026-11-11 — التصدير كان يتوقف قبل البدء، وأحد أسباب ذلك أن `/proxy` يُرجع 500 لملفات mp3، وفشل يوم كامل يحتاج تدخّلًا يدويًا.
+
