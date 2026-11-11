@@ -197,5 +197,5 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 - [ ] G35: اليوم الذي يضيع يُعوَّض تلقائيًا
   CHECK: node tests/autonomy_test.js
   EXPECT: `missingDays(runs, today, lookback)` يرجع الأيام بلا نشر من الأحدث للأقدم ويتخطى أي يوم جرت محاولة تعويضه (`:backfill`) · `backfillDaily` لا يعمل قبل أن يكون اليوم منشورًا (`today-pending`) · يعوّض يومًا واحدًا بمفتاح `daily:<uid>:<day>:backfill` وبفحص نسخة قبل الرندر · `api/cron/monitor.js` يستدعي التعويض بعد ضمان اليوم فقط (`todaySettled` / `rescue-pending`)
-  EVIDENCE: 2026-11-12 — التشغيل اليومي ينتج فيديو «اليوم» فقط، فأي يوم فاشل يبقى ثقبًا دائمًا (11 نوفمبر بلا فيديو حتى بعد إصلاح المسار).
+  EVIDENCE: 2026-11-12 — التشغيل اليومي ينتج فيديو «اليوم» فقط، فأي يوم فاشل يبقى ثقبًا دائمًا (11 نوفمبر بلا فيديو حتى بعد إصلاح المسار). أثبت `tools/e2e_backfill.js` بمتصفح حقيقي أن التعويض يعيد بناء 2026-11-11 وينشره (run_key `daily:user-e2e:2026-11-11:backfill`، published 1، audioHits 3).
 
