@@ -15,8 +15,10 @@ const { catchUpDaily, backfillDaily } = require("../../lib/autopilot");
 const COMPETITORS = ["quranreels.tech", "tashghil.pro", "quranvideomaker.com"];
 
 module.exports = async (req, res) => {
+  /* فشل مغلق مثل كرون النشر: بلا CRON_SECRET لا يُسمح لأحد بإطلاق
+   * توليد فيديو (٣٠٠ ثانية + رفع) من الإنترنت. Vercel يرسل الترويسة تلقائيًا. */
   const secret = process.env.CRON_SECRET || "";
-  if (secret && (req.headers.authorization || "") !== `Bearer ${secret}`) {
+  if (!secret || (req.headers.authorization || "") !== `Bearer ${secret}`) {
     return json(res, 401, { error: "unauthorized" });
   }
   const base = (process.env.SITE_ORIGIN || "https://quran-reels-tau.vercel.app").replace(/\/+$/, "");
@@ -29,7 +31,16 @@ module.exports = async (req, res) => {
   /* 2) تعويض أقرب يوم ناقص — بشرط ألّا يكون اليوم نفسه ناقصًا أو قيد الرندر.
    * الأولوية دائمًا لليوم الحاضر: لا نحرق الميزانية على ماضٍ ونضيّع اليوم. */
   let backfill = [];
-  const todaySettled = rescue.length > 0 && rescue.every((r) => r && (r.skipped === "published" || r.skipped === "running"));
+  /* «اليوم مضبوط» تعني: منشور فعلًا أو نُشر له من ملف مخزّن — لا «قيد الرندر»
+   * (رندر جارٍ يستهلك الميزانية، والتعويض سيُرفض هناك على أي حال)
+   * ولا «أنشأنا الآن» (الميزانية استُهلكت في هذا التشغيل). */
+  const settled = (r) => Boolean(r) && (
+    r.skipped === "published" ||
+    r.skipped === "published-cached" ||
+    r.skipped === "rendered-cached" ||
+    (r.ok === true && r.resumed === true)
+  );
+  const todaySettled = rescue.length > 0 && rescue.every(settled);
   if (todaySettled) {
     try { backfill = await backfillDaily(); }
     catch (e) { backfill = [{ ok: false, error: String((e && e.message) || e).slice(0, 200) }]; }
