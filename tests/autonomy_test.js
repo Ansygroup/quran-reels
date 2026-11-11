@@ -341,6 +341,8 @@ const mkRoute = (url) => {
   const monSrc2 = fs.readFileSync(path.join(ROOT, "api", "cron", "monitor.js"), "utf8");
   chk("كرون الإنقاذ يعوّض بعد ضمان اليوم فقط",
     /backfillDaily\(\)/.test(monSrc2) && /todaySettled/.test(monSrc2) && /rescue-pending/.test(monSrc2));
+  chk("الدوال متاحة للاستخدام خارج الوحدة (كرون/محاكي)", ["backfillDaily", "catchUpDaily", "missingDays", "dayShift"].every((k) => typeof T[k] === "function"));
+  chk("نتيجة التعويض تحمل مفتاحها ويومها", /run_key: `daily:\$\{userId\}:\$\{day\}:backfill`/.test(bfSrc));
   impl.q = async () => [];
   impl.rest = async () => [];
 
