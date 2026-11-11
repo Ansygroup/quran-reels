@@ -228,7 +228,8 @@ const handler = async (req, res) => {
     /* فحص محرّك التوليد: هل يستطيع الخادم إطلاق المتصفح وفتح الصانع؟
      * (لا يُنشئ فيديو ولا ينشر) — يجيب عن «هل النشر الآلي يعمل الآن؟» */
     if (body.action === "selftest_render") {
-      const report = await renderSelfTest();
+      /* deep=true يُنتج فيديو قصيرًا فعليًا (بلا رفع أو نشر) — إثبات أن التسجيل يعمل */
+      const report = await renderSelfTest({ deep: body.deep === true });
       return json(res, report.ok ? 200 : 502, report);
     }
 

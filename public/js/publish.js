@@ -129,6 +129,7 @@ window.PublishApp = {
           <button class="btn btn-gold" id="quickGenArticle">${articleLabel}</button>
           <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
           <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
+          <button class="btn btn-ghost" id="quickRenderTest">🎬 اختبار توليد فيديو</button>
         </div>
       `;
     }
@@ -412,31 +413,56 @@ window.PublishApp = {
 
     /* فحص محرّك التوليد: يخبر المستخدم فورًا هل النشر الآلي قادر على العمل،
      * وبنص الخطأ الحقيقي (libnss3، مسار التنفيذ، زمن الإقلاع) بدل التخمين. */
-    document.getElementById("quickSelfTest")?.addEventListener("click", async (e) => {
-      const btn = e.currentTarget, notice = document.getElementById("acctNotice");
+    /* فحص المحرّك مرّتين: سريع (يقلع المتصفح ويفتح الصفحة) وعميق
+     * (يُنتج فيديو قصيرًا فعليًا بلا رفع أو نشر) — الفرق بين «يقلع» و«ينتج». */
+    const runSelfTest = async (btn, deep) => {
+      const notice = document.getElementById("acctNotice");
       const original = btn.textContent;
-      btn.disabled = true; btn.textContent = "⏳ جارٍ الفحص…";
-      if (notice) { notice.style.display = "block"; notice.textContent = "نجرّب إطلاق المتصفح على الخادم…"; }
+      btn.disabled = true;
+      btn.textContent = deep ? "⏳ جارٍ توليد فيديو تجريبي…" : "⏳ جارٍ الفحص…";
+      if (notice) {
+        notice.style.display = "block";
+        notice.style.color = "";
+        notice.textContent = deep
+          ? "نُنتج الآن فيديو قصيرًا على الخادم (آية واحدة) للتأكد أن التسجيل يعمل — قد يستغرق حتى دقيقتين."
+          : "نجرّب إطلاق المتصفح على الخادم…";
+      }
       try {
         const res = await fetch("/api/autopilot", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-          body: JSON.stringify({ action: "selftest_render" }),
+          body: JSON.stringify({ action: "selftest_render", deep }),
         });
         const data = await res.json().catch(() => ({}));
         if (notice) {
           notice.style.display = "block";
-          notice.textContent = data.ok
-            ? `✅ محرّك التوليد يعمل (Node ${data.node} · ${Math.round((data.ms || 0) / 100) / 10}ث · صفحة: ${String(data.page_title || "").slice(0, 60)})`
-            : `⚠️ محرّك التوليد لا يعمل: ${String(data.error || "سبب غير معروف").slice(0, 200)}`;
-          notice.style.color = data.ok ? "#7ee0a2" : "#ffb4a2";
+          const secs = Math.round((data.ms || 0) / 100) / 10;
+          if (data.ok && deep) {
+            const ex = data.export || {};
+            notice.textContent = ex.ok
+              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""}`
+              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${String(data.error || "").slice(0, 160)}`;
+            notice.style.color = ex.ok ? "#7ee0a2" : "#ffb4a2";
+          } else {
+            notice.textContent = data.ok
+              ? `✅ محرّك التوليد يعمل (Node ${data.node} · ${secs}ث · صفحة: ${String(data.page_title || "").slice(0, 60)})`
+              : `⚠️ محرّك التوليد لا يعمل: ${String(data.error || "سبب غير معروف").slice(0, 200)}`;
+            notice.style.color = data.ok ? "#7ee0a2" : "#ffb4a2";
+          }
         }
       } catch (error) {
-        if (notice) { notice.style.display = "block"; notice.textContent = "تعذّر تنفيذ الفحص: " + String(error?.message || error).slice(0, 120); }
+        if (notice) {
+          notice.style.display = "block";
+          notice.style.color = "#ffb4a2";
+          notice.textContent = "تعذّر تنفيذ الفحص: " + String(error?.message || error).slice(0, 120);
+        }
       } finally {
-        btn.disabled = false; btn.textContent = original;
+        btn.disabled = false;
+        btn.textContent = original;
       }
-    });
+    };
+    document.getElementById("quickSelfTest")?.addEventListener("click", (e) => runSelfTest(e.currentTarget, false));
+    document.getElementById("quickRenderTest")?.addEventListener("click", (e) => runSelfTest(e.currentTarget, true));
     
     // زر الإجراءات السريعة (توازي)
     document.getElementById("quickRunAll")?.addEventListener("click", () => document.getElementById("autoRunAll")?.click());
