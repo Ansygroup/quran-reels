@@ -25,12 +25,23 @@ module.exports = async (req, res) => {
   if (!PLATFORMS.includes(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة" });
   const now = b.publish_at ? new Date(b.publish_at) : new Date();
   if (isNaN(now.getTime())) return json(res, 400, { error: "وقت غير صالح" });
+
+  /* قناة محددة (اختياري): يجب أن تكون للمستخدم وبنفس المنصة.
+   * بلا تحديد ⇒ القناة الافتراضية، وإلا الأحدث (انظر pickConnection). */
+  let connId = null;
+  if (b.connection_id) {
+    const conn = await q1(`select id, platform from social_connections where id=$1 and user_id=$2`, [String(b.connection_id), uid]);
+    const okPlat = conn && (conn.platform === b.platform || (b.platform === "instagram" && conn.platform === "facebook"));
+    if (!okPlat) return json(res, 400, { error: "قناة غير مرتبطة بهذه المنصة" });
+    connId = conn.id;
+  }
+
   const row = await q1(
-    `insert into publish_queue (user_id, platform, video_path, video_name, title, caption, hashtags, status, publish_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+    `insert into publish_queue (user_id, platform, video_path, video_name, title, caption, hashtags, status, publish_at, connection_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
     [uid, b.platform, b.video_path.replace(/^\/+/, ""), String(b.video_name || "").slice(0, 120),
       String(b.title || "ريلز قرآن").slice(0, 120), String(b.caption || "").slice(0, 4000),
-      String(b.hashtags || "").slice(0, 500), b.now ? "scheduled" : "scheduled", now.toISOString()]
+      String(b.hashtags || "").slice(0, 500), b.now ? "scheduled" : "scheduled", now.toISOString(), connId]
   );
   if (b.now || now.getTime() <= Date.now()) {
     const out = await publishRow(row);

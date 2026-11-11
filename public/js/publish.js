@@ -254,12 +254,20 @@ window.PublishApp = {
       const head = `<b style="min-width:96px">${p.name}</b>`;
       const expired = (c) => Boolean(c.expires_at && Number(c.expires_at) < Date.now());
       if (mine.length) {
+        /* كل قناة في سطرها: الشارة «⭐ افتراضية» أو زر تعيينها، + إضافة قناة أخرى.
+         * (قبل ذلك كان النشر يذهب دائمًا لأحدث قناة بلا أي اختيار ظاهر) */
+        const chan = (c) => `<span class="soc-chan" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
+          <span style="color:${expired(c) ? "#ffcf8b" : "#7ee0a2"}">${expired(c) ? "⚠️" : "✅"} ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
+          ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost" data-default="${c.id}">⭐ اجعلها الافتراضية</button>`}
+          ${expired(c) ? '<small class="hint">انتهت صلاحية الجلسة — أعد الربط لتُنشر الفيديوهات</small>' : ""}
+          <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>
+          ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">🔄 إعادة الربط</button>` : ""}
+        </span>`;
         return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${head}
-          ${mine.map((c) => `<span style="color:${expired(c) ? "#ffcf8b" : "#7ee0a2"}">${expired(c) ? "⚠️" : "✅"} ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
-            ${expired(c) ? '<small class="hint">انتهت صلاحية الجلسة — أعد الربط لتُنشر الفيديوهات</small>' : ""}
-            <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>
-            ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">🔄 إعادة الربط</button>` : ""}`).join("")}
+          ${mine.map(chan).join("")}
+          ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">➕ إضافة قناة</button>` : ""}
+          <small class="hint">يُنشر على القناة الافتراضية (⭐). أضف قناة ثانية بتسجيل الدخول بحساب جوجل الذي يملكها.</small>
         </div>`;
       }
       if (!prov) {
@@ -341,6 +349,27 @@ window.PublishApp = {
         btnC.disabled = true;
         btnC.textContent = "⏳ جارٍ التحويل…";
         window.location.href = url; // الخادم يحوّل بدوره إلى المزوّد (302)
+        return;
+      }
+      const btnDef = e.target.closest("[data-default]");
+      if (btnDef) {
+        const id = btnDef.dataset.default;
+        if (!id) return;
+        btnDef.disabled = true;
+        try {
+          const res = await fetch("/api/gw?op=default", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+            body: JSON.stringify({ id }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "تعذّر تعيين القناة");
+          if (typeof toast === "function") toast("⭐ صارت القناة الافتراضية للنشر");
+          await this.renderConnections(await window.AuthApp.getToken());
+        } catch (error) {
+          if (typeof toast === "function") toast(String(error?.message || error).slice(0, 120), "err");
+          btnDef.disabled = false;
+        }
         return;
       }
       if (btnD) {
