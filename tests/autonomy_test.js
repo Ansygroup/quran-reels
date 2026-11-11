@@ -407,6 +407,26 @@ const mkRoute = (url) => {
   pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id });
   pub.calls.length = 0;
 
+  /* 14c) تشغيل أساسي قُتل وترك صفّه rendering ⇒ الإنقاذ ينظّفه ولا يتخطاه */
+  const sqlSeen = [];
+  impl.q = async (sql, params) => {
+    const s2 = String(sql);
+    sqlSeen.push({ sql: s2, params });
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  await T.catchUpDaily();
+  const stale = sqlSeen.find((c) => /update autopilot_runs set status='failed'/.test(c.sql));
+  chk("الإنقاذ يغلق التشغيلات العالقة قبل الحكم عليها",
+    Boolean(stale) && JSON.stringify(stale.params) === JSON.stringify(["أُغلقت تلقائيًا: تجاوزت المهلة بلا نتيجة (تنظيف تلقائي)", "20"]),
+    stale ? JSON.stringify(stale.params) : "لم يُستدعَ closeStaleRuns");
+  /* والصفّ العالق فعليًا لا يُقرأ «جارٍ» بعد التنظيف: نتحقق من الترتيب في المصدر */
+  const cuSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const catchUpBody = cuSrc.slice(cuSrc.indexOf("async function catchUpDaily"), cuSrc.indexOf("async function backfillDaily"));
+  chk("التنظيف يسبق قراءة صفوف اليوم في الإنقاذ",
+    catchUpBody.indexOf("closeStaleRuns(20)") > -1 && catchUpBody.indexOf("closeStaleRuns(20)") < catchUpBody.indexOf("select=id,status,run_key"));
+
   /* 15) منع النشر المكرر: صفّ منشور في القائمة يتقدّم على حالة التشغيل */
   impl.q = async (sql) => {
     const s2 = String(sql);
