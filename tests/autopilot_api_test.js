@@ -320,6 +320,34 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("probeAudio لا يرمي عند فشل الشبكة", paErr.ok === false && /ECONNREFUSED/.test(paErr.error || ""), JSON.stringify(paErr));
   global.fetch = realFetch;
 
+  /* 18) لماذا لم يبدأ التصدير؟ + حوارات متأخرة (تشغيل 2026-11-11 14:22) */
+  const libSrc5 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderRecipe يستخدم acceptDialogs بدل نقرة واحدة",
+    /await acceptDialogs\(page, 20000\)/.test(libSrc5) && !/waitForTimeout\(900\);\s*\n\s*await page\.locator\("\.overlay/.test(libSrc5));
+  chk("waitForExport يقرأ exporting/dialog/toast/count", /exporting: Boolean\(window\.Creator/.test(libSrc5) && /dialog: Boolean\(document\.querySelector\("\.overlay \[data-ok\]"\)\)/.test(libSrc5) && /toast:/.test(libSrc5));
+  chk("assertExportStarted مُصدَّرة", typeof libAuto2.__test.assertExportStarted === "function");
+
+  // رفض صريح برسالة توست
+  const pToast = { evaluate: async () => ({ exporting: false, running: false, toast: "اختر الآيات أولًا", count: 3 }) };
+  let eToast = null; try { await libAuto2.__test.assertExportStarted(pToast); } catch (e) { eToast = e; }
+  chk("يشرح رفض المولّد بنص التوست", Boolean(eToast && /اختر الآيات أولًا/.test(eToast.message)), eToast && eToast.message.slice(0, 80));
+
+  // اختيار فارغ
+  const pEmpty = { evaluate: async () => ({ exporting: false, running: false, toast: "", count: 0 }) };
+  let eEmpty = null; try { await libAuto2.__test.assertExportStarted(pEmpty); } catch (e) { eEmpty = e; }
+  chk("يشرح اختيار الآيات الفارغ", Boolean(eEmpty && /count=0/.test(eEmpty.message)), eEmpty && eEmpty.message.slice(0, 80));
+
+  // بدأ فعلًا → لا يرمي
+  let startedErr = null;
+  try { await libAuto2.__test.assertExportStarted({ evaluate: async () => ({ exporting: true, running: true, toast: "", count: 3 }) }); } catch (e) { startedErr = e; }
+  chk("لا يرمي حين يبدأ التصدير فعلًا", startedErr === null, startedErr && startedErr.message);
+
+  // حوار متأخر: acceptDialogs يضغطه حين يظهر في المحاولة الثالثة
+  let calls = 0;
+  const pDialog = { evaluate: async () => { calls++; return calls >= 3; }, waitForTimeout: async () => {} };
+  const clicked = await libAuto2.__test.acceptDialogs(pDialog, 8000);
+  chk("acceptDialogs يلتقط الحوار المتأخر", clicked === true && calls >= 3, `clicked=${clicked} calls=${calls}`);
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
