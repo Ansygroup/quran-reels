@@ -33,6 +33,15 @@ Module._load = function (request) {
   if (Object.prototype.hasOwnProperty.call(STUBS, request)) return STUBS[request];
   return origLoad.apply(this, arguments);
 };
+const pubPath = require.resolve(path.join(ROOT, "lib", "publish.js"));
+const pub = { calls: [], results: [], impl: async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id }) };
+require.cache[pubPath] = {
+  id: pubPath, filename: pubPath, loaded: true,
+  exports: {
+    publishRow: async (row, platform) => { pub.calls.push({ id: row.id, platform: platform || row.platform }); return pub.impl(row, platform); },
+    videoUrl: () => "", pickConnection: () => null, __test: { pickConnection: () => null },
+  },
+};
 const dbPath = require.resolve(path.join(ROOT, "lib", "db.js"));
 const dbCalls = [];
 const impl = {
@@ -345,6 +354,53 @@ const mkRoute = (url) => {
   chk("نتيجة التعويض تحمل مفتاحها ويومها", /run_key: `daily:\$\{userId\}:\$\{day\}:backfill`/.test(bfSrc));
   impl.q = async () => [];
   impl.rest = async () => [];
+
+  /* 14) إن فشل النشر فقط: نعيد النشر بلا إعادة توليد (ولا منشور مكرر) */
+  const queueRow = (id, platform) => ({ id, platform, connection_id: null, video_path: `u1/autopilot/2026-11-12-run1.mp4`, video_name: "x.mp4", title: "t", caption: "c", hashtags: "", status: "failed" });
+  const sqlCalls = [];
+  impl.q = async (sql) => {
+    const s2 = String(sql);
+    sqlCalls.push(s2);
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    if (/from publish_queue/i.test(s2)) return [queueRow("q1", "youtube")];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  pub.calls.length = 0; dbCalls.length = 0;
+  pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id });
+  const cResume = await T.catchUpDaily();
+  chk("فشل النشر فقط ⇒ إعادة نشر بلا إعادة توليد",
+    cResume.length === 1 && cResume[0].ok === true && cResume[0].skipped === "rendered-cached" && cResume[0].resumed === true,
+    JSON.stringify(cResume).slice(0, 240));
+  chk("إعادة النشر تستخدم صفّ القائمة نفسه", pub.calls.length === 1 && pub.calls[0].id === "q1");
+  chk("التشغيل يُصحَّح إلى published بالرابط",
+    sqlCalls.some((q) => /update autopilot_runs set status='published'/.test(String(q))));
+
+  /* فشل جزئي: منصة نجحت وأخرى لا ⇒ لا إعادة توليد (كي لا يتكرر المنشور) */
+  impl.q = async (sql) => (/from publish_queue/i.test(sql) ? [queueRow("q1", "youtube"), queueRow("q2", "tiktok")] : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }] : []));
+  pub.calls.length = 0;
+  let pubSeq = 0;
+  pub.impl = async (row) => (++pubSeq === 1 ? { ok: true, url: "https://youtu.be/ok" } : { ok: false, error: "token" });
+  const cPartial = await T.catchUpDaily();
+  chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "partial-publish" && cPartial[0].ok === false, JSON.stringify(cPartial).slice(0, 240));
+
+  /* فشل النشر كله ⇒ لا شيء منشور، فيجوز إعادة التوليد الكاملة */
+  impl.q = async (sql) => (/from publish_queue/i.test(sql) ? [queueRow("q1", "youtube")] : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []));
+  pub.calls.length = 0;
+  pub.impl = async () => ({ ok: false, error: "token" });
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button>' });
+  const cFull = await T.catchUpDaily();
+  chk("فشل النشر كله ⇒ يكمل لإعادة التوليد", cFull.length === 1 && cFull[0].catchup === true && pub.calls.length === 1, JSON.stringify(cFull).slice(0, 240));
+
+  /* لا صفوف فاشلة ⇒ لا استدعاء للنشر */
+  impl.q = async (sql) => (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
+  pub.calls.length = 0;
+  await T.catchUpDaily();
+  chk("بلا صفوف فاشلة ⇒ لا نداء نشر", pub.calls.length === 0);
+  impl.q = async () => [];
+  impl.rest = async () => [];
+  pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id });
+  pub.calls.length = 0;
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
