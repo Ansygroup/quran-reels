@@ -154,3 +154,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: كوكي `qr_<prov>_st` = `<حمولة base64url>.<HMAC>` · `readStCookie` يعيد `{n,u,r}` · التلاعب بالحمولة أو التوقيع يُرفض · بدء الربط يضبط الكوكي · العودة من جوجل تنتهي `linked=youtube` وتكتب صفًا في `social_connections` بتوكن مشفّر · كل فشل يحمل `?w=denied|no_code|state|token` والواجهة تشرحه بدل «youtube_err»
   EVIDENCE: 2026-11-11 — كان يُخزَّن التوقيع وحده بلا الحمولة، فكان `readStCookie` يعيد `null` دائمًا ⇒ كل محاولة ربط تنتهي «لم يكتمل ربط youtube_err».
 
+- [ ] G27: أكثر من قناة للمنصة الواحدة (قناة افتراضية + توجيه المهمة)
+  CHECK: node tests/multichannel_test.js
+  EXPECT: `pickConnection` = المطلوبة ← الافتراضية ← الأحدث · `publishRow` يقرأ كل قنوات المنصة (لا `limit 1`) · `/api/gw?op=default` يصفّر افتراضية المنصة ثم يعلّم القناة (ويحترم الملكية/الطريقة) · `soc_list` يُرجع `is_default` بلا توكنات · `publish_queue.connection_id` يُحفظ ويُتحقق منه · `ensureDefault` يجعل أول قناة افتراضية بلا المساس بافتراضية موجودة · الواجهة: شارة ⭐ + «اجعلها الافتراضية» + «➕ إضافة قناة»
+  EVIDENCE: 2026-11-11 — ربط قناة يوتيوب ثانية كان يحوّل هدف النشر إليها بصمت (order by updated_at desc limit 1) بلا أي اختيار.
+
