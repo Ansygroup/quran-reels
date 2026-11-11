@@ -53,6 +53,18 @@ const ACCOUNT = {
   articles: { count: 500 },
   /* آخر تشغيل آلي: فاشل بسبب نص يحوي وسمًا — يختبر العرض والتهريب معًا */
   last_daily: { run_date: "2026-11-11", status: "failed", error: "توقّف عند «تحضير التلاوة» <b>x</b>", external_url: null },
+  /* آخر فحص محفوظ: فشل توليد كامل التشخيص — يختبر العرض + التهريب */
+  last_check: {
+    kind: "render_failure", ok: false, created_at: "2026-11-11T04:20:00Z",
+    detail: {
+      error: "توليد الفيديو توقّف عند «<b>تحضير التلاوة</b>» (0%)",
+      diag: {
+        kind: "stall", stage: "<i>تحضير التلاوة</i>", pct: "0%",
+        last: { exporting: false, running: false, count: 0, dialog: false, toast: "حدّد آية أولًا", abort: "" },
+        errors: ["console: TypeError <script>", "pageerror: x"],
+      },
+    },
+  },
 };
 
 const dom = new JSDOM(html, { url: "https://quran-reels.test/#/account", runScripts: "outside-only", pretendToBeVisual: true });
@@ -205,6 +217,25 @@ window.fetch = async (url, opts = {}) => {
 
   if (consoleErrors.length) fail("أخطاء console غير متوقعة: " + consoleErrors.slice(0, 3).join(" | "));
   else ok("لا أخطاء console");
+
+  /* ---- تفاصيل آخر فشل توليد: تُعرض في اللوحة بدل أن تبقى في القاعدة ---- */
+  window.PublishApp.renderAccount({ ...ACCOUNT });
+  const check = d.getElementById("acctLastCheck");
+  const diag = d.getElementById("acctDiag");
+  if (!check || !/فاشل/.test(check.textContent)) fail("سطر آخر فحص محفوظ لا يبيّن الفشل");
+  else if (!diag) fail("تفاصيل فشل التوليد غير معروضة في اللوحة");
+  else {
+    const txt = diag.textContent || "";
+    const want = ["توقّف بلا تقدّم", "بدأ التصدير؟: لا", "الآيات المحددة: 0", "حدّد آية أولًا", "TypeError"];
+    const missing = want.filter((w) => !txt.includes(w));
+    if (missing.length) fail("تفاصيل التشخيص ناقصة: " + missing.join(", "));
+    else if (diag.querySelector("b, i, script")) fail("تفاصيل التشخيص لم تُهرَّب (وسم من الخادم)");
+    else ok("تفاصيل آخر فشل توليد تُعرض كاملة ومُهرَّبة");
+  }
+  // بلا فشل توليد: لا صندوق تفاصيل فارغ
+  window.PublishApp.renderAccount({ ...ACCOUNT, last_check: { kind: "render_selftest_deep", ok: true, created_at: "2026-11-11T05:00:00Z", detail: {} } });
+  if (d.getElementById("acctDiag")) fail("صندوق تفاصيل يظهر مع فحص ناجح");
+  else ok("لا صندوق تفاصيل مع فحص ناجح");
 
   // ---- سطر التشغيل الآلي: حالة «منشور» + الرابط (آخر خطوة حتى لا تُفقد مستمعات الحفظ) ----
   window.PublishApp.renderAccount({ ...ACCOUNT, last_daily: { run_date: "2026-11-11", status: "published", external_url: "https://youtu.be/ok" } });
