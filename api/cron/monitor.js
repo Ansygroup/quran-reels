@@ -1,9 +1,14 @@
-/* مراقبة أسبوعية (Vercel Cron — الاثنين 06:30 UTC) — كمل#14
- * ذاتي (sitemap + كل الروابط + robots/llms) + عدّ مداخل منافسين.
- * الـdiff الكامل والتقرير اليومي في السكربت المحلي: npm run monitor
+/* مراقبة + شبكة أمان يومية (Vercel Cron — 10:15 UTC = 13:15 القاهرة)
+ * ------------------------------------------------------------
+ * الخطة تسمح بكرون واحد للنشر يوميًا (04:15 UTC)، فأي فشل مزدوج يعني
+ * يومًا بلا فيديو. هنا — إن غاب تشغيل اليوم أو فشل — نُشغّل محاولة إنقاذ
+ * واحدة (catchUpDaily) بلا أي تدخّل بشري.
+ * فحص الموقع الكامل (sitemap + كل الروابط + robots/llms + المنافسون)
+ * يبقى أيام الاثنين فقط لتوفير الوقت، أو عند ?full=1.
  */
 const { json } = require("../../lib/oauth");
 const { checkOwn, sitemapCount } = require("../../lib/monitor");
+const { catchUpDaily } = require("../../lib/autopilot");
 
 const COMPETITORS = ["quranreels.tech", "tashghil.pro", "quranvideomaker.com"];
 
@@ -13,6 +18,17 @@ module.exports = async (req, res) => {
     return json(res, 401, { error: "unauthorized" });
   }
   const base = (process.env.SITE_ORIGIN || "https://quran-reels-tau.vercel.app").replace(/\/+$/, "");
+
+  /* 1) شبكة الأمان أولًا: إن لم يُنشر اليوم شيء نُنشئ وننشر الآن */
+  let rescue = [];
+  try { rescue = await catchUpDaily(); }
+  catch (e) { rescue = [{ ok: false, error: String((e && e.message) || e).slice(0, 200) }]; }
+
+  const url = new URL(req.url || "/", "http://local");
+  const full = url.searchParams.get("full") === "1" || new Date().getUTCDay() === 1;
+  if (!full) {
+    return json(res, 200, { ok: true, day: "rescue-only", rescue, at: new Date().toISOString() });
+  }
 
   const own = await checkOwn(base, { limit: 10 });
 
@@ -31,6 +47,7 @@ module.exports = async (req, res) => {
   json(res, ok ? 200 : 503, {
     ok,
     base,
+    rescue,
     at: new Date().toISOString(),
     sitemap: own.sitemap,
     checked: own.urls ? own.urls.total : 0,

@@ -263,7 +263,7 @@
     },
     {
       "path": "/api/cron/monitor",
-      "schedule": "30 6 * * 1"
+      "schedule": "15 10 * * *"
     }
   ],
   "functions": {
@@ -281,7 +281,8 @@
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
     },
     "api/cron/monitor.js": {
-      "maxDuration": 120
+      "maxDuration": 300,
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
     },
     "api/oauth/callback.js": {
       "maxDuration": 30
