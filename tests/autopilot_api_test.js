@@ -299,6 +299,27 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("renderSelfTest({deep:true}) يعيد تقريرًا يحمل العلم", Boolean(deepReport) && deepReport.deep === true && typeof deepReport.ok === "boolean",
     JSON.stringify(deepReport).slice(0, 120));
 
+  /* 17) فحص التلاوة: مباشر وعبر الوسيط (فرضية تعليق «تحضير التلاوة») */
+  const realFetch = global.fetch;
+  const libSrc4 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderSelfTest يفحص التلاوة مباشرة وعبر /api/proxy",
+    /report\.audio_direct = await probeAudio\(\)/.test(libSrc4) && /report\.audio_proxy = await probeAudioViaProxy\(\)/.test(libSrc4));
+  chk("يسجّل أخطاء الصفحة والطلبات الفاشلة",
+    /requestfailed/.test(libSrc4) && /report\.failed_requests/.test(libSrc4));
+  chk("audioUrlFor يبني صيغة everyayah الصحيحة",
+    libAuto2.__test.audioUrlFor("Alafasy_128kbps", 108, 1) === "https://everyayah.com/data/Alafasy_128kbps/108001.mp3",
+    libAuto2.__test.audioUrlFor("Alafasy_128kbps", 108, 1));
+
+  global.fetch = async () => ({ ok: true, status: 206, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new ArrayBuffer(2048), text: async () => "" });
+  const pa = await libAuto2.__test.probeAudio();
+  chk("probeAudio يعيد ok/status/bytes", pa.ok === true && pa.status === 206 && pa.bytes === 2048, JSON.stringify(pa));
+  const pv = await libAuto2.__test.probeAudioViaProxy();
+  chk("probeAudioViaProxy يقرأ عبر /api/proxy", pv.ok === true && /\/api\/proxy\?u=/.test(libSrc4), JSON.stringify(pv));
+  global.fetch = async () => { throw new Error("ECONNREFUSED"); };
+  const paErr = await libAuto2.__test.probeAudio();
+  chk("probeAudio لا يرمي عند فشل الشبكة", paErr.ok === false && /ECONNREFUSED/.test(paErr.error || ""), JSON.stringify(paErr));
+  global.fetch = realFetch;
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
