@@ -124,11 +124,50 @@ if (cfg) {
     ok("rewrite /api/app-config → /api/ip?mode=config موجود");
   }
 
-  /* كل دالة مذكورة في functions يجب أن يكون ملفها موجودًا */
-  for (const key of Object.keys(cfg.functions || {})) {
+  /* كل دالة مذكورة في functions يجب أن يكون ملفها موجودًا، والمفتاح نسبي بلا شرطة بادئة.
+   * حدث فعلًا (2026-11-12): مفتاح "/api/cron/monitor.js" أسقط البناء كله بـ
+   * [invalid_function_source] — «The path must be relative to your project root and
+   * therefore cannot start with a slash» — فبقي الموقع على النسخة القديمة.
+   */
+  const fnKeys = Object.keys(cfg.functions || {});
+  for (const key of fnKeys) {
+    if (key.startsWith("/")) {
+      fail(`functions مفتاحه يبدأ بشرطة: "${key}" — Vercel يرفض البناء (invalid_function_source). اكتبه نسبيًا: "${key.replace(/^\/+/, "")}"`);
+      continue;
+    }
     if (!fs.existsSync(path.join(ROOT, key))) fail(`functions يشير إلى ملف غير موجود: ${key}`);
   }
-  ok(`فحص functions: ${Object.keys(cfg.functions || {}).length} مدخلًا`);
+  /* ازدواج المفتاح بشكلين (نسبي/مطلق) يعني أن أحدهما يُتجاهل بصمت */
+  const seen = new Set();
+  for (const key of fnKeys) {
+    const norm = key.replace(/^\/+/, "");
+    if (seen.has(norm)) fail(`functions يعرّف نفس الدالة مرتين: ${norm}`);
+    seen.add(norm);
+  }
+  /* Hobby: أقصى مدة 300 ثانية، وأي دالة تشغّل المتصفح تحتاج الميزانية كاملة */
+  const RENDERS = ["api/cron/publish.js", "api/cron/monitor.js", "api/autopilot.js"];
+  for (const key of fnKeys) {
+    const d = Number((cfg.functions[key] || {}).maxDuration || 0);
+    if (d > 300) fail(`functions["${key}"].maxDuration = ${d} > 300 — خطة Hobby ترفض أكثر من 300 ثانية`);
+    if (RENDERS.includes(key) && d < 300) fail(`functions["${key}"].maxDuration = ${d} < 300 — هذه الدالة تولّد فيديو بالمتصفح وتحتاج الميزانية كاملة`);
+  }
+  ok(`فحص functions: ${fnKeys.length} مدخلًا (مفاتيح نسبية، بلا تكرار، ≤ 300 ثانية)`);
+
+  /* الإنقاذ اليومي: مجدول المراقبة يعمل يوميًا ويستدعي catchUpDaily قبل أي شيء */
+  const monCron = (cfg.crons || []).find((c) => String(c.path).startsWith("/api/cron/monitor"));
+  if (!monCron) {
+    fail("مجدول /api/cron/monitor مفقود — بدونه لا توجد شبكة أمان لليوم الفاشل");
+  } else if (/^\S+\s+\S+\s+\*\s+\*\s+\*$/.test(String(monCron.schedule).trim()) === false) {
+    fail(`cron المراقبة "${monCron.schedule}" ليس يوميًا — الإنقاذ لا يعمل كل يوم`);
+  } else {
+    ok("مجدول المراقبة/الإنقاذ يومي ✓");
+  }
+  const monFile = path.join(ROOT, "api/cron/monitor.js");
+  if (fs.existsSync(monFile)) {
+    const src = fs.readFileSync(monFile, "utf8");
+    if (!/catchUpDaily/.test(src)) fail("api/cron/monitor.js لا يستدعي catchUpDaily — اليوم الفاشل يبقى بلا فيديو");
+    else ok("api/cron/monitor.js يستدعي catchUpDaily ✓");
+  }
 
   /* كل rewrite إلى /api/... يجب أن يصل إلى دالة موجودة */
   for (const r of rewrites) {
