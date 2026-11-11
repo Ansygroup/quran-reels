@@ -325,6 +325,41 @@
     </div>
   </section>
 
+  <!-- نافذة تصدير الفيديو.
+       كانت هذه الكتلة مفقودة من الماركب، و startExport يفتح #exportOverlay أولًا،
+       فكان يرمي «Cannot set properties of null» ويتوقف التوليد عند 0% بلا سبب ظاهر.
+       كل المعرّفات هنا مطلوبة في public/js/creator.js (يحرسها tests/markup_ids_test.js). -->
+  <div class="overlay" id="exportOverlay" hidden>
+    <div class="modal">
+      <div id="expRunning">
+        <div class="export-visual"><canvas id="miniCanvas" width="270" height="480"></canvas></div>
+        <h3>جارٍ إنشاء الفيديو…</h3>
+        <div class="pct-big" id="expPct">0%</div>
+        <div class="progress"><i id="expBar"></i></div>
+        <p id="expStage">جارٍ تحضير التلاوة…</p>
+        <p class="hint" id="expSub">اترك الصفحة مفتوحة حتى يكتمل الفيديو</p>
+        <div class="result-actions">
+          <button class="btn btn-ghost" id="btnCancelExport">⏹ إيقاف الإنشاء</button>
+        </div>
+      </div>
+      <div id="expResult" hidden>
+        <h3>تم إنشاء الفيديو ✨</h3>
+        <div class="export-visual"><video id="resultVideo" playsinline controls preload="metadata" style="width:100%;height:100%;display:block;background:#000"></video></div>
+        <p id="resultMeta"></p>
+        <div class="switch-row" style="margin-top:6px">
+          <div class="t">إشعار عند اكتمال التحميل<small>إن كان مسموحًا في المتصفح</small></div>
+          <label class="switch"><input type="checkbox" id="chkNotify"><i></i></label>
+        </div>
+        <div class="result-actions">
+          <a class="btn btn-gold" id="btnDownload" download>⬇ تحميل الفيديو</a>
+          <button class="btn btn-ghost" id="btnShare">📲 مشاركة</button>
+          <button class="btn btn-em" id="btnSchedule">🗓 جدولة للنشر</button>
+          <button class="btn btn-ghost" id="btnNew">✨ فيديو جديد</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- آية اليوم -->
   <section class="section" style="padding-top:10px">
     <div class="container">
@@ -380,7 +415,7 @@
     <div class="container">
       <div class="section-head">
         <div class="eyebrow">تعلّم وانشر</div>
-        <h2>مكتبة المقالات: 20,000 دليل عملي</h2>
+        <h2>مكتبة المقالات: 7,993 دليل عملي</h2>
         <p>أدلة مجانية عن صناعة المقاطع القرآنية والصلاة والحفظ والأذكار والمواسم والأسرة والنشر — اختر محورك أو ابحث مباشرة</p>
       </div>
       <div class="lib-grid">
@@ -456,7 +491,7 @@
       </div>
       <div class="tools-search"><input class="input" id="toolsSearch" placeholder="ابحث عن أداة… (صلاة، زكاة، أذكار…)"></div>
       <div class="tools-grid" id="toolsGridAll"></div>
-      <div class="tools-more"><a class="btn btn-em" href="/articles/">📚 مكتبة المقالات — 20,000 دليل عملي ←</a></div>
+      <div class="tools-more"><a class="btn btn-em" href="/articles/">📚 مكتبة المقالات — 7,993 دليل عملي ←</a></div>
       <div class="center muted" id="toolsEmpty" hidden style="margin-top:20px">لا توجد أداة بهذا الاسم — جرّب كلمة أخرى</div>
     </div>
   </section>
@@ -486,75 +521,74 @@
     </div>
   </section>
 </div>
-
-<!-- ================= حسابي والنشر ================= -->
+<!-- ================= حسابي والنشر التلقائي ================= -->
 <div class="view" id="view-account" hidden>
   <section class="section container" style="max-width:900px">
-    <div class="acct-head">
-      <h1>حسابي والنشر التلقائي 🤖</h1>
-      <p class="lead">سجّل مرة واحدة — اربط قنواتك بضغطة، ودع الموقع يكتب البوست وينشر ريلزك مجدولًا وتلقائيًا. بدون أي إعداد يدوي منك.</p>
+    <div class="section-head">
+      <div class="eyebrow">حسابي والنشر التلقائي</div>
+      <h1>إدارة الحساب والجدولة</h1>
+      <p class="hint">اربط القنوات، جدولة النشر، والأتمتة اليومية (06:15 القاهرة)</p>
     </div>
-    <div id="acctNotice" class="card notice-card" hidden></div>
-    <div id="acctAuth"></div>
 
-    <div id="acctStats" class="card" style="margin-top:16px" hidden></div>
-
-    <div id="acctHowTo" class="card" style="margin-top:16px">
-      <h2>📖 كيف يعمل النشر التلقائي؟</h2>
-      <div class="howto-steps">
-        <div class="howto-step">
-          <span class="howto-num">١</span>
-          <div>
-            <b>أنشئ ريلك</b>
-            <p>اذهب للصانع واختر الآيات والقارئ — سيتم إنشاء الفيديو فورًا</p>
-          </div>
-        </div>
-        <div class="howto-step">
-          <span class="howto-num">٢</span>
-          <div>
-            <b>اضغط «جدولة للنشر»</b>
-            <p>بعد إنشاء الفيديو، اضغط زر الجدولة واختر المنصة والوقت</p>
-          </div>
-        </div>
-        <div class="howto-step">
-          <span class="howto-num">٣</span>
-          <div>
-            <b>اربط منصاتك</b>
-            <p>وافق على الصلاحيات مرة واحدة — وسيقع النشر تلقائيًا</p>
-          </div>
-        </div>
-        <div class="howto-step">
-          <span class="howto-num">٤</span>
-          <div>
-            <b>فعّل الأتمتة (اختياري)</b>
-            <p>اجعل الموقع ينشر ريلز قرآني يوميًا تلقائيًا من اختيارك</p>
-          </div>
-        </div>
+    <!-- بطاقة الإجراءات السريعة (تعدد القنوات والتوازي والمقالات) -->
+    <div id="acctQuickActions" class="card" style="margin-top:16px" hidden>
+      <h2>⚡ إجراءات سريعة</h2>
+      <div class="row gap-lg">
+        <button class="btn btn-gold" id="quickGenArticle">توليد من مقال</button>
+        <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
       </div>
     </div>
 
-    <div class="plans-row">
-      <div class="plan-card"><b>مجاني</b><span class="price">٠</span><ul><li>إنشاء بلا حدود</li><li>حفظ وجدولة النشر</li><li>ربط منصة واحدة</li></ul></div>
-      <div class="plan-card hot"><b>برو</b><span class="price">قريبًا</span><ul><li>كل المجاني</li><li>5 منصات معًا</li><li>أولوية نشر</li></ul></div>
-      <div class="plan-card"><b>مدى الحياة</b><span class="price">قريبًا</span><ul><li>دفعة واحدة</li><li>أتمتة أبدية</li><li>تحديثات دائمة</li></ul></div>
-    </div>
-
-    <div id="acctQuickActions" class="card" style="margin-top:16px" hidden></div>
-
+    <!-- بطاقة الربط (تعدد القنوات) -->
     <div class="card" style="margin-top:18px">
       <h2>🔗 ربط المنصات</h2>
-      <p class="hint">اضغط «اربط» ووافق مرة واحدة — بعدها ينشر الموقع نيابةً عنك. التوكنات مشفّرة ولا تظهر لأحد (حتى لك).</p>
-      <div class="chan-grid" id="acctChannels"></div>
+      <div class="row gap-md" id="acctPlatforms">
+        <!-- سيتم ملؤها بواسطة JavaScript (PLATFORMS: يوتيوب، فيسبوك، إنستغرام، تيك توك، X، لينكد إن، تيليجرام، واتساب) -->
+      </div>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <div class="auto-head"><h2>🗓️ جدول النشر</h2>
-        <button class="btn btn-gold btn-sm" id="btnNewSched">+ مهمة جديدة (ملف)</button></div>
-      <input type="file" id="schedFile" accept="video/mp4,video/webm,video/*" hidden>
-      <div id="acctQueue" class="qlist"></div>
+    <!-- بطاقة الحسابات المرتبطة فعليًا (OAuth) — كانت غير موجودة: لا زر «اربط» في أي صفحة -->
+    <div class="card" id="acctAccounts" style="margin-top:18px" hidden>
+      <h2>🔐 الحسابات المرتبطة</h2>
+      <p class="hint">ربط رسمي عبر OAuth — لا نرى كلمة مرورك، والتوكنات مشفّرة على الخادم، ويمكنك فك الربط في أي وقت.</p>
+      <div id="acctAccountsList" class="col" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
 
-    <div class="card" style="margin-top:16px" id="acctAuto"></div>
+    <!-- جدول النشر -->
+    <div id="acctQueue" class="card" style="margin-top:18px">
+      <h2>📅 جدول النشر</h2>
+      <div class="row gap-lg">
+        <div class="f-group" style="flex:1"><label>العنوان</label><input id="schedTitle" maxlength="120" style="width:100%" placeholder="عنوان الفيديو أو المقال"></div>
+        <div class="f-group" style="flex:1"><label>الوقت</label><input type="time" id="schedTime" style="width:100%"></div>
+        <div class="f-group" style="flex:1"><label>المنصات</label>
+          <div class="row gap-sm wrap" id="schedPlatforms">
+            <!-- سيتم ملؤها بواسطة JavaScript -->
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-gold" style="margin-top:12px" id="schedSave">جدولة النشر</button>
+      <div id="queueList" class="auto-runs" style="margin-top:20px"></div>
+    </div>
+
+    <!-- لوحة الأتمتة (تعدد القنوات والتوازي والمقالات) -->
+    <div id="acctAuto" class="card" style="margin-top:18px">
+      <!-- سيتم ملؤها بواسطة JavaScript -->
+    </div>
+
+    <!-- بطاقة المقال (العدد الحقيقي يأتي من الخادم) -->
+    <div id="acctArticles" class="card" style="margin-top:18px;display:none">
+      <h2>📚 مكتبة المقالات</h2>
+      <div class="row gap-lg" id="articleCards">
+        <!-- سيتم ملؤها بواسطة JavaScript (نمط .article-card) -->
+      </div>
+    </div>
+
+    <!-- بطاقة المصادقة -->
+    <div id="acctAuth" class="card" style="margin-top:18px"></div>
+
+    <!-- إشعارات الإعداد -->
+    <div id="acctNotice" class="center" style="margin-top:20px;display:none"></div>
+  </div>
   </section>
 </div>
 
@@ -616,52 +650,15 @@
 <div class="cookie" id="cookieBar" hidden>
   <span>🍪 نستخدم تخزينًا محليًا بسيطًا لحفظ تفضيلاتك على جهازك فقط — لا إعلانات ولا تتبع.</span>
   <button class="btn btn-em btn-sm" id="cookieOk">فهمت</button>
-</div>
 
-<!-- نافذة الإنشاء -->
-<div class="overlay" id="exportOverlay" hidden>
-  <div class="modal" style="position:relative">
-    <div class="export-visual"><canvas id="miniCanvas" width="108" height="192"></canvas></div>
-    <div id="expRunning">
-      <h3>⏳ جاري إنشاء الفيديو…</h3>
-      <div class="pct-big" id="expPct">0%</div>
-      <div class="progress"><i id="expBar"></i></div>
-      <p id="expStage">جارٍ التحضير…</p>
-      <p id="expSub" style="margin-top:6px">📱 اترك الصفحة مفتوحة حتى يكتمل الفيديو</p>
-      <div class="switch-row" style="justify-content:center;margin-top:10px">
-        <div class="t" style="text-align:center">🔔 نبّهني عندما يكتمل الفيديو</div>
-        <label class="switch"><input type="checkbox" id="chkNotify"><i></i></label>
-      </div>
-      <div class="result-actions">
-        <button class="btn btn-danger btn-sm" id="btnCancelExport">إيقاف الإنشاء</button>
-      </div>
-    </div>
-    <div id="expResult" hidden>
-      <div style="font-size:2.2rem">✨</div>
-      <h3>تم بنجاح!</h3>
-      <p>الفيديو جاهز — شاهقه أو شاركه مباشرة</p>
-      <div class="card" style="margin-top:14px;padding:8px">
-        <video id="resultVideo" controls playsinline style="width:100%;max-height:300px;border-radius:12px;background:#000"></video>
-        <div class="hint center" id="resultMeta" style="margin-top:6px"></div>
-      </div>
-      <div class="result-actions">
-        <a class="btn btn-gold" id="btnDownload" href="#" download>⬇ تحميل الآن</a>
-        <button class="btn btn-em" id="btnShare">📤 مشاركة</button>
-        <button class="btn btn-gold" id="btnSchedule">🤖 جدولة للنشر</button>
-        <button class="btn btn-ghost" id="btnNew">إنشاء فيديو آخر</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- نافذة تسجيل الدخول -->
+<!-- ================= نافذة الدخول (تعمل من أي صفحة) ================= -->
 <div class="overlay" id="loginOverlay" hidden>
-  <div class="modal" style="position:relative;max-width:420px">
-    <button class="btn btn-ghost btn-sm close-x" aria-label="إغلاق">✕</button>
+  <div class="modal acct-login" style="position:relative;max-width:420px">
+    <button class="btn btn-ghost btn-sm close-x" id="loginClose" aria-label="إغلاق">✕</button>
     <h3>🔑 دخول آمن</h3>
     <p>بريدك + رابط سحري، أو حساب جوجل. لا كلمات مرور ولا بيانات تُباع.</p>
     <div class="login-row" style="margin-top:14px">
-      <input type="email" id="loginEmail" placeholder="you@example.com" dir="ltr">
+      <input type="email" id="loginEmail" placeholder="you@example.com" dir="ltr" autocomplete="email">
       <button class="btn btn-gold" id="loginSubmit">أرسل الرابط</button>
     </div>
     <div class="or-line"><span>أو</span></div>
@@ -670,46 +667,15 @@
   </div>
 </div>
 
-<!-- نافذة جدولة النشر -->
-<div class="overlay" id="schedOverlay" hidden>
-  <div class="modal" style="position:relative;max-width:560px">
-    <button class="btn btn-ghost btn-sm close-x" aria-label="إغلاق">✕</button>
-    <h3>🤖 جدولة ونشر تلقائي</h3>
-    <div id="schedFileLabel" class="hint" style="color:#7ee0a2"></div>
-    <div class="f-group">
-      <label>المنصات (اختر واحدة أو أكثر):</label>
-      <div class="plat-checks">
-        <label class="chk"><input type="checkbox" class="schedPlat" value="youtube" checked> 🎬 يوتيوب</label>
-        <label class="chk"><input type="checkbox" class="schedPlat" value="facebook"> 👥 فيسبوك</label>
-        <label class="chk"><input type="checkbox" class="schedPlat" value="instagram"> 📸 إنستغرام</label>
-        <label class="chk"><input type="checkbox" class="schedPlat" value="tiktok"> 🎵 تيك توك</label>
-        <label class="chk"><input type="checkbox" class="schedPlat" value="x"> 𝕏 منصة X</label>
-      </div>
-    </div>
-    <div class="f-group"><label>العنوان</label><input id="schedTitle" maxlength="120" style="width:100%"></div>
-    <div class="f-group">
-      <label>البوست (الوصف) <button class="btn btn-ghost btn-sm" id="schedGen" type="button">✨ ولّد بوستًا</button></label>
-      <textarea id="schedCaption" rows="4" style="width:100%"></textarea>
-    </div>
-    <div class="f-group"><label>الوسوم</label><input id="schedTags" dir="ltr" style="width:100%"></div>
-    <div class="f-group"><label>وقت النشر</label><input type="datetime-local" id="schedWhen" style="width:100%"></div>
-    <div class="result-actions">
-      <button class="btn btn-gold" id="schedSubmit">احفظ في الجدول 🗓️</button>
-      <button class="btn btn-ghost" id="schedCancel">إلغاء</button>
-    </div>
-    <p class="hint center">المهام المستحقة تُنشر آليًا في نافذة التشغيل اليومية (الموعد تقريبي وقد يتأخر حتى ساعة) — أو اضغط «انشر الآن» من حسابي.</p>
-  </div>
-</div>
-
 <!-- السكربتات -->
 <script src="js/data.js?v=3" defer></script>
 <script src="js/core.js?v=3" defer></script>
-<script src="js/quran.js?v=3" defer></script>
+<script src="js/quran.js?v=4" defer></script>
 <script src="js/reel.js?v=3" defer></script>
-<script src="js/creator.js?v=3" defer></script>
+<script src="js/creator.js?v=5" defer></script>
 <script src="js/tools.js?v=3" defer></script>
   <script src="js/auth.js?v=3" defer></script>
-  <script src="js/publish.js?v=7" defer></script>
+  <script src="js/publish.js?v=19" defer></script>
   <script src="js/app.js?v=3" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "قرآن ريلز", "alternateName": "Quran Reels", "url": "https://quran-reels-tau.vercel.app/", "applicationCategory": "MultimediaApplication", "operatingSystem": "Any (web browser)", "browserRequirements": "Requires JavaScript", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EGP"}, "description": "صانع فيديو قرآن مجاني فوري: اختر الآيات والقارئ والخلفية والترجمة، شاهد معاينة حية، وصدّر MP4 عمودي 1080×1920 مباشرة داخل المتصفح — بدون طابور انتظار وبدون حدود. مع 32 أداة إسلامية.", "inLanguage": "ar", "featureList": "47 قارئًا، 114 سورة، ترجمة بـ8 لغات، 14 خلفية، معاينة حية، تصدير MP4/WebM فوري، 32 أداة إسلامية، حساب اختياري مع نشر تلقائي وجدولة للمنصات", "screenshot": "https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "هل الموقع مجاني تمامًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الإنشاء والتحميل مجاني 100% — لا اشتراك ولا بطاقة ائتمان ولا حدود يومية. كل شيء يعمل من متصفحك مباشرة."}}, {"@type": "Question", "name": "هل أحتاج تسجيل حساب أو تثبيت برنامج؟", "acceptedAnswer": {"@type": "Answer", "text": "لا — كل الأدوات والإنشاء تعمل فورًا دون تسجيل. التسجيل اختياري فقط لو أردت ميزة النشر التلقائي: تحفظ فيديوهاتك وترتبط بقنواتك وتجدول النشر من صفحة حسابي."}}, {"@type": "Question", "name": "ما صيغة وأبعاد الفيديو الناتج؟", "acceptedAnswer": {"@type": "Answer", "text": "فيديو عمودي 1080×1920 (أو 720×1280 اقتصادي) بصيغة WebM/MP4 حسب متصفحك — مناسب لتيك توك وإنستغرام ريلز ويوتيوب شورتس وحالات واتساب."}}, {"@type": "Question", "name": "هل توجد فترة انتظار أو حد يومي؟", "acceptedAnswer": {"@type": "Answer", "text": "لا. على عكس المواقع الأخرى لا توجد قوائم انتظار ولا حد لعدد الفيديوهات — أنشئ ما شئت في اللحظة نفسها."}}, {"@type": "Question", "name": "كيف يعمل إنشاء الفيديو بدون خادم؟", "acceptedAnswer": {"@type": "Answer", "text": "يُسجَّل الفيديو لحظيًا داخل متصفحك عبر Canvas + MediaRecorder مع صوت التلاوة، لذلك الخصوصية مضمونة ولا تُرفع ملفاتك إلى أي خادم."}}, {"@type": "Question", "name": "هل يمكنني استخدام صورة خلفية من جهازي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، ارفع أي صورة من جهازك وستبقى محلية 100% لا تُرسل لأي مكان."}}, {"@type": "Question", "name": "هل الترجمة متاحة بعدة لغات؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — الإنجليزية والفرنسية والتركية والإندونيسية والأردية والإسبانية والإيطالية بالإضافة للعربية."}}, {"@type": "Question", "name": "على أي منصات أنشر الفيديو؟", "acceptedAnswer": {"@type": "Answer", "text": "تيك توك، إنستغرام ريلز، يوتيوب شورتس، فيسبوك، حالات واتساب، تيليجرام — وكل منصات التواصل."}}, {"@type": "Question", "name": "هل النص القرآني مضبوط بالرسم الإملائي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، يُعرض النص بالرسم العثماني المضبوط مع علامات الوقف والأرقام بالشكل الصحيح."}}, {"@type": "Question", "name": "ما المدة المثالية للريلز؟", "acceptedAnswer": {"@type": "Answer", "text": "من 15 إلى 60 ثانية هو الأنسب للتفاعل، ويُسمح بالفيديو حتى 5 دقائق لمن أراد."}}, {"@type": "Question", "name": "هل تعمل الخدمة من خارج مصر والخليج؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الموقع يعمل من أي مكان في العالم والمواقيت والأدوات تدعم الدول حسب موقعك."}}, {"@type": "Question", "name": "هل بياناتي محفوظة عندكم؟", "acceptedAnswer": {"@type": "Answer", "text": "الإنشاء والأدوات بلا حساب — ملفاتك تبقى في متصفحك. أما إن سجّلت للنشر التلقائي فيُحفظ بريدك وفيديوهاتك المجدولة في قاعدة بيانات محمية بصلاحيات، وتوكنات المنصات مشفّرة وتُحذف بضغطة «فك الربط»."}}, {"@type": "Question", "name": "هل يمكن للموقع أن ينشر فيديوهاتي تلقائيًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم. سجّل دخولك، اربط قناتك من صفحة «حسابي» بضغطة موافقة واحدة، ثم جدولة أي فيديو أو فعّل «الأتمتة» — والنشر يتم يوميًا 06:15 بتوقيت القاهرة مع كتابة البوست والعناوين والوسوم تلقائيًا."}}, {"@type": "Question", "name": "كيف أربط قناتي بيوتيوب أو المنصات؟", "acceptedAnswer": {"@type": "Answer", "text": "من صفحة «حسابي والنشر التلقائي» اضغط «اربط» أمام المنصة، توافق مرة واحدة على الصلاحيات، ويظهر الحساب مرتبطًا بعدها. يمكنك فك الربط في أي لحظة بضغطة."}}, {"@type": "Question", "name": "هل ربط حساباتي آمن؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — ربط رسمي عبر OAuth من المنصات نفسها (لا نرى كلمة مرورك أبدًا)، والتوكنات تُخزَّن مشفّرة AES-256 على الخادم فقط، ولا تظهر في أي استجابة، وتُحذف فورًا عند فك الربط."}}]}</script>

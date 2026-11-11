@@ -111,21 +111,22 @@ async function mountTool(id) {
 
 /* ---------- الإقلاع ---------- */
 document.addEventListener("DOMContentLoaded", async () => {
-  // السنة
-  $("#year").textContent = new Date().getFullYear();
-  $("#statReciters").textContent = toAr(RECITERS.length);
+  // السنة — عناصر اختيارية: غيابها كان يوقف بقية الإقلاع (الراوتر + الصانع)
+  const yearEl = $("#year"); if (yearEl) yearEl.textContent = new Date().getFullYear();
+  const statReciters = $("#statReciters"); if (statReciters) statReciters.textContent = toAr(RECITERS.length);
 
   // القائمة الجوّالة
-  $("#burger").addEventListener("click", () => $("#mainNav").classList.toggle("open"));
+  $("#burger")?.addEventListener("click", () => $("#mainNav")?.classList.toggle("open"));
   $("#mainNav")?.addEventListener("click", e => { if (e.target.closest("a")) $("#mainNav").classList.remove("open"); });
   document.addEventListener("click", e => {
     if (!e.target.closest("#mainNav") && !e.target.closest("#burger")) $("#mainNav")?.classList.remove("open");
   });
 
   // الكوكيز
-  if (!store.get("cookieOk")) {
-    $("#cookieBar").hidden = false;
-    $("#cookieOk").addEventListener("click", () => { store.set("cookieOk", 1); $("#cookieBar").hidden = true; });
+  const cookieBar = $("#cookieBar"), cookieOk = $("#cookieOk");
+  if (cookieBar && cookieOk && !store.get("cookieOk")) {
+    cookieBar.hidden = false;
+    cookieOk.addEventListener("click", () => { store.set("cookieOk", 1); cookieBar.hidden = true; });
   }
 
   // روابط التمرير
@@ -163,7 +164,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     QRAuth.on(u => {
       const b = $("#authBtn");
       if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
-      if (u && typeof QRPublish !== "undefined" && !window._authBooted) QRPublish.afterLogin();
+      /* كان الشرط !window._authBooted والراية تُضبط بعد QRAuth.boot() مباشرة،
+       * فحين تصل نتيجة الجلسة (غير متزامنة) تكون الراية true ولا يُنفَّذ
+       * afterLogin أبدًا — فلا تُحمَّل لوحة الحساب بعد الدخول. */
+      if (!u) { window._afterLoginDone = false; return; }
+      if (typeof QRPublish !== "undefined" && !window._afterLoginDone) {
+        window._afterLoginDone = true;
+        QRPublish.afterLogin();
+      }
     });
     QRAuth.boot();
     window._authBooted = true;

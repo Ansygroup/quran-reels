@@ -413,6 +413,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         chk("S9 oauth start rejects guest (401)", st === 401, String(st));
         const rList = await page.request.get(BASE + "/api/social?op=list");
         chk("S9 social list unauthorized (401)", rList.status() === 401, String(rList.status()));
+        // المسارات القانونية الجديدة (دالة التوزيع api/gw.js) — والقديمة أعلاه تتحقق عبر rewrites
+        const rGwList = await page.request.get(BASE + "/api/gw?op=list");
+        chk("S9 gw social list unauthorized (401)", rGwList.status() === 401, String(rGwList.status()));
+        const rGwPub = await page.request.post(BASE + "/api/gw?op=publish", { data: {} });
+        chk("S9 gw publish unauthorized (401)", rGwPub.status() === 401, String(rGwPub.status()));
+        const rGwBad = await page.request.get(BASE + "/api/gw?op=nope", { maxRedirects: 0 });
+        chk("S9 gw unknown op (404)", rGwBad.status() === 404, String(rGwBad.status()));
       }
     } catch (e) {
       chk("S9 account section", false, String(e && e.message ? e.message : e).slice(0, 140));

@@ -541,22 +541,27 @@ const Creator = {
   },
 
   /* ---------------- الإنشاء/التسجيل ---------------- */
+  /* سبب عدم بدء التصدير — يُقرأ من مشغّل الخادم (lib/autopilot) ليقول
+   * الحقيقة بدل انتظار مهلة صامتة. كل خروج مبكر يسجّل سببه هنا. */
+  lastAbortReason: "",
+
   async startExport() {
-    if (this.exporting) return;
+    this.lastAbortReason = "";
+    if (this.exporting) { this.lastAbortReason = "التصدير جارٍ بالفعل"; return; }
     await Quran.load();
 
     const count = Selection.count();
-    if (count < 1) { toast("اختر الآيات أولًا", "err"); return; }
+    if (count < 1) { this.lastAbortReason = "لم تُحدَّد آيات — اختر الآيات أولًا"; toast("اختر الآيات أولًا", "err"); return; }
     if (!this.prepared && !AyahPlayer.playing) {
       // تحضير الصوت قبل التسجيل
       this._setPlayIcon(false);
       const ok = await this._prepareForExport();
-      if (ok === "abort") return;
+      if (ok === "abort") { this.lastAbortReason = "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)"; return; }
     }
     const total = AyahPlayer.totalDuration();
     if (total > 300) {
       const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
-      if (!yes) return;
+      if (!yes) { this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»"; return; }
     }
 
     this.exporting = true;
@@ -574,6 +579,13 @@ const Creator = {
     this._dirty();
 
     const ov = $("#exportOverlay");
+    /* حزام أمان: نافذة التصدير جزء من الماركب؛ إن غابت فلا نُترك exporting=true أبدًا */
+    if (!ov) {
+      this.exporting = false;
+      this.lastAbortReason = "نافذة التصدير (#exportOverlay) غير موجودة في الصفحة";
+      toast("تعذّر بدء التصدير — أعد تحميل الصفحة", "err");
+      return;
+    }
     ov.hidden = false;
     $("#expResult").hidden = true;
     $("#expRunning").hidden = false;
@@ -696,3 +708,7 @@ const _btnCancelExp = document.getElementById("btnCancelExport");
 if (_btnCancelExp) _btnCancelExp.addEventListener("click", () => {
   try { Creator.cancelExport(); } catch (e) { console.error(e); }
 });
+
+/* متاح على نافذة الصفحة: مشغّل الخادم (lib/autopilot) والاختبارات يقرآن
+ * حالة التصدير وسبب الرفض من هنا بدل التخمين. */
+window.Creator = Creator;

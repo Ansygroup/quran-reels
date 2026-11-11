@@ -174,3 +174,6 @@ function ayahRef(s, a, b) {
   const name = Quran.shortName(s);
   return b && b !== a ? `${name} ${toAr(a)}–${toAr(b)}` : `${name} ${toAr(a)}`;
 }
+
+/* متاح على نافذة الصفحة (مشغّل الخادم والاختبارات) */
+window.Selection = Selection;

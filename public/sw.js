@@ -7,21 +7,21 @@ self.lary = ""
 importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
 
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v7";
+const CACHE = "qr-v20";
 const SHELL = [
   "/",
-  "/css/style.css?v=3",
+  "/css/style.css?v=4",
   "/js/data.js?v=3",
   "/js/core.js?v=3",
-  "/js/quran.js?v=3",
+  "/js/quran.js?v=4",
   "/js/reel.js?v=3",
-  "/js/creator.js?v=3",
+  "/js/creator.js?v=4",
   "/js/tools.js?v=3",
   "/js/tools-a.js?v=3",
   "/js/tools-b.js?v=3",
     "/js/tools-c.js?v=3",
     "/js/auth.js?v=3",
-    "/js/publish.js?v=3",
+    "/js/publish.js?v=19",
     "/js/app.js?v=3",
   "/data/quran-uthmani.json",
   "/data/adhkar.json",

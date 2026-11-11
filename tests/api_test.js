@@ -1,5 +1,8 @@
-const proxy = require('/home/user/quran-reels/api/proxy.js');
-const ip = require('/home/user/quran-reels/api/ip.js');
+const path = require('path');
+const API = p => path.join(__dirname, '..', 'api', p);
+const proxy = require(API('proxy.js'));
+const ip = require(API('ip.js'));
+const gw = require(API('gw.js'));
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -7,9 +10,9 @@ function mockRes() {
   res.end = (b) => { res.body = b === undefined ? Buffer.alloc(0) : (Buffer.isBuffer(b) ? b : Buffer.from(String(b))); };
   return res;
 }
-async function call(handler, url, method = 'GET', headers = {}) {
+async function call(handler, url, method = 'GET', headers = {}, body) {
   const res = mockRes();
-  const out = handler({ url, method, headers }, res);
+  const out = handler({ url, method, headers, body }, res);
   if (out && typeof out.then === 'function') await out;
   for (let i = 0; i < 800 && res.body === null; i += 50) await new Promise(r => setTimeout(r, 50));
   return res;
@@ -69,6 +72,32 @@ async function call(handler, url, method = 'GET', headers = {}) {
   r = await call(ip, '/api/ip?mode=config');
   let c = null; try { c = JSON.parse(r.body.toString()); } catch {}
   chk('config -> 200 object with supabase', r.statusCode === 200 && c && c.supabase && typeof c.supabase.url === 'string', r.body && r.body.toString());
+
+  // ---- بوابة api/gw.js: توزيع العمليات + بقاء المسارات القديمة عاملة (بلا شبكة) ----
+  r = await call(gw, '/api/gw?op=nonexistent');
+  chk('gw unknown op -> 404', r.statusCode === 404, r.statusCode);
+
+  r = await call(gw, '/api/gw?op=start&p=youtube&t=invalid');
+  chk('gw oauth start guest -> 401', r.statusCode === 401, r.statusCode);
+
+  r = await call(gw, '/api/gw?op=list');
+  chk('gw social list guest -> 401', r.statusCode === 401, r.statusCode);
+
+  r = await call(gw, '/api/gw?op=publish', 'POST');
+  chk('gw publish guest -> 401', r.statusCode === 401, r.statusCode);
+
+  r = await call(gw, '/api/publish', 'POST', {}, {});
+  chk('gw old path /api/publish -> 401', r.statusCode === 401, r.statusCode);
+
+  r = await call(gw, '/api/gw?op=version');
+  let v = null; try { v = JSON.parse(r.body.toString()); } catch {}
+  chk('gw version -> 200 json with sha field', r.statusCode === 200 && v && typeof v.sha === 'string' && v.service === 'quran-reels', r.statusCode + ' ' + (r.body && r.body.toString().slice(0, 120)));
+
+  r = await call(gw, '/api/gw?op=contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
+  chk('gw contact bad email -> 400', r.statusCode === 400, r.statusCode);
+
+  r = await call(gw, '/api/contact', 'POST', {}, { name: 'x', email: 'bad', message: 'hi' });
+  chk('gw old path /api/contact bad email -> 400', r.statusCode === 400, r.statusCode);
 
   console.log(errs.length ? 'ERRORS ' + errs.length + ': ' + JSON.stringify(errs) : 'ALL OK (0 errors)');
   process.exit(errs.length ? 1 : 0);
