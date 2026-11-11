@@ -232,19 +232,30 @@ window.PublishApp = {
 
     const row = (p) => {
       const mine = conns.filter((c) => c.platform === p.key);
-      const prov = CONNECT_PLATFORM[p.key];
+      const prov = p.connect || CONNECT_PLATFORM[p.key];
+      /* ready من الخادم: هل مفاتيح المزوّد مضبوطة في هذه البيئة؟ إن لم تكن،
+       * فالزر كان يعيد المستخدم إلى ?setup=meta بلا أي تفسير. */
+      const ready = p.ready !== false;
       const head = `<b style="min-width:96px">${p.name}</b>`;
+      const expired = (c) => Boolean(c.expires_at && Number(c.expires_at) < Date.now());
       if (mine.length) {
         return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${head}
-          ${mine.map((c) => `<span style="color:#7ee0a2">✅ ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
-            <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>`).join("")}
-          ${prov ? `<button class="btn btn-ghost" data-connect="${p.key}">➕ إضافة حساب</button>` : ""}
+          ${mine.map((c) => `<span style="color:${expired(c) ? "#ffcf8b" : "#7ee0a2"}">${expired(c) ? "⚠️" : "✅"} ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
+            ${expired(c) ? '<small class="hint">انتهت صلاحية الجلسة — أعد الربط لتُنشر الفيديوهات</small>' : ""}
+            <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>
+            ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">🔄 إعادة الربط</button>` : ""}`).join("")}
         </div>`;
       }
       if (!prov) {
         return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
           ${head}<span class="hint">قريبًا — لا يوجد ربط/نشر لهذه المنصة بعد</span>
+        </div>`;
+      }
+      if (!ready) {
+        return `<div class="soc-row" data-soc="${p.key}" data-notready="1" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${head}<span class="hint">الربط غير مهيأ على الخادم — مفاتيح ${prov === "meta" ? "META_APP_ID/SECRET" : prov.toUpperCase() + "_CLIENT_*"} غير مضبوطة</span>
+          <button class="btn btn-ghost" disabled title="أضف مفاتيح التطبيق في Vercel ثم أعد النشر">⚙️ غير مهيأ</button>
         </div>`;
       }
       return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
@@ -260,7 +271,20 @@ window.PublishApp = {
   /* رسالة العودة من المزوّد: /#/account?linked=youtube | linked=youtube_err | linked=err */
   reportLinkedFlag() {
     try {
-      const m = String(window.location.hash || "").match(/[?&]linked=([a-z_]+)/i);
+      const raw = String(window.location.hash || "");
+      /* ?setup=<provider> تعني أن الخادم لا يملك مفاتيح المزوّد بعد */
+      const setup = raw.match(/[?&]setup=([a-z_]+)/i);
+      if (setup) {
+        const prov = setup[1].toLowerCase();
+        const label = prov === "meta" ? "فيسبوك/إنستغرام" : (PLATFORMS[prov] || prov);
+        const notice0 = document.getElementById("acctNotice");
+        const msg0 = `⚙️ ربط ${label} غير مهيأ بعد: مفاتيح التطبيق (${prov === "meta" ? "META_APP_ID وMETA_APP_SECRET" : prov.toUpperCase() + "_CLIENT_*"}) غير مضبوطة في Vercel. الربط متاح الآن ليوتيوب وتيك توك وX.`;
+        if (notice0) { notice0.style.display = "block"; notice0.textContent = msg0; notice0.style.color = "#ffcf8b"; }
+        if (typeof toast === "function") toast(msg0);
+        try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
+        return;
+      }
+      const m = raw.match(/[?&]linked=([a-z_]+)/i);
       if (!m) return;
       const flag = m[1].toLowerCase();
       const ok = Boolean(CONNECT_PLATFORM[flag]) && !/_err$/.test(flag) && flag !== "err";

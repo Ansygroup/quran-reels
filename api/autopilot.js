@@ -1,11 +1,25 @@
 /* Account dashboard API: safe settings, private run history, and manual generation. */
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
-const { json } = require("../lib/oauth");
+const { json, configured } = require("../lib/oauth");
 const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
+
+/* أي مزوّد OAuth يخدم كل منصة (facebook/instagram يتشاركان تطبيق Meta) */
+const CONNECT_PROVIDER = { youtube: "youtube", facebook: "meta", instagram: "meta", tiktok: "tiktok", x: "x" };
+
+/* هل مفاتيح المزوّد موجودة فعلًا في هذه البيئة؟
+ * يمنع «زر ربط لا يفعل شيئًا»: META_APP_ID/SECRET غير مضبوطين في Vercel،
+ * فكان الضغط على «اربط فيسبوك» يعود إلى ?setup=meta بلا أي تفسير. */
+function providerReady() {
+  const out = {};
+  for (const [key, prov] of Object.entries(CONNECT_PROVIDER)) {
+    try { out[key] = configured(prov); } catch { out[key] = false; }
+  }
+  return out;
+}
 const PLATFORMS = PLATFORM_NAMES;
 
 const DEFAULTS = {
@@ -103,6 +117,8 @@ async function accountData(uid) {
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
+  const ready = providerReady();
+
   return {
     config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
     runs: Array.isArray(runs) ? runs : [],
@@ -110,7 +126,13 @@ async function accountData(uid) {
     platforms: connectedPlatforms,
     channel: channelNames || "لا توجد قنوات مرتبطة",
     reciters: RECITERS,
-    available: PLATFORM_LIST,
+    /* كل منصة مع: هل النشر مدعوم (publish) · أي مزوّد ربط (connect) ·
+     * وهل مفاتيحه مضبوطة الآن (ready) — الواجهة لا تَعِد بما لا يعمل */
+    available: PLATFORM_LIST.map(p => ({
+      ...p,
+      connect: CONNECT_PROVIDER[p.key] || null,
+      ready: CONNECT_PROVIDER[p.key] ? Boolean(ready[p.key]) : false,
+    })),
     // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
     articles: { count: repoArticles().length },
   };
@@ -218,4 +240,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest };
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER };

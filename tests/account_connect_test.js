@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=12)", /publish\.js\?v=12/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=13)", /publish\.js\?v=13/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -74,15 +74,17 @@ if (!JSDOM) {
     window.fetch = (url) => {
       fetched.push(String(url));
       if (String(url).includes("/api/gw?op=list")) {
-        return json({ connections: [{ id: "conn-1", platform: "youtube", account_name: "Psychology World" }] });
+        return json({ connections: [
+          { id: "conn-1", platform: "youtube", account_name: "Psychology World", expires_at: 1793878001416 },
+        ] });
       }
       if (String(url).includes("/api/autopilot")) {
         return json({ config: {}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
           reciters: [], available: [
-            { key: "youtube", name: "يوتيوب", publish: true },
-            { key: "tiktok", name: "تيك توك", publish: true },
-            { key: "instagram", name: "إنستغرام", publish: true },
-            { key: "linkedin", name: "لينكد إن", publish: false },
+            { key: "youtube", name: "يوتيوب", publish: true, connect: "youtube", ready: true },
+            { key: "tiktok", name: "تيك توك", publish: true, connect: "tiktok", ready: true },
+            { key: "facebook", name: "فيسبوك", publish: true, connect: "meta", ready: false },
+            { key: "linkedin", name: "لينكد إن", publish: false, connect: null, ready: false },
           ], articles: { count: 7993 } });
       }
       return json({});
@@ -108,10 +110,37 @@ if (!JSDOM) {
     const li = window.document.querySelector('[data-soc="linkedin"]');
     chk("لينكد إن يظهر «قريبًا» بلا زر ربط", Boolean(li && /قريبًا/.test(li.textContent)));
 
+    /* جلسة منتهية: البطاقة كانت تعرض «مرتبط» بلا تحذير رغم أن النشر يفشل بـinvalid_grant */
+    chk("يوتيوب المنتهي يُنبّه «انتهت صلاحية الجلسة»", Boolean(yt && /انتهت صلاحية/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
+    chk("يوتيوب المنتهي يعرض «إعادة الربط»", Boolean(window.document.querySelector('[data-soc="youtube"] [data-connect="youtube"]')));
+
+    /* مزوّد غير مهيأ (META_APP_ID/SECRET غائبة في Vercel): زر معطّل وسبب واضح */
+    const fb = window.document.querySelector('[data-soc="facebook"]');
+    chk("فيسبوك غير المهيأ يظهر بسبب واضح", Boolean(fb && /غير مهيأ/.test(fb.textContent)), fb && fb.textContent.slice(0, 90));
+    chk("فيسبوك غير المهيأ: الزر معطّل (لا رابط ميت)", Boolean(fb && fb.querySelector("button[disabled]")));
+    chk("فيسبوك غير المهيأ: لا يحمل data-connect", Boolean(fb && !fb.querySelector("[data-connect]")));
+
     chk("connectPath صحيح ليوتيوب", P.connectPath("youtube", "T") === "/api/gw?op=start&p=youtube&t=T", P.connectPath("youtube", "T"));
     chk("connectPath يحوّل instagram إلى meta", P.connectPath("instagram", "T") === "/api/gw?op=start&p=meta&t=T", P.connectPath("instagram", "T"));
     chk("connectPath يعيد null لمنصة بلا ربط", P.connectPath("linkedin", "T") === null);
     chk("connectPath يعيد null بلا توكن", P.connectPath("youtube", "") === null);
+
+    /* ---------- العودة من الخادم بـ?setup=meta (مفاتيح ناقصة) ---------- */
+    const dom2 = new JSDOM(index, { url: "https://quran-reels-tau.vercel.app/#/account?setup=meta", runScripts: "outside-only", pretendToBeVisual: true });
+    const w2 = dom2.window;
+    w2.scrollTo = () => {};
+    w2.fetch = (url) => {
+      if (String(url).includes("/api/gw?op=list")) return json({ connections: [] });
+      return json({ config: {}, runs: [], connected: false, platforms: [], reciters: [], available: [], articles: { count: 7993 } });
+    };
+    w2.AuthApp = { getUserId: async () => "u1", getToken: async () => "T" };
+    w2.eval(publish);
+    let e2 = null;
+    try { await w2.PublishApp.init(); } catch (e) { e2 = e; }
+    const notice2 = w2.document.getElementById("acctNotice");
+    chk("init() مع ?setup=meta لا يرمي", !e2, e2 && String(e2.message).slice(0, 80));
+    chk("رسالة ?setup تشرح المفاتيح الناقصة", Boolean(notice2 && /غير مهيأ/.test(notice2.textContent)), notice2 && notice2.textContent.slice(0, 90));
+    chk("رسالة ?setup تذكر الربط المتاح (يوتيوب)", Boolean(notice2 && /يوتيوب/.test(notice2.textContent)));
 
     console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
     if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
