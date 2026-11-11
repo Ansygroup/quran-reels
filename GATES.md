@@ -169,3 +169,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: كل معرّف ثابت في `creator.js` موجود في `index.html` · نافذة التصدير كاملة (16 معرّفًا: `#exportOverlay`, `#expRunning`, `#expResult`, `#expPct`, `#expBar`, `#expStage`, `#expSub`, `#miniCanvas`, `#resultVideo`, `#resultMeta`, `#btnDownload`, `#btnShare`, `#btnSchedule`, `#btnNew`, `#btnCancelExport`, `#chkNotify`) · `startExport` يحمي ضد غياب النافذة (لا يبقى `exporting=true`) · `confirmDialog` يستخدم `.overlay`+`[data-ok]` ونافذة التصدير لا تحتوي `data-ok` · الكاش `creator.js?v=5` و`qr-v19`
   EVIDENCE: 2026-11-11 — `startExport` كان يفتح `#exportOverlay` وهي **غير موجودة** في الماركب، فيرمي `Cannot set properties of null` ويبقى `exporting=true` عند 0% للأبد (طابق أعراض كل التشغيلات الفاشلة من 11-04). أُثبت بتشغيل حقيقي على Chromium: `tools/e2e_render.js` ⇒ `export.ok=true` و100% وملف mp4.
 
+- [ ] G30: التشغيل اليومي يفحص نسخة الإنتاج قبل أن يحرق ميزانيته
+  CHECK: node tests/autonomy_test.js + LD_LIBRARY_PATH=/tmp/al2023/lib node tools/e2e_daily.js
+  EXPECT: `preflightPage` يقرأ `SITE/` ويتأكد من وجود `#exportOverlay`/`#expPct`/`#expStage`/`#expRunning`/`#expResult`/`#btnCancelExport` + إصدارات `creator/quran/publish` · صفحة ناقصة أو 503 أو انقطاع ⇒ فشل واضح بلا استثناء · `closeStaleRuns` يغلق `autopilot_runs` العالقة (`rendering` > 45 دقيقة) · التشغيل اليومي: تنظيف ← فحص ← توليد، وفشل الفحص ⇒ لا توليد ويُسجَّل السبب · الفحص اليدوي يحمل `preflight` في تقريره
+  EVIDENCE: 2026-11-11 — سقطت `#exportOverlay` من الماركب فاحترقت خمس دقائق في كل تشغيل. التشغيل الآلي الكامل أُثبت بمحاكي حقيقي: `tools/e2e_daily.js` ⇒ preflight ok · فيديو mp4 · رفع · صف نشر · نشر · تسجيل (26.6s).
+
