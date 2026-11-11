@@ -302,12 +302,23 @@ window.PublishApp = {
       const m = raw.match(/[?&]linked=([a-z_]+)/i);
       if (!m) return;
       const flag = m[1].toLowerCase();
-      const ok = Boolean(CONNECT_PLATFORM[flag]) && !/_err$/.test(flag) && flag !== "err";
-      const label = PLATFORMS[flag] || (flag === "meta" ? "فيسبوك/إنستغرام" : flag);
+      /* الخادم يرسل linked=youtube_err مع ?w=<سبب> — نزيل _err للاسم ونشرح السبب.
+       * (كانت الرسالة تعرض «youtube_err» حرفيًا وتطلب إعادة المحاولة بلا سبب.) */
+      const base = flag.replace(/_err$/, "");
+      const ok = Boolean(CONNECT_PLATFORM[base]) && !/_err$/.test(flag) && flag !== "err";
+      const label = PLATFORMS[base] || (base === "meta" ? "فيسبوك/إنستغرام" : base);
+      const whyKey = (raw.match(/[?&]w=([a-z_]+)/i) || [])[1] || "";
+      const WHY = {
+        denied: "لم توافق على كل الصلاحيات في شاشة جوجل/المزوّد (رفع الفيديوهات وقراءة القناة). إن كان التطبيق في وضع الاختبار فأضف حسابك كـ Test user ثم أعد المحاولة.",
+        no_code: "لم يصل رمز التفويض من المزوّد — ابدأ الربط من جديد من نفس المتصفح.",
+        state: "انتهت صلاحية جلسة التفويض أو مُنعت كوكيز الطرف الأول — أعد المحاولة الآن من نفس المتصفح دون فتح النافذة في تبويب آخر.",
+        token: "وصل الرمز لكن تبادله فشل — تحقّق من أسرار التطبيق (Client ID/Secret) وعنوان إعادة التوجيه المسجّل.",
+        err: "لم يصل رمز التفويض — أعد المحاولة من نفس المتصفح.",
+      };
       const notice = document.getElementById("acctNotice");
       const msg = ok
         ? `✅ تم ربط ${label} بنجاح — يمكنك الآن اختياره في الأتمتة أو جدولة فيديو عليه.`
-        : `⚠️ لم يكتمل ربط ${label}. أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة.`;
+        : `⚠️ لم يكتمل ربط ${label}${whyKey ? " (" + whyKey + ")" : ""}: ${WHY[whyKey] || "أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة."}`;
       if (notice) { notice.style.display = "block"; notice.textContent = msg; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
       if (typeof toast === "function") toast(msg);
       // تنظيف الرابط حتى لا تتكرر الرسالة عند كل تحديث
