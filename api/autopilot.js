@@ -128,7 +128,7 @@ async function accountData(uid) {
   const ready = providerReady();
 
   return {
-    config: config ? { ...config, template: parseTemplate(config.template) } : DEFAULTS,
+    config: config ? { ...config, template: parseTemplate(config.template), all_channels: config.all_channels === true } : DEFAULTS,
     runs: Array.isArray(runs) ? runs : [],
     connected: connectedPlatforms.length > 0,
     platforms: connectedPlatforms,
@@ -177,10 +177,12 @@ const handler = async (req, res) => {
       }
       
       const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
+      /* all_channels: انشر على كل القنوات المرتبطة (افتراضي: القناة الافتراضية فقط) */
+      const all_channels = body.all_channels === true;
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
         method: "POST",
         headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify({ user_id: uid, enabled, at_utc: "04:15:00", platforms, template, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ user_id: uid, enabled, at_utc: "04:15:00", platforms, template, all_channels, updated_at: new Date().toISOString() }),
       });
       const config = Array.isArray(saved) ? saved[0] : saved;
       return json(res, 200, { ok: true, config: { ...config, template: parseTemplate(config?.template) } });

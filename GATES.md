@@ -174,3 +174,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `preflightPage` يقرأ `SITE/` ويتأكد من وجود `#exportOverlay`/`#expPct`/`#expStage`/`#expRunning`/`#expResult`/`#btnCancelExport` + إصدارات `creator/quran/publish` · صفحة ناقصة أو 503 أو انقطاع ⇒ فشل واضح بلا استثناء · `closeStaleRuns` يغلق `autopilot_runs` العالقة (`rendering` > 45 دقيقة) · التشغيل اليومي: تنظيف ← فحص ← توليد، وفشل الفحص ⇒ لا توليد ويُسجَّل السبب · الفحص اليدوي يحمل `preflight` في تقريره
   EVIDENCE: 2026-11-11 — سقطت `#exportOverlay` من الماركب فاحترقت خمس دقائق في كل تشغيل. التشغيل الآلي الكامل أُثبت بمحاكي حقيقي: `tools/e2e_daily.js` ⇒ preflight ok · فيديو mp4 · رفع · صف نشر · نشر · تسجيل (26.6s).
 
+- [ ] G31: «انشر على كل القنوات المرتبطة» (تعدد القنوات في التشغيل الآلي)
+  CHECK: node tests/multichannel_test.js
+  EXPECT: `planTargets` = مهمة واحدة بلا `connection_id` عند `all_channels=false` (الافتراضي) · مهمة لكل قناة عند `true` · تراجع بأمان لقناة واحدة عند غياب الصفوف أو قائمة منصات فارغة · الـAPI يحفظ ويعيد `all_channels` · الواجهة تُظهر المفتاح فقط عند تكرار القناة لنفس المنصة
+  EVIDENCE: 2026-11-11 — كان النشر الآلي يستهدف القناة الافتراضية وحدها حتى لو رُبطت قناتان، فلا سبيل لتوزيع الفيديو على القناتين تلقائيًا.
+
