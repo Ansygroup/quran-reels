@@ -132,3 +132,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: `renderSelfTest` يسجّل `audio_direct` (fetch مباشر لـ everyayah) و`audio_proxy` (عبر `/api/proxy`) و`page_errors`/`failed_requests` · `audioUrlFor` يبني `.../SSSAAA.mp3` · لا استثناء عند فشل الشبكة
   EVIDENCE: 2026-11-11 — تعليق التصدير عند «تحضير التلاوة… 0%» يرجّح فشل تحميل الصوت؛ وطلب mp3 عبر `/api/proxy` من خارج Vercel رجع 500 بينما JSON/woff2/HTML رجعت 200، فصار الفحص يفصل السببين بضغطة.
+
+- [ ] G23: التصدير لا يعلق على حوار تأكيد، ويرفض بسرعة برسالة مفهومة
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: `acceptDialogs` يلتقط الحوار المتأخر (حتى 20s) · `assertExportStarted` يرمي بنص التوست أو `count=0` بدل انتظار 90s · `waitForExport` يقرأ `exporting/dialog/toast/count`
+  EVIDENCE: 2026-11-11 14:22 — تشغيل حقيقي سجّل `{"pct":"","stage":"","running":false}` أي أن overlay لم يُفتح إطلاقًا: النقرة على «إنشاء الفيديو» لم تُنتج تصديرًا (حوار/تحقق)، والكود كان يجرّب تأكيد الحوار مرة واحدة بعد ٩٠٠ms ثم ينتظر ٩٠ ثانية صامتًا.
