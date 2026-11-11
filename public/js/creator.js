@@ -579,6 +579,13 @@ const Creator = {
     this._dirty();
 
     const ov = $("#exportOverlay");
+    /* حزام أمان: نافذة التصدير جزء من الماركب؛ إن غابت فلا نُترك exporting=true أبدًا */
+    if (!ov) {
+      this.exporting = false;
+      this.lastAbortReason = "نافذة التصدير (#exportOverlay) غير موجودة في الصفحة";
+      toast("تعذّر بدء التصدير — أعد تحميل الصفحة", "err");
+      return;
+    }
     ov.hidden = false;
     $("#expResult").hidden = true;
     $("#expRunning").hidden = false;

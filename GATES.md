@@ -164,3 +164,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `installAudioRoute` يعترض `/proxy?u=` و`/api/proxy?u=` ويخدم الصوت من الخادم (200 + `audio/mpeg` + ACAO) · `fetchAudio` يقصر المضيفين على everyayah/qurango ويمنع التكرار بالكاش ويرفض الضخم والفاشل بلا استثناء · `runWithRetry` يحاول مرتين عند فشل عارض، مرة واحدة عند النجاح، ويلتزم الميزانية الزمنية · `recordDaily` يكتب `system_checks/autopilot_daily` بعدد المحاولات ولا يُفشل التشغيل · `runDailyAutopilots` يستخدم الاثنين
   EVIDENCE: 2026-11-11 — التصدير كان يتوقف قبل البدء، وأحد أسباب ذلك أن `/proxy` يُرجع 500 لملفات mp3، وفشل يوم كامل يحتاج تدخّلًا يدويًا.
 
+- [ ] G29: الماركب لا يفقد عناصر يعتمد عليها الكود (سبب توقّف التوليد الحقيقي)
+  CHECK: node tests/markup_ids_test.js
+  EXPECT: كل معرّف ثابت في `creator.js` موجود في `index.html` · نافذة التصدير كاملة (16 معرّفًا: `#exportOverlay`, `#expRunning`, `#expResult`, `#expPct`, `#expBar`, `#expStage`, `#expSub`, `#miniCanvas`, `#resultVideo`, `#resultMeta`, `#btnDownload`, `#btnShare`, `#btnSchedule`, `#btnNew`, `#btnCancelExport`, `#chkNotify`) · `startExport` يحمي ضد غياب النافذة (لا يبقى `exporting=true`) · `confirmDialog` يستخدم `.overlay`+`[data-ok]` ونافذة التصدير لا تحتوي `data-ok` · الكاش `creator.js?v=5` و`qr-v19`
+  EVIDENCE: 2026-11-11 — `startExport` كان يفتح `#exportOverlay` وهي **غير موجودة** في الماركب، فيرمي `Cannot set properties of null` ويبقى `exporting=true` عند 0% للأبد (طابق أعراض كل التشغيلات الفاشلة من 11-04). أُثبت بتشغيل حقيقي على Chromium: `tools/e2e_render.js` ⇒ `export.ok=true` و100% وملف mp4.
+
