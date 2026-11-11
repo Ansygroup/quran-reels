@@ -402,7 +402,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const pubSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("اللوحة تعرض «آخر فحص محفوظ»", /acctLastCheck/.test(pubSrc) && /آخر \$\{kind\} محفوظ/.test(pubSrc));
   chk("نص الفحص يذكر هل حُفظت النتيجة", /data\.recorded \?/.test(pubSrc));
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=18/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=19/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

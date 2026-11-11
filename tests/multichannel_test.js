@@ -149,8 +149,8 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
   chk("تلميح أن النشر على القناة الافتراضية", /يُنشر على القناة الافتراضية/.test(ui));
   chk("الكاش مكسور (v=18) في الماركب والخدمة",
-    /publish\.js\?v=18/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v19/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /publish\.js\?v=19/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v20/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
@@ -172,6 +172,30 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
     const src = fs.readFileSync(path.join(ROOT, "lib", f), "utf8");
     chk(`${f}: يستدعي ensureDefault بعد الحفظ`, /ensureDefault\(saved\.u,/.test(src), f);
   }
+
+  /* 9) «انشر على كل القنوات المرتبطة» في التشغيل الآلي */
+  const A = require(path.join(ROOT, "lib", "autopilot.js"));
+  const PT = A.__test.planTargets;
+  const two = { youtube: [{ id: "y1" }, { id: "y2" }] };
+  chk("معطّل ⇒ مهمة واحدة لكل منصة بلا قناة محددة",
+    JSON.stringify(PT(["youtube"], two, false)) === JSON.stringify([{ platform: "youtube", connection_id: null }]));
+  const on = PT(["youtube"], two, true);
+  chk("مفعّل ⇒ مهمة لكل قناة مع connection_id", on.length === 2 && on[0].connection_id === "y1" && on[1].connection_id === "y2", JSON.stringify(on));
+  chk("مفعّل بلا قنوات ⇒ تراجع لمهمة واحدة", PT(["youtube"], {}, true).length === 1);
+  const mixed = PT(["youtube", "tiktok"], { youtube: [{ id: "y1" }], tiktok: [] }, true);
+  chk("قنوات ناقصة لمنصة لا تُسقط الباقي", mixed.length === 2 && mixed[1].connection_id === null, JSON.stringify(mixed));
+  chk("قائمة منصات فارغة ⇒ لا أهداف", PT([], {}, true).length === 0 && PT(null, {}, true).length === 0);
+
+  const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التشغيل يستخدم planTargets ويمرّر connection_id",
+    /planTargets\(platforms, connsByPlatform/.test(autoSrc) && /connection_id, video_path: storagePath/.test(autoSrc));
+  chk("يقرأ كل القنوات فقط عند تفعيل الخيار", /runConfig\?\.all_channels === true/.test(autoSrc) && /connectionsFor\(userId, platform\)/.test(autoSrc));
+  const apiSrc = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
+  chk("الـAPI يحفظ all_channels ويعيده", /all_channels = body\.all_channels === true/.test(apiSrc) && /all_channels: config\.all_channels === true/.test(apiSrc));
+  const uiSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("الواجهة تُظهر المفتاح عند تعدد القنوات وترسله",
+    /chkAllChannels/.test(uiSrc) && /multiChannel \?/.test(uiSrc) && /all_channels: Boolean\(document\.getElementById\("chkAllChannels"\)/.test(uiSrc));
+  chk("ترحيل all_channels موجود", fs.existsSync(path.join(ROOT, "sql", "migrations", "20261112_autopilot_all_channels.sql")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

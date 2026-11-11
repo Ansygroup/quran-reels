@@ -191,6 +191,11 @@ window.PublishApp = {
     }
 
     // لوحة الأتمتة (تعدد القنوات والتوازي والمقالات)
+    /* خيار «انشر على كل القنوات المرتبطة» — يظهر فقط عند ربط قناتين فأكثر لنفس المنصة */
+    const allChannelsOn = data.config && data.config.all_channels === true;
+    const chanCount = new Map();
+    for (const c of Array.isArray(this.connections) ? this.connections : []) chanCount.set(c.platform, (chanCount.get(c.platform) || 0) + 1);
+    const multiChannel = [...chanCount.values()].some((n) => n > 1);
     const acctAuto = document.getElementById("acctAuto");
     if (acctAuto) {
       acctAuto.innerHTML = `
@@ -209,6 +214,10 @@ window.PublishApp = {
             <div class="status-badge">${channel || 'لا توجد قنوات'}</div>
           </div>
         </div>
+        ${multiChannel ? `<div class="switch-row" style="margin-top:14px">
+          <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل يُنشر على القناة الافتراضية (⭐) فقط · عندك ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${PLATFORMS[k] || k}: ${n}`).join(" · ")}</small></div>
+          <label class="switch"><input type="checkbox" id="chkAllChannels" ${allChannelsOn ? "checked" : ""}><i></i></label>
+        </div>` : ""}
         <div class="row gap-lg" style="margin-top:12px">
           <button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button>
           <button class="btn btn-em" id="autoRun">تشغيل الآن</button>
@@ -419,7 +428,7 @@ window.PublishApp = {
       const res = await fetch("/api/autopilot", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-        body: JSON.stringify({ action: "save", enabled: true, platforms, template })
+        body: JSON.stringify({ action: "save", enabled: true, platforms, template, all_channels: Boolean(document.getElementById("chkAllChannels")?.checked) })
       });
       const data = await res.json();
       if (res.ok) alert("تم حفظ الإعدادات بنجاح!");
