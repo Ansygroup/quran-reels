@@ -289,8 +289,60 @@ const mkRoute = (url) => {
 
   const retrySrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   chk("التشغيل اليومي والإنقاذ يمرّران reuseFailed للمحاولة الثانية",
-    (retrySrc.match(/reuseFailed: n > 1/g) || []).length === 2 &&
+    (retrySrc.match(/reuseFailed: n > 1/g) || []).length >= 2 &&
     /runWithRetry\(\(n\) => generateAndPublish/.test(retrySrc));
+
+  /* 13) تعويض اليوم الناقص: يوم ضاع لا يعود من نفسه */
+  chk("dayShift يعبر حدود الشهر", T.dayShift("2026-03-01", -1) === "2026-02-28" && T.dayShift("2026-11-12", -2) === "2026-11-10");
+  const runsToday = [{ run_date: "2026-11-12", status: "published", run_key: "daily:u:2026-11-12" }];
+  chk("يرجع الأيام الناقصة من الأحدث للأقدم", JSON.stringify(T.missingDays(runsToday, "2026-11-12", 2)) === JSON.stringify(["2026-11-11", "2026-11-10"]), JSON.stringify(T.missingDays(runsToday, "2026-11-12", 2)));
+  chk("التعويض يأخذ الأحدث فقط (خطوة واحدة)", T.missingDays(runsToday, "2026-11-12", 2)[0] === "2026-11-11");
+  chk("أمس منشور ⇒ يرجع ما قبله",
+    JSON.stringify(T.missingDays([...runsToday, { run_date: "2026-11-11", status: "published" }], "2026-11-12", 2)) === JSON.stringify(["2026-11-10"]));
+  chk("محاولة تعويض سابقة لا تُعاد",
+    JSON.stringify(T.missingDays([...runsToday, { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11:backfill" }], "2026-11-12", 2)) === JSON.stringify(["2026-11-10"]));
+  chk("لا نعوّض اليوم نفسه (catchUp يتولاه)", T.missingDays(runsToday, "2026-11-12", 0).length === 0 && !T.missingDays([], "2026-11-12", 2).includes("2026-11-12"));
+
+  impl.q = async () => [];
+  impl.rest = async () => [];
+  chk("بلا إعدادات مُفعّلة ⇒ لا تعويض", (await T.backfillDaily()).length === 0);
+
+  impl.q = async () => [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+  impl.rest = async () => [{ run_date: "2026-11-12", status: "failed", run_key: "daily:u1:2026-11-12" }];
+  const bf1 = await T.backfillDaily();
+  chk("اليوم غير منشور ⇒ لا تعويض (الأولوية لليوم)", bf1.length === 1 && bf1[0].skipped === "today-pending", JSON.stringify(bf1));
+
+  const publishedToday = [
+    { run_date: "2026-11-12", status: "published", run_key: "daily:u1:2026-11-12" },
+    { run_date: "2026-11-11", status: "published", run_key: "daily:u1:2026-11-11" },
+    { run_date: "2026-11-10", status: "published", run_key: "daily:u1:2026-11-10" },
+  ];
+  impl.rest = async () => publishedToday;
+  const bf2 = await T.backfillDaily();
+  chk("كل الأيام منشورة ⇒ لا شيء", bf2.length === 1 && bf2[0].skipped === "nothing-missing", JSON.stringify(bf2));
+
+  impl.rest = async () => [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
+  const savedFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div>' });
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => {
+    if (/autopilot_runs/.test(String(p2)) && (!opts || opts.method !== "POST")) return [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
+    dbCalls.push({ p: p2, opts });
+    return [];
+  };
+  const bf3 = await T.backfillDaily();
+  chk("نسخة ناقصة ⇒ يتوقف قبل الرندر بلا حرق ميزانية", bf3.length === 1 && bf3[0].skipped === "preflight" && bf3[0].day === "2026-11-11", JSON.stringify(bf3));
+  chk("فشل الفحص يُسجَّل في system_checks", dbCalls.some((c) => /system_checks/.test(String(c.p))));
+  global.fetch = savedFetch;
+
+  const bfSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التعويض يستخدم يومًا صريحًا ومفتاحًا خاصًا",
+    /runDate: day, runKeySuffix: "backfill"/.test(bfSrc) && /runDate: dayOverride/.test(bfSrc));
+  const monSrc2 = fs.readFileSync(path.join(ROOT, "api", "cron", "monitor.js"), "utf8");
+  chk("كرون الإنقاذ يعوّض بعد ضمان اليوم فقط",
+    /backfillDaily\(\)/.test(monSrc2) && /todaySettled/.test(monSrc2) && /rescue-pending/.test(monSrc2));
+  impl.q = async () => [];
+  impl.rest = async () => [];
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
