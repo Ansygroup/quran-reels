@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=13)", /publish\.js\?v=13/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=14)", /publish\.js\?v=14/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -120,6 +120,8 @@ if (!JSDOM) {
     chk("فيسبوك غير المهيأ: الزر معطّل (لا رابط ميت)", Boolean(fb && fb.querySelector("button[disabled]")));
     chk("فيسبوك غير المهيأ: لا يحمل data-connect", Boolean(fb && !fb.querySelector("[data-connect]")));
 
+    chk("زر «🎬 اختبار توليد فيديو» يُعرض في الإجراءات السريعة",
+      Boolean(window.document.getElementById("quickRenderTest")));
     chk("connectPath صحيح ليوتيوب", P.connectPath("youtube", "T") === "/api/gw?op=start&p=youtube&t=T", P.connectPath("youtube", "T"));
     chk("connectPath يحوّل instagram إلى meta", P.connectPath("instagram", "T") === "/api/gw?op=start&p=meta&t=T", P.connectPath("instagram", "T"));
     chk("connectPath يعيد null لمنصة بلا ربط", P.connectPath("linkedin", "T") === null);

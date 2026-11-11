@@ -284,6 +284,21 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     Array.isArray(libAuto2.__test.LAUNCH_FLAGS) && libAuto2.__test.LAUNCH_FLAGS.includes("--disable-renderer-backgrounding") && libAuto2.__test.LAUNCH_FLAGS.includes("--disable-background-timer-throttling"),
     JSON.stringify(libAuto2.__test.LAUNCH_FLAGS || []));
 
+  /* 16) الفحص العميق: توليد فيديو تجريبي بلا رفع أو نشر */
+  const libDeep = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const apiDeep = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
+  const pubDeep = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("renderSelfTest يقبل deep", /async function renderSelfTest\(\{ deep = false \} = \{\}\)/.test(libDeep));
+  chk("الفحص العميق يستخدم waitForExport", /if \(deep\)\s*\{/.test(libDeep) && /waitForExport\(page, 150000/.test(libDeep));
+  chk("الفحص العميق لا يرفع ولا ينشر", !/storage\/v1\/object[^\n]*selftest/.test(libDeep) && !/publishRow\([^)]*\)[^\n]*deep/.test(libDeep));
+  chk("الـAPI يمرّر body.deep", /renderSelfTest\(\{ deep: body\.deep === true \}\)/.test(apiDeep));
+  chk("الواجهة ترسل deep", /action: "selftest_render", deep/.test(pubDeep));
+  chk("زر اختبار التوليد موجود في الواجهة", /quickRenderTest/.test(pubDeep));
+  let deepReport = null;
+  try { deepReport = await T.renderSelfTest({ deep: true }); } catch (e) { deepReport = { error: String(e.message) }; }
+  chk("renderSelfTest({deep:true}) يعيد تقريرًا يحمل العلم", Boolean(deepReport) && deepReport.deep === true && typeof deepReport.ok === "boolean",
+    JSON.stringify(deepReport).slice(0, 120));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);

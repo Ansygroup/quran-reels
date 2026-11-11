@@ -122,3 +122,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: `waitForExport` تنجح عند ظهور النتيجة · ترمي رسالة تحمل المرحلة والنسبة عند التوقّف 90s · ترمي «لم يكتمل خلال …» عند انتهاء المهلة · أعلام منع تقييد الخلفية في `LAUNCH_FLAGS`
   EVIDENCE: 2026-11-08→11 — التشغيل اليومي كان يفشل بـ«page.waitForFunction: Timeout 210000ms exceeded» بلا أي تفصيل؛ التسجيل يعتمد requestAnimationFrame بالزمن الحقيقي ويتوقف حين يعدّ Chromium الصفحة خلفية.
+
+- [ ] G21: فحص عميق يُثبت أن الفيديو يُنتج فعلًا (لا مجرد قلع المتصفح)
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: `renderSelfTest({deep:true})` يُنتج تسلسل تصدير ويُعيد `{deep:true, export:{ok,pct,stage,ms}}` · لا رفع إلى التخزين ولا نشر داخل الفحص · زر «🎬 اختبار توليد فيديو» يرسل `deep:true`
+  EVIDENCE: 2026-11-07 — الفحص القديم كان يكتفي بـ«المتصفح أقلع والصفحة فُتحت»، بينما الفشل الحقيقي كان في مرحلة التسجيل؛ الفحص العميق يجيب عن السؤال الصحيح بضغطة.
