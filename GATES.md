@@ -117,3 +117,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: npm run test:connect && npm test
   EXPECT: `accountData.available[*]` يحمل `ready` (مفاتيح المزوّد موجودة فعلًا) و`connect` · فيسبوك/إنستغرام معطّلان بلا META_APP_ID/SECRET مع سبب مكتوب · الجلسة المنتهية (`expires_at` ماضٍ) تظهر «⚠️ انتهت صلاحية الجلسة» + «إعادة الربط» · `#/account?setup=meta` تعرض رسالة تشرح المفاتيح الناقصة
   EVIDENCE: 2026-11-07 — META_APP_ID/SECRET غير مضبوطين في Vercel، فكان زر «اربط فيسبوك» يعيد المستخدم إلى `?setup=meta` بلا تفسير؛ وجلسة يوتيوب منتهية (`expires_at` 2026-11-05) كانت تظهر «مرتبط» بينما النشر يفشل بـ`invalid_grant`.
+
+- [ ] G20: فشل التوليد يقول أين توقّف، ولا يتعلّق صامتًا
+  CHECK: node tests/autopilot_api_test.js
+  EXPECT: `waitForExport` تنجح عند ظهور النتيجة · ترمي رسالة تحمل المرحلة والنسبة عند التوقّف 90s · ترمي «لم يكتمل خلال …» عند انتهاء المهلة · أعلام منع تقييد الخلفية في `LAUNCH_FLAGS`
+  EVIDENCE: 2026-11-08→11 — التشغيل اليومي كان يفشل بـ«page.waitForFunction: Timeout 210000ms exceeded» بلا أي تفصيل؛ التسجيل يعتمد requestAnimationFrame بالزمن الحقيقي ويتوقف حين يعدّ Chromium الصفحة خلفية.
