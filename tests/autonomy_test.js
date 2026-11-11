@@ -140,6 +140,41 @@ const mkRoute = (url) => {
   chk("runDailyAutopilots يستخدم الإعادة والتسجيل", src.includes("runWithRetry(() => generateAndPublish") && src.includes("recordDaily(config.user_id"));
   chk("النتيجة تُرجع attempts/recorded", /attempts, recorded/.test(src));
 
+  /* 6) فحص النسخة المنشورة قبل التوليد (درس النافذة المفقودة) */
+  const goodHtml = '<div id="exportOverlay" hidden></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button><script src="js/creator.js?v=5"></script><script src="js/quran.js?v=4"></script>';
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => goodHtml });
+  const pre1 = await T.preflightPage();
+  chk("نسخة سليمة ⇒ preflight ناجح", pre1.ok === true && pre1.missing.length === 0);
+  chk("preflight يقرأ إصدارات السكربتات", pre1.versions && pre1.versions.creator === 5 && pre1.versions.quran === 4, JSON.stringify(pre1.versions));
+
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div>' });
+  const pre2 = await T.preflightPage();
+  chk("نسخة ناقصة ⇒ preflight فاشل بأسماء العناصر",
+    pre2.ok === false && pre2.missing.includes("expPct") && /نسخة الإنتاج تفتقد/.test(pre2.error), pre2.error);
+
+  global.fetch = async () => ({ ok: false, status: 503, text: async () => "" });
+  const pre3 = await T.preflightPage();
+  chk("صفحة لا تستجيب ⇒ فشل واضح لا استثناء", pre3.ok === false && /503/.test(String(pre3.error)));
+
+  global.fetch = async () => { throw new Error("network down"); };
+  const pre4 = await T.preflightPage();
+  chk("انقطاع الشبكة ⇒ فشل مُلتقط", pre4.ok === false && /network down/.test(String(pre4.error)));
+  const realFetch2 = require("util").types ? global.fetch : global.fetch;
+
+  /* 7) تنظيف التشغيلات العالقة */
+  dbCalls.length = 0;
+  impl.rest = async () => [];
+  impl.q = async (sql, params) => { dbCalls.push({ sql, params }); return []; };
+  const closed = await T.closeStaleRuns(45);
+  chk("ينظّف autopilot_runs العالقة", closed === true && dbCalls.some((c) => /status='rendering'/.test(c.sql) && /completed_at=now\(\)/.test(c.sql)));
+  chk("لا يمسّ التشغيلات الحديثة (نافذة زمنية)", dbCalls.some((c) => /\(\$2 \|\| ' minutes'\)::interval/.test(c.sql)));
+
+  /* 8) الترتيب في التشغيل اليومي: تنظيف ← فحص ← توليد */
+  const src2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التشغيل اليومي يفحص النسخة قبل التوليد", /await closeStaleRuns\(\)/.test(src2) && /const pre = await preflightPage\(\)/.test(src2));
+  chk("فشل الفحص ⇒ لا توليد + تسجيل السبب", /if \(!pre\.ok\)/.test(src2) && /فحص النسخة المنشورة فشل/.test(src2));
+  chk("الفحص اليدوي يحمل نتيجة preflight", /report\.preflight = preflight/.test(src2));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
