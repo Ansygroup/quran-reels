@@ -199,3 +199,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: `missingDays(runs, today, lookback)` يرجع الأيام بلا نشر من الأحدث للأقدم ويتخطى أي يوم جرت محاولة تعويضه (`:backfill`) · `backfillDaily` لا يعمل قبل أن يكون اليوم منشورًا (`today-pending`) · يعوّض يومًا واحدًا بمفتاح `daily:<uid>:<day>:backfill` وبفحص نسخة قبل الرندر · `api/cron/monitor.js` يستدعي التعويض بعد ضمان اليوم فقط (`todaySettled` / `rescue-pending`)
   EVIDENCE: 2026-11-12 — التشغيل اليومي ينتج فيديو «اليوم» فقط، فأي يوم فاشل يبقى ثقبًا دائمًا (11 نوفمبر بلا فيديو حتى بعد إصلاح المسار). أثبت `tools/e2e_backfill.js` بمتصفح حقيقي أن التعويض يعيد بناء 2026-11-11 وينشره (run_key `daily:user-e2e:2026-11-11:backfill`، published 1، audioHits 3).
 
+- [ ] G36: حالة التشغيل الآلي ظاهرة في اللوحة (لا فشل صامت)
+  CHECK: node tests/autopilot_api_test.js && node tests/publish_client_dom.js
+  EXPECT: `accountData.last_daily` = آخر صفّ `run_type=daily` (اليوم، الحالة، السبب، الرابط) · `lastDaily` يرجّع null عند تعذّر القاعدة بلا إسقاط اللوحة · الواجهة ترسم `#acctLastDaily` بالنص «آخر تشغيل آلي (اليوم): ✅ منشور/⏳ قيد التوليد/⚠️ فشل — السبب · رابط» · السبب يُهرَّب (لا HTML) · النوع `render_failure` يُسمّى «محاولة توليد آلية» بدل «فحص المحرّك»
+  EVIDENCE: 2026-11-12 — الفشل اليومي كان يُعرف فقط بفتح Supabase؛ الآن يظهر في بطاقة الإجراءات السريعة فورًا.
+

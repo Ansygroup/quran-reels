@@ -117,6 +117,15 @@ async function lastSelfTest() {
   } catch { return null; /* الجدول غير موجود بعد — لا نُسقط اللوحة */ }
 }
 
+/* آخر تشغيل آلي (يومي/تعويض) — يُعرض في اللوحة بلا فتح قاعدة البيانات.
+ * «فشل صامت» كان يعني أن المستخدم لا يعرف إلا إذا فتح Supabase. */
+async function lastDaily(uid) {
+  try {
+    const rows = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=run_date,status,error,external_url,completed_at,created_at&order=created_at.desc&limit=1`);
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch { return null; }
+}
+
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
@@ -145,6 +154,8 @@ async function accountData(uid) {
     articles: { count: repoArticles().length },
     // نتيجة آخر فحص توليد محفوظة (null إن لم يُجرَ فحص بعد)
     last_check: await lastSelfTest(),
+    // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
+    last_daily: await lastDaily(uid),
   };
 }
 
@@ -255,4 +266,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest };
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };

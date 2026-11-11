@@ -120,12 +120,31 @@ window.PublishApp = {
       if (!c || !c.created_at) return "";
       const when = new Date(c.created_at);
       const stamp = Number.isNaN(when.getTime()) ? "" : when.toISOString().slice(0, 16).replace("T", " ") + " UTC";
-      const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي" : "فحص المحرّك";
+      const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي"
+        : c.kind === "render_failure" ? "محاولة توليد آلية"
+        : c.kind === "autopilot_daily" ? "تشغيل آلي" : "فحص المحرّك";
       const why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
       const cls = c.ok ? "hint ok" : "hint warn";
       return `<p class="${cls}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${why} · ${stamp}</p>`;
     };
     this.lastCheckLine = lastCheckLine(data.last_check);
+
+    /* «هل الشغل بيمشي لوحده؟» — سطر واحد يقول حالة آخر تشغيل آلي: يومه،
+     * حالته، سببه، ورابط المنشور. بدونه كان الفشل صامتًا حتى يفتح أحدهم
+     * قاعدة البيانات. النصوص تأتي من الخادم فتُهرَّب. */
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    const lastDailyLine = (d) => {
+      if (!d || !d.run_date) return "";
+      const day = String(d.run_date).slice(0, 10);
+      const published = d.status === "published";
+      const running = d.status === "rendering";
+      const state = published ? "✅ منشور" : running ? "⏳ قيد التوليد" : "⚠️ فشل";
+      const why = !published && !running && d.error ? " — " + String(d.error).slice(0, 140) : "";
+      const link = published && d.external_url
+        ? ` · <a href="${esc(d.external_url)}" target="_blank" rel="noopener">رابط المنشور</a>` : "";
+      return `<p class="hint ${published ? "ok" : running ? "" : "warn"}" id="acctLastDaily">آخر تشغيل آلي (${esc(day)}): ${state}${esc(why)}${link} · يُعاد تلقائيًا كل يوم 12:15 القاهرة إن تعذّر</p>`;
+    };
+    this.lastDailyLine = lastDailyLine(data.last_daily);
 
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
     this.available = Array.isArray(data.available) && data.available.length
@@ -144,6 +163,7 @@ window.PublishApp = {
           <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
           <button class="btn btn-ghost" id="quickRenderTest">🎬 اختبار توليد فيديو</button>
         </div>
+        ${this.lastDailyLine || ""}
         ${this.lastCheckLine || ""}
       `;
     }
