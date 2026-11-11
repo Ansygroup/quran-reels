@@ -241,6 +241,49 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     ok("accountData غير متاح في بيئة الاختبار (تُخطّى)");
   }
 
+  /* 15) انتظار التصدير التشخيصي — بدل مهلة صامتة (توقّف 210s في الإنتاج) */
+  const w4 = libAuto2.__test.waitForExport;
+  chk("waitForExport مُصدَّرة للاختبار", typeof w4 === "function");
+  const fakePage = (states, opts = {}) => {
+    let i = 0;
+    return {
+      waitTimeout: 0,
+      evaluate: async () => states[Math.min(i++, states.length - 1)],
+      waitForTimeout: async (ms) => { this && 0; },
+    };
+  };
+  // نجاح: تصبح النتيجة جاهزة بعد مرحلتين
+  const okStates = [
+    { pct: "0%", stage: "جارٍ تحضير التلاوة…", running: true, result: false },
+    { pct: "45%", stage: "جارٍ إنشاء الفيديو… 0:12 / 0:28", running: true, result: false },
+    { pct: "100%", stage: "", running: false, result: true, meta: "quran-reels.webm · 3.2 م.ب" },
+  ];
+  const okPage = { evaluate: async () => okStates[Math.min(okPage._i++, okStates.length - 1)], waitForTimeout: async () => {} , _i: 0 };
+  let okRes = null, okErr = null;
+  try { okRes = await w4(okPage, 30000, 10000); } catch (e) { okErr = e; }
+  chk("waitForExport ينجح عند ظهور النتيجة", Boolean(okRes && okRes.result), okErr && String(okErr.message).slice(0, 80));
+
+  // فشل: الحالة ثابتة عند 0% → رسالة تشخيصية تحمل المرحلة والنسبة
+  const stuckPage = { evaluate: async () => ({ pct: "0%", stage: "جارٍ تحضير التلاوة…", running: true, result: false }), waitForTimeout: async () => {} };
+  let stuckErr = null;
+  try { await w4(stuckPage, 60000, 50); } catch (e) { stuckErr = e; }
+  chk("waitForExport يرمي عند التوقّف بدل التعليق", Boolean(stuckErr));
+  chk("رسالة التوقّف تحمل المرحلة والنسبة",
+    Boolean(stuckErr && /تحضير التلاوة/.test(stuckErr.message) && /0%/.test(stuckErr.message)),
+    stuckErr && stuckErr.message.slice(0, 120));
+
+  // فشل: انتهاء المهلة الكلية مع تقدّم بطيء
+  const slowStates = [{ pct: "1%", stage: "جارٍ إنشاء الفيديو…", running: true, result: false }];
+  let slowPageI = 0;
+  const slowPage = { evaluate: async () => slowStates[0], waitForTimeout: async () => {} };
+  let slowErr = null;
+  try { await w4(slowPage, 40, 100000); } catch (e) { slowErr = e; }
+  chk("انتهاء المهلة الكلية يذكر الزمن", Boolean(slowErr && /لم يكتمل خلال/.test(slowErr.message)), slowErr && slowErr.message.slice(0, 90));
+
+  chk("أعلام منع تقييد الخلفية موجودة في الإطلاق",
+    Array.isArray(libAuto2.__test.LAUNCH_FLAGS) && libAuto2.__test.LAUNCH_FLAGS.includes("--disable-renderer-backgrounding") && libAuto2.__test.LAUNCH_FLAGS.includes("--disable-background-timer-throttling"),
+    JSON.stringify(libAuto2.__test.LAUNCH_FLAGS || []));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
