@@ -362,6 +362,48 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   let eAbort = null; try { await libAuto2.__test.assertExportStarted(pAbort); } catch (e) { eAbort = e; }
   chk("رسالة الخطأ تحمل سبب الصفحة بالحرف", Boolean(eAbort && /تعذّر تحميل الصوت/.test(eAbort.message)), eAbort && eAbort.message.slice(0, 90));
 
+  /* 20) حفظ نتيجة الفحص في system_checks (بدل أن تعيش في المتصفح فقط) */
+  const calls20 = [];
+  setDb({ rest: async (p, opts) => { calls20.push({ p, opts }); return []; } });
+  const rec1 = await libAuto2.__test.recordSelfTest({ ok: true, deep: true, node: "v24", export: { ok: true, pct: "100%" } });
+  chk("recordSelfTest يكتب صفًا واحدًا", rec1 === true && calls20.length === 1, JSON.stringify(calls20.map((c) => c.p)));
+  chk("المسار /rest/v1/system_checks بطريقة POST",
+    calls20[0] && calls20[0].p === "/rest/v1/system_checks" && calls20[0].opts.method === "POST");
+  const body20 = calls20[0] && JSON.parse(calls20[0].opts.body || "{}");
+  chk("النوع render_selftest_deep والحالة ok", body20 && body20.kind === "render_selftest_deep" && body20.ok === true, body20 && body20.kind);
+  chk("التفاصيل مختصرة (نصوص ≤ 300 حرف)", Boolean(body20 && body20.detail && body20.detail.node === "v24" && body20.detail.export.ok === true));
+  const longReport = libAuto2.__test.compactReport({ ok: false, error: "x".repeat(900), page_errors: ["a", "b", "c", "d"], failed_requests: Array.from({ length: 9 }, () => "y".repeat(500)) });
+  chk("compactReport يقتطع الأخطاء والطلبات إلى 3 ونصوص ≤ 300",
+    longReport.error.length <= 300 && longReport.page_errors.length === 3 && longReport.failed_requests.length === 3 && longReport.failed_requests[0].length <= 300);
+  setDb({ rest: async () => { throw new Error("db down"); } });
+  const rec2 = await libAuto2.__test.recordSelfTest({ ok: false, deep: false });
+  chk("فشل التسجيل لا يرمي (best effort)", rec2 === false);
+  const apiSrc6 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
+  chk("الـAPI يعيد recorded مع التقرير", /recorded = await recordSelfTest\(report\)/.test(apiSrc6) && /recorded }/.test(apiSrc6));
+  chk("ملف ترحيل الجدول موجود ومحميّ", fs.existsSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql")) &&
+    /enable row level security/.test(fs.readFileSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql"), "utf8")));
+
+  /* 21) آخر فحص محفوظ يظهر في لوحة الحساب */
+  setDb({
+    q1: async () => null,
+    rest: async (p) => {
+      if (/system_checks/.test(p)) return [{ kind: "render_selftest_deep", ok: true, detail: { ms: 9000 }, created_at: "2026-11-11T15:20:00Z" }];
+      if (/autopilot_runs/.test(p)) return [];
+      if (/social_connections/.test(p)) return [];
+      return [];
+    },
+  });
+  const acct = await T.accountData("u9");
+  chk("accountData يحمل last_check", Boolean(acct.last_check && acct.last_check.kind === "render_selftest_deep"), JSON.stringify(acct.last_check));
+  chk("lastSelfTest يقرأ أحدث صف بترتيب تنازلي",
+    (await T.lastSelfTest()) !== null);
+  setDb({ rest: async () => { throw new Error("table missing"); } });
+  chk("غياب الجدول لا يُسقط اللوحة (last_check = null)", (await T.lastSelfTest()) === null);
+  const pubSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("اللوحة تعرض «آخر فحص محفوظ»", /acctLastCheck/.test(pubSrc) && /آخر \$\{kind\} محفوظ/.test(pubSrc));
+  chk("نص الفحص يذكر هل حُفظت النتيجة", /data\.recorded \?/.test(pubSrc));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=16/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
   process.exit(errs.length ? 1 : 0);
