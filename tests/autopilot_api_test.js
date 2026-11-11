@@ -324,7 +324,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const libSrc5 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   chk("renderRecipe يستخدم acceptDialogs بدل نقرة واحدة",
     /await acceptDialogs\(page, 20000\)/.test(libSrc5) && !/waitForTimeout\(900\);\s*\n\s*await page\.locator\("\.overlay/.test(libSrc5));
-  chk("waitForExport يقرأ exporting/dialog/toast/count", /exporting: Boolean\(window\.Creator/.test(libSrc5) && /dialog: Boolean\(document\.querySelector\("\.overlay \[data-ok\]"\)\)/.test(libSrc5) && /toast:/.test(libSrc5));
+  chk("waitForExport يقرأ exporting/dialog/toast/count", /exporting: Boolean\(typeof Creator/.test(libSrc5) && /dialog: Boolean\(document\.querySelector\("\.overlay \[data-ok\]"\)\)/.test(libSrc5) && /toast:/.test(libSrc5));
   chk("assertExportStarted مُصدَّرة", typeof libAuto2.__test.assertExportStarted === "function");
 
   // رفض صريح برسالة توست
@@ -347,6 +347,20 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const pDialog = { evaluate: async () => { calls++; return calls >= 3; }, waitForTimeout: async () => {} };
   const clicked = await libAuto2.__test.acceptDialogs(pDialog, 8000);
   chk("acceptDialogs يلتقط الحوار المتأخر", clicked === true && calls >= 3, `clicked=${clicked} calls=${calls}`);
+
+  /* 19) سبب الرفض من الصفحة نفسها + تقييد المدة قبل الإنشاء */
+  const libSrc6 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const creatorSrc = fs.readFileSync(path.join(ROOT, "public", "js", "creator.js"), "utf8");
+  chk("Wait/تعريف: Creator.lastAbortReason يُسجَّل قبل كل خروج مبكر",
+    /lastAbortReason/.test(creatorSrc) && (creatorSrc.match(/lastAbortReason = "/g) || []).length >= 4,
+    String((creatorSrc.match(/lastAbortReason = "/g) || []).length) + " موضعًا");
+  chk("assertExportStarted يقرأ lastAbortReason", /st\.abort/.test(libSrc6) && /المولّد لم يبدأ التصدير/.test(libSrc6));
+  chk("renderRecipe يقيّد المدة قبل الإنشاء (لا حوار «المدة طويلة»)",
+    /totalDuration\(\)/.test(libSrc6) && /<= 240/.test(libSrc6));
+
+  const pAbort = { evaluate: async () => ({ exporting: false, running: false, toast: "", count: 2, abort: "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)" }) };
+  let eAbort = null; try { await libAuto2.__test.assertExportStarted(pAbort); } catch (e) { eAbort = e; }
+  chk("رسالة الخطأ تحمل سبب الصفحة بالحرف", Boolean(eAbort && /تعذّر تحميل الصوت/.test(eAbort.message)), eAbort && eAbort.message.slice(0, 90));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

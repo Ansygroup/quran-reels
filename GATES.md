@@ -137,3 +137,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js
   EXPECT: `acceptDialogs` يلتقط الحوار المتأخر (حتى 20s) · `assertExportStarted` يرمي بنص التوست أو `count=0` بدل انتظار 90s · `waitForExport` يقرأ `exporting/dialog/toast/count`
   EVIDENCE: 2026-11-11 14:22 — تشغيل حقيقي سجّل `{"pct":"","stage":"","running":false}` أي أن overlay لم يُفتح إطلاقًا: النقرة على «إنشاء الفيديو» لم تُنتج تصديرًا (حوار/تحقق)، والكود كان يجرّب تأكيد الحوار مرة واحدة بعد ٩٠٠ms ثم ينتظر ٩٠ ثانية صامتًا.
+
+- [ ] G24: سبب عدم بدء التصدير مكتوب، والمدة لا تُنتج حوارًا في الوضع الآلي
+  CHECK: node tests/site_boot_test.js && node tests/autopilot_api_test.js
+  EXPECT: `Creator.lastAbortReason` يُملأ قبل كل خروج مبكر (4 مواضع على الأقل) · `assertExportStarted` يرمي بنصه · `renderRecipe` يقيّد المدة ≤ 240s قبل الإنشاء · `window.Creator`/`window.Selection` متاحان للقراءة
+  EVIDENCE: 2026-11-11 14:22 — التشغيل سجّل `{"pct":"","stage":"","running":false}` أي أن التصدير لم يبدأ أصلًا ولم تعرف الأتمتة السبب.
