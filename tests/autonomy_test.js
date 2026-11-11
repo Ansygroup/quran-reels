@@ -1,0 +1,149 @@
+#!/usr/bin/env node
+/* ============================================================
+ * الاختبار الآلي الذاتي (G28)
+ * ------------------------------------------------------------
+ * غرضه: أن يعمل النشر اليومي بلا تدخّل بشري.
+ *   1) الصوت: الصفحة تطلبه عبر /proxy (وسيط كان يُرجع 500 لملفات
+ *      mp3)، فنعترضه ونخدمه من fetch الخادم + كاش، مع قصر
+ *      المضيفين المسموحين (لا وسيط مفتوح).
+ *   2) إعادة محاولة واحدة تلقائيًا عند فشل عارض ضمن ميزانية زمنية.
+ *   3) تسجيل نتيجة كل تشغيل في system_checks (نوع autopilot_daily).
+ *
+ * التشغيل: node tests/autonomy_test.js
+ * ============================================================ */
+const path = require("path");
+const fs = require("fs");
+const Module = require("module");
+
+const ROOT = path.join(__dirname, "..");
+let pass = 0;
+const errs = [];
+const ok = (m) => { pass++; console.log("OK   " + m); };
+const fail = (m) => { errs.push(m); console.log("FAIL " + m); };
+const chk = (name, cond, extra = "") => (cond ? ok(name) : fail(name + (extra ? " :: " + extra : "")));
+
+/* بدائل الاعتماديات الثقيلة + قاعدة البيانات (كما في بقية الحزم) */
+const STUBS = {
+  "@sparticuz/chromium": { default: { executablePath: async () => "/bin/true", args: [], headless: true } },
+  "playwright-core": { chromium: { launch: async () => ({ newPage: async () => ({}), close: async () => {} }) } },
+  playwright: {},
+};
+const origLoad = Module._load;
+Module._load = function (request) {
+  if (Object.prototype.hasOwnProperty.call(STUBS, request)) return STUBS[request];
+  return origLoad.apply(this, arguments);
+};
+const dbPath = require.resolve(path.join(ROOT, "lib", "db.js"));
+const dbCalls = [];
+const impl = {
+  q: async () => [],
+  q1: async () => null,
+  rest: async (p, opts) => { dbCalls.push({ p, opts }); return []; },
+};
+require.cache[dbPath] = {
+  id: dbPath, filename: dbPath, loaded: true,
+  exports: { q: (...a) => impl.q(...a), q1: (...a) => impl.q1(...a), rest: (...a) => impl.rest(...a) },
+};
+process.env.SITE_ORIGIN = process.env.SITE_ORIGIN || "https://example.test";
+
+const A = require(path.join(ROOT, "lib", "autopilot.js"));
+const T = A.__test;
+
+const mkRoute = (url) => {
+  const state = { url, fulfilled: null, continued: false };
+  return {
+    state,
+    request: () => ({ url: () => url }),
+    fulfill: async (o) => { state.fulfilled = o; },
+    continue: async () => { state.continued = true; },
+  };
+};
+
+(async () => {
+  /* 1) fetchAudio: قصر المضيفين + الكاش */
+  chk("AUDIO_HOSTS لا يفتح الوسيط لكل الإنترنت", T.AUDIO_HOSTS instanceof Set && T.AUDIO_HOSTS.size <= 4 && T.AUDIO_HOSTS.has("everyayah.com") && !T.AUDIO_HOSTS.has("example.com"));
+  chk("يرفض مضيفًا غير مسموح", (await T.fetchAudio("https://evil.example/x.mp3", new Map())) === null);
+  chk("يرفض رابطًا غير صالح", (await T.fetchAudio("not a url", new Map())) === null && (await T.fetchAudio("", new Map())) === null);
+
+  const realFetch = global.fetch;
+  let fetches = 0;
+  global.fetch = async () => { fetches++; return { ok: true, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }; };
+  const cache = new Map();
+  const got1 = await T.fetchAudio("https://everyayah.com/data/x/001001.mp3", cache);
+  await T.fetchAudio("https://everyayah.com/data/x/001001.mp3", cache);
+  chk("يعيد الجسم والنوع", Boolean(got1) && got1.type === "audio/mpeg" && got1.body.length === 4);
+  chk("الكاش يمنع إعادة التنزيل", fetches === 1, "fetches=" + fetches);
+  global.fetch = async () => ({ ok: false, status: 500, headers: { get: () => "" }, arrayBuffer: async () => new ArrayBuffer(0) });
+  chk("فشل المصدر ⇒ null (لا استثناء)", (await T.fetchAudio("https://qurango.net/a.mp3", new Map())) === null);
+  global.fetch = async () => ({ ok: true, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new ArrayBuffer(20 * 1024 * 1024) });
+  chk("ملف ضخم يُرفض", (await T.fetchAudio("https://everyayah.com/big.mp3", new Map())) === null);
+  global.fetch = realFetch;
+
+  /* 2) installAudioRoute: يعترض الصوت فقط ويخدمه من الخادم */
+  global.fetch = async () => ({ ok: true, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new Uint8Array([9, 9, 9]).buffer });
+  const routes = [];
+  const fakePage = { route: async (matcher, handler) => { routes.push({ matcher, handler }); } };
+  const installed = await T.installAudioRoute(fakePage);
+  chk("يُثبّت مسارًا واحدًا على الصفحة", installed === true && routes.length === 1);
+  const m = routes[0].matcher;
+  chk("يطابق /proxy?u=", m("https://quran-reels-tau.vercel.app/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
+  chk("يطابق /api/proxy?u=", m("https://quran-reels-tau.vercel.app/api/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
+  chk("لا يطابق طلبًا عاديًا", m("https://quran-reels-tau.vercel.app/js/core.js") === false && m("https://quran-reels-tau.vercel.app/proxy") === false);
+
+  const r1 = mkRoute("https://quran-reels-tau.vercel.app/proxy?u=" + encodeURIComponent("https://everyayah.com/data/x/002255.mp3"));
+  await routes[0].handler(r1);
+  chk("يخدم الصوت من الخادم (fulfill 200)", r1.state.fulfilled && r1.state.fulfilled.status === 200 && r1.state.continued === false);
+  chk("الترويسات تسمح للصفحة بقراءة الصوت",
+    r1.state.fulfilled.headers["access-control-allow-origin"] === "*" && r1.state.fulfilled.headers["content-type"] === "audio/mpeg");
+
+  const r2 = mkRoute("https://quran-reels-tau.vercel.app/proxy?u=" + encodeURIComponent("https://evil.example/a.mp3"));
+  await routes[0].handler(r2);
+  chk("مضيف غير مسموح يمرّ للوسيط الأصلي", r2.state.fulfilled === null && r2.state.continued === true);
+  global.fetch = realFetch;
+
+  chk("renderRecipe يثبّت المسار قبل التوجيه للصفحة",
+    /await installAudioRoute\(page\);\s*\n\s*await page\.goto/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
+
+  /* 3) إعادة المحاولة التلقائية */
+  let n = 0;
+  const flaky = async () => (++n === 1 ? { ok: false, error: "تعذّر تحضير التلاوة" } : { ok: true, url: "https://youtu.be/x" });
+  const r = await T.runWithRetry(flaky, { budgetMs: 150000 });
+  chk("فشل عارض ⇒ محاولة ثانية تنجح", r.result.ok === true && r.attempts === 2 && n === 2);
+  let k = 0;
+  const always = async () => ({ ok: false, error: "x" + ++k });
+  const r2b = await T.runWithRetry(always, { budgetMs: 150000 });
+  chk("فشل متكرر ⇒ محاولتان فقط", r2b.attempts === 2 && r2b.result.ok === false && k === 2);
+  let c = 0;
+  const okFirst = async () => { c++; return { ok: true }; };
+  chk("النجاح من أول مرة لا يعيد المحاولة", (await T.runWithRetry(okFirst)).attempts === 1 && c === 1);
+  let t = 0;
+  const slowFail = async () => { t++; return { ok: false, error: "بطيء" }; };
+  const clockValues = [0, 999999];
+  let ci = 0;
+  const rBudget = await T.runWithRetry(slowFail, { budgetMs: 1000, clock: () => clockValues[Math.min(ci++, clockValues.length - 1)] });
+  chk("تجاوز الميزانية ⇒ لا محاولة ثانية (حد ٣٠٠ ثانية)", rBudget.attempts === 1 && t === 1);
+  const thrown = async () => { throw new Error("انفجار"); };
+  const rThrow = await T.runWithRetry(thrown, { budgetMs: 0 });
+  chk("الاستثناء يُلتقط كنتيجة فشل", rThrow.result.ok === false && /انفجار/.test(rThrow.result.error));
+
+  /* 4) تسجيل نتيجة التشغيل اليومي */
+  dbCalls.length = 0;
+  const recOk = await T.recordDaily("user-1", { ok: true, run_id: "r1", url: "https://youtu.be/x" }, 2);
+  const body = dbCalls[0] && JSON.parse(dbCalls[0].opts.body || "{}");
+  chk("يكتب في system_checks نوع autopilot_daily", recOk === true && body && body.kind === "autopilot_daily" && body.ok === true);
+  chk("يحفظ عدد المحاولات والسبب", body && body.detail.attempts === 2 && body.detail.url.includes("youtu.be"));
+  impl.rest = async () => { throw new Error("db down"); };
+  chk("فشل التسجيل لا يُفشل التشغيل", (await T.recordDaily("user-1", { ok: false, error: "x" }, 2)) === false);
+
+  /* 5) الربط في التشغيل اليومي */
+  const src = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("runDailyAutopilots يستخدم الإعادة والتسجيل", src.includes("runWithRetry(() => generateAndPublish") && src.includes("recordDaily(config.user_id"));
+  chk("النتيجة تُرجع attempts/recorded", /attempts, recorded/.test(src));
+
+  console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
+  if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
+  process.exit(errs.length ? 1 : 0);
+})().catch((e) => {
+  console.log("FAIL استثناء غير متوقع: " + (e && e.stack ? e.stack.split("\n").slice(0, 2).join(" | ") : e));
+  process.exit(1);
+});
