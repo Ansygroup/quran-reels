@@ -96,6 +96,11 @@ function reset() {
   chk("اليوم منشور ⇒ التعويض يعمل", stub.calls.rescue === 1 && stub.calls.backfill === 1);
   chk("لا فحص موقع كامل في يوم عادي", daily.body.checked === undefined && daily.body.sitemap === undefined);
 
+  reset();
+  stub.rescue = async () => [{ skipped: "already-settled" }, { skipped: "deferred", count: 22 }];
+  const deferred = await call();
+  chk("حسابات خارج الدفعة ⇒ لا تعويض على حساب اليوم", stub.calls.backfill === 0 && deferred.body.backfill[0].skipped === "rescue-pending");
+
   /* 3) اليوم قيد الرندر ⇒ لا تعويض (حماية الميزانية) */
   reset();
   stub.rescue = async () => [{ user_id: "u1", skipped: "running" }];
