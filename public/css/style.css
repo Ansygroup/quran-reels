@@ -896,3 +896,25 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   #view-home .steps-tabs{gap:6px}
   #view-home .step-tab{padding:8px 12px}
 }
+
+/* أقسام مساعدة مختصرة: المحتوى المهم أولًا وروابط الأدوات والمكتبة واضحة. */
+#view-home .home-features .features{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#view-home .home-features .feature{padding:20px}
+#view-home .home-features .f-ic{width:42px;height:42px;margin-bottom:12px;font-size:1.2rem}
+#view-home .home-library-card{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;background:linear-gradient(135deg,rgba(212,175,55,.1),rgba(45,212,160,.08));border-color:var(--line)}
+#view-home .home-library-card h2{font-size:1.5rem}
+#view-home .home-library-card p{margin-top:8px;color:var(--muted);line-height:1.8}
+#view-home .home-library-card .btn{flex-shrink:0}
+@media(max-width:820px){#view-home .home-features .features{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  #view-home .home-features .feature{padding:16px}
+  #view-home .home-features .feature h3{font-size:.94rem}
+  #view-home .home-features .feature p{font-size:.82rem}
+  #view-home .home-library-card{align-items:flex-start;flex-direction:column;padding:22px;gap:16px}
+}
+#view-home #homeTools{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:820px){#view-home #homeTools{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  #view-home #steps .steps-flow{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  #view-home #steps .step-card{padding:16px 12px}
+}
