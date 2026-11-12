@@ -183,7 +183,15 @@ const AyahPlayer = {
       let ayahElapsed;
       if (this.silent) {
         ayahElapsed = (performance.now() - this._silentStart) / 1000;
-        if (ayahElapsed >= this.durationAt(this.index)) { this._advance(); return; }
+        /* في الوضع الصامت لا يوجد onended يُحرّك الآية التالية، فكان `return`
+         * يقتل حلقة الرسم بعد الآية الأولى: التصدير يتجمّد عند نهاية أول آية
+         * (٤١٪ من ١٧ ثانية في محاكاة 2026-11-12) ولا ينتهي أبدًا. الآن
+         * نُعيد جدولة الحلقة ما دام التشغيل مستمرًا. */
+        if (ayahElapsed >= this.durationAt(this.index)) {
+          this._advance();
+          if (this.playing) this._raf = requestAnimationFrame(step);
+          return;
+        }
       } else {
         ayahElapsed = this.ctx.currentTime - this.startedAt;
         const dur = this.durationAt(this.index);

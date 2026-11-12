@@ -491,10 +491,44 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v4 / creator v6 / sw qr-v22)",
-    /reel\.js\?v=4/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / sw qr-v23)",
+    /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v22/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v23/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+
+  /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
+  chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
+  let eSilent = null;
+  try { await libAuto2.__test.assertAudioPresent({ evaluate: async () => ({ silent: true, cache: 0, prepErr: "HTTP 502" }) }); } catch (e) { eSilent = e; }
+  chk("يرفض الفيديو الصامت بسبب مسمّى",
+    Boolean(eSilent) && /لن يُنشر فيديو بلا صوت/.test(eSilent.message) && /HTTP 502/.test(eSilent.message),
+    eSilent && eSilent.message.slice(0, 90));
+  const aOk = await libAuto2.__test.assertAudioPresent({ evaluate: async () => ({ silent: false, cache: 3, prepErr: "" }) });
+  chk("يمرّ حين تكون التلاوة محمَّلة", aOk && aOk.silent === false && aOk.cache === 3, JSON.stringify(aOk));
+  chk("الفحص يقع قبل أي تنزيل أو رفع",
+    libSrcAudio.indexOf("await assertAudioPresent(page)") > 0 &&
+    libSrcAudio.indexOf("await assertAudioPresent(page)") < libSrcAudio.indexOf('page.click("#btnDownload")'));
+
+  const reelLoop = fs.readFileSync(path.join(ROOT, "public", "js", "reel.js"), "utf8");
+  chk("الحلقة الصامتة تُعيد جدولة نفسها بعد تقدّم الآية",
+    /this\._advance\(\);\s*\n\s*if \(this\.playing\) this\._raf = requestAnimationFrame\(step\);/.test(reelLoop));
+
+  /* assertExportStarted: ينتظر بدء التصدير بدل الحكم من قراءة واحدة، ويتجاهل تنبيهًا قديمًا */
+  let g43Calls = 0;
+  const pSlow = { evaluate: async () => (++g43Calls < 2 ? { exporting: false, running: false, toast: "تم إنشاء الفيديو بنجاح ✨", count: 3 } : { exporting: true, running: true, toast: "", count: 3 }), waitForTimeout: async () => {} };
+  let eSlow = null;
+  try { await libAuto2.__test.assertExportStarted(pSlow, { tries: 4, gapMs: 1 }); } catch (e) { eSlow = e; }
+  chk("لا يحكم بالرفض قبل بدء التصدير فعلًا", eSlow === null, eSlow && eSlow.message.slice(0, 80));
+
+  const pStale = { evaluate: async () => ({ exporting: false, running: false, toast: "تم إنشاء الفيديو بنجاح ✨", count: 3 }), waitForTimeout: async () => {} };
+  let eStale = null;
+  try { await libAuto2.__test.assertExportStarted(pStale, { tries: 2, gapMs: 1 }); } catch (e) { eStale = e; }
+  chk("تنبيه نجاح قديم لا يُقرأ كرفض", eStale === null, eStale && eStale.message.slice(0, 80));
+
+  /* 21) محاكي المتصفح الحقيقي: الوضع الصامت يرفض النشر (SILENT=1) */
+  const dailySim = fs.readFileSync(path.join(ROOT, "tools", "e2e_daily.js"), "utf8");
+  chk("المحاكي يدعم SILENT=1 لاختبار الحارس",
+    /const SILENT = process\.env\.SILENT === "1"/.test(dailySim) && /رفض النشر بلا صوت/.test(dailySim));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
