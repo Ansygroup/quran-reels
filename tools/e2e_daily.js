@@ -18,6 +18,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
+const SILENT = process.env.SILENT === "1";
 const PORT = Number(process.env.PORT || 8898);
 
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".woff2": "font/woff2" };
@@ -113,6 +114,12 @@ server.listen(PORT, "127.0.0.1", async () => {
     const s = String(url);
     if (/everyayah\.com|qurango\.net/.test(s)) {
       audioHits++;
+      /* SILENT=1 يحاكي تعذّر المصدر كليًا: يجب أن يرفض المسار الآلي النشر
+       * بدل إخراج فيديو تلاوة بلا تلاوة (حارس المنتج). */
+      /* الطلبات التي تحمل Range هي فحص ما قبل الرندر فتنجح؛ طلبات الصفحة
+       * تفشل: يحاكي مصدرًا سقط أثناء التوليد فيُختبر حارس «لا نشر بلا صوت». */
+      const isProbe = Boolean(opts && opts.headers && (opts.headers.Range || opts.headers.range));
+      if (SILENT && !isProbe) return { ok: false, status: 502, headers: { get: () => "" }, arrayBuffer: async () => new ArrayBuffer(0), text: async () => "source down" };
       return { ok: true, status: 200, headers: { get: () => "audio/wav" }, arrayBuffer: async () => WAV.buffer.slice(WAV.byteOffset, WAV.byteOffset + WAV.byteLength) };
     }
     return realFetch(url, opts);
@@ -132,8 +139,11 @@ server.listen(PORT, "127.0.0.1", async () => {
     preflight: r && r.preflight ? { ok: r.preflight.ok, versions: r.preflight.versions, missing: r.preflight.missing } : null,
     storage_uploads: storage.length, queue_rows: queue.length, published: published.length,
     system_checks: checks.map((c) => c.kind), audioHits }, null, 1));
-  const pass = Boolean(r && r.ok) && storage.length === 1 && queue.length === 1 && published.length === 1 && audioHits > 0;
-  console.log(pass ? "✅ المسار الآلي كامل يعمل" : "❌ المسار الآلي لم يكتمل");
+  const silentGuard = /لن يُنشر فيديو بلا صوت/.test(String((r && r.error) || error || ""));
+  const pass = SILENT
+    ? Boolean(r && !r.ok) && silentGuard && storage.length === 0 && queue.length === 0 && published.length === 0
+    : Boolean(r && r.ok) && storage.length === 1 && queue.length === 1 && published.length === 1 && audioHits > 0;
+  console.log(pass ? (SILENT ? "✅ رفض النشر بلا صوت — لا فيديو صامت" : "✅ المسار الآلي كامل يعمل") : "❌ المسار الآلي لم يكتمل");
   global.fetch = realFetch;
   server.close();
   process.exitCode = pass ? 0 : 1;
