@@ -239,6 +239,15 @@ window.fetch = async (url, opts = {}) => {
   if (!audioLine || !/التلاوة غير متاحة من الخادم/.test(audioLine.textContent)) fail("فشل الصوت لا يُسمّى في سطر آخر فحص");
   else ok("فشل تحميل التلاوة يُسمّى صريحًا في اللوحة");
 
+  // صفّ قديم يحمل invalid_grant بلا حقل reauth ⇒ يُترجم ويظهر الزر
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: [], last_daily: { run_date: "2026-11-12", status: "failed", error: "فشل في 1 منصات: youtube: تجديد التوكن فشل (youtube): invalid_grant", external_url: null } });
+  const legacy = d.getElementById("acctReauth");
+  const legacyDaily = d.getElementById("acctLastDaily");
+  if (!legacy || !/إعادة الربط/.test(legacy.textContent)) fail("صفّ invalid_grant القديم لا يُظهر تنبيه إعادة الربط");
+  else if (!d.getElementById("btnRetryPublish")) fail("صفّ invalid_grant القديم لا يُظهر زر النشر الجاهز");
+  else if (!legacyDaily || /invalid_grant/.test(legacyDaily.textContent)) fail("نص الخطأ الخام invalid_grant لا يزال معروضًا");
+  else ok("صفّ invalid_grant القديم يُترجم ويُظهر زر النشر الجاهز");
+
   // ربط منتهٍ: تنبيه صريح يقول ماذا يفعل المستخدم (وأن الفيديو الجاهز سيُنشر)
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
   const re = d.getElementById("acctReauth");

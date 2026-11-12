@@ -115,6 +115,16 @@ window.PublishApp = {
     const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
     const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
     const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    /* ترجمة الأسباب الخام لصفوف قديمة كُتبت قبل G44: invalid_grant لا تعني
+     * شيئًا لمن يقرأها. الصفوف المحفوظة لا تتغيّر، فنُصلح العرض لا التخزين. */
+    const friendly = (v) => {
+      const t = String(v || "");
+      if (/invalid_grant|expired or revoked|unauthorized_client/i.test(t)) {
+        return "انتهت صلاحية ربط " + (/tiktok/i.test(t) ? "تيك توك" : /\bx\b|twitter/i.test(t) ? "X" : "يوتيوب") + " — أعد الربط من بطاقة الحسابات";
+      }
+      if (/quotaExceeded|exceeded your quota/i.test(t)) return "تجاوز الحد اليومي للرفع على يوتيوب — يُعاد تلقائيًا";
+      return t;
+    };
     /* آخر فحص محفوظ في القاعدة: «هل التوليد يعمل؟» يُجاب في اللوحة نفسها
      * بدل لقطة شاشة تُنسى. النصوص من الخادم تُقصّ وتُهرَّب. */
     const lastCheckLine = (c) => {
@@ -124,7 +134,7 @@ window.PublishApp = {
       const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي"
         : c.kind === "render_failure" ? "محاولة توليد آلية"
         : c.kind === "autopilot_daily" ? "تشغيل آلي" : "فحص المحرّك";
-      let why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
+      let why = !c.ok && c.detail && c.detail.error ? " — " + friendly(String(c.detail.error).slice(0, 120)) : "";
       /* فحص فاشل بلا سبب مكتوب لكن التلاوة نفسها لم تصل: نسمّيها بدل «غير معروف» */
       const d = c.detail || {};
       if (!c.ok && !why && d.audio_direct && d.audio_direct.ok === false) {
@@ -147,7 +157,7 @@ window.PublishApp = {
       const published = d.status === "published";
       const running = d.status === "rendering";
       const state = published ? "✅ منشور" : running ? "⏳ قيد التوليد" : "⚠️ فشل";
-      const why = !published && !running && d.error ? " — " + String(d.error).slice(0, 140) : "";
+      const why = !published && !running && d.error ? " — " + friendly(String(d.error).slice(0, 140)) : "";
       const link = published && d.external_url
         ? ` · <a href="${esc(d.external_url)}" target="_blank" rel="noopener">رابط المنشور</a>` : "";
       return `<p class="hint ${published ? "ok" : running ? "" : "warn"}" id="acctLastDaily">آخر تشغيل آلي (${esc(day)}): ${state}${esc(why)}${link} · يُعاد تلقائيًا كل يوم 12:15 القاهرة إن تعذّر</p>`;
@@ -182,6 +192,13 @@ window.PublishApp = {
      * نقولها صريحة + أن الفيديو الجاهز سيُنشر بعد الربط بلا إعادة توليد. */
     const reauthLine = (list) => {
       const arr = (Array.isArray(list) ? list : []).filter((p) => typeof p === "string" && p);
+      /* صفّ قديم يقول invalid_grant قبل أن يوجد حقل reauth ⇒ نستنتج المنصة منه */
+      if (!arr.length) {
+        const raw = `${(data.last_daily && data.last_daily.error) || ""} ${(data.last_check && data.last_check.detail && data.last_check.detail.error) || ""}`;
+        if (/invalid_grant|expired or revoked|unauthorized_client/i.test(raw)) {
+          arr.push(/tiktok/i.test(raw) ? "tiktok" : /youtube/i.test(raw) ? "youtube" : "youtube");
+        }
+      }
       if (!arr.length) return "";
       const names = arr.map((p) => esc(PLATFORMS[p] || p)).join("، ");
       return `<p class="hint warn" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة الحسابات أدناه، ثم «🔁 انشر الفيديو الجاهز» فلن يُولَّد فيديو جديد.</p>
