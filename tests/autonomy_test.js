@@ -392,6 +392,18 @@ const mkRoute = (url) => {
   const cPartial = await T.catchUpDaily();
   chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "partial-publish" && cPartial[0].ok === false, JSON.stringify(cPartial).slice(0, 240));
 
+  // اليوم منشور جزئيًا؛ نعيد المنصة الفاشلة فقط من الفيديو نفسه.
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }];
+    if (/from publish_queue/i.test(sql) && /status='failed'/i.test(sql)) return [queueRow("tiktok-failed", "tiktok")];
+    if (/from publish_queue/i.test(sql) && /status='published'/i.test(sql) && /select id, video_path/i.test(sql)) return [{ id: "yt-published", video_path: `u1/autopilot/${A.cairoDate()}-run1.mp4` }];
+    return [];
+  };
+  pub.calls.length = 0;
+  pub.impl = async (row) => ({ ok: true, url: "https://example.test/" + row.id });
+  const resumedPartial = await T.catchUpDaily();
+  chk("منشور جزئيًا ⇒ يعيد المنصة الفاشلة بلا توليد أو إعادة الناجحة", resumedPartial.length === 1 && resumedPartial[0].skipped === "rendered-cached" && pub.calls.length === 1 && pub.calls[0].id === "tiktok-failed", JSON.stringify(resumedPartial));
+
   /* فشل النشر كله ⇒ الفيديو الجاهز يبقى ولا نعيد توليده */
   impl.q = async (sql) => (/from publish_queue/i.test(sql)
     ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube")])

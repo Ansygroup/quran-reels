@@ -110,11 +110,14 @@ async function loadRuns(uid) {
 }
 
 /* آخر نتيجة فحص محفوظة (system_checks) — اللوحة تعرضها بلا أن يضغط المستخدم شيئًا */
-async function lastSelfTest() {
+async function lastSelfTest(uid) {
+  if (!uid) return null;
   try {
-    const rows = await rest("/rest/v1/system_checks?select=kind,ok,detail,created_at&order=created_at.desc&limit=1");
-    return Array.isArray(rows) && rows[0] ? rows[0] : null;
-  } catch { return null; /* الجدول غير موجود بعد — لا نُسقط اللوحة */ }
+    // system_checks جدول مشترك بمفتاح خدمة: لا نعرض تفاصيل حساب آخر.
+    const rows = await rest(`/rest/v1/system_checks?detail->>user_id=eq.${encodeURIComponent(uid)}&kind=in.(render_selftest,render_selftest_deep)&select=kind,ok,detail,created_at&order=created_at.desc&limit=1`);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    return row?.detail?.user_id === uid && ["render_selftest", "render_selftest_deep"].includes(row.kind) ? row : null;
+  } catch { return null; /* لا نُسقط اللوحة عند تعذّر القراءة */ }
 }
 
 /* آخر تشغيل آلي (يومي/تعويض) — يُعرض في اللوحة بلا فتح قاعدة البيانات.
@@ -171,7 +174,7 @@ async function accountData(uid) {
     // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
     articles: { count: repoArticles().length },
     // نتيجة آخر فحص توليد محفوظة (null إن لم يُجرَ فحص بعد)
-    last_check: await lastSelfTest(),
+    last_check: await lastSelfTest(uid),
     // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
     last_daily: await lastDaily(uid),
     // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
@@ -321,7 +324,7 @@ const handler = async (req, res) => {
       /* deep=true يُنتج فيديو قصيرًا فعليًا (بلا رفع أو نشر) — إثبات أن التسجيل يعمل */
       const report = await renderSelfTest({ deep: body.deep === true });
       /* نحفظ النتيجة حتى تُقرأ لاحقًا من قاعدة البيانات بدل لقطة شاشة */
-      const recorded = await recordSelfTest(report);
+      const recorded = await recordSelfTest(report, uid);
       return json(res, report.ok ? 200 : 502, { ...report, recorded });
     }
 
