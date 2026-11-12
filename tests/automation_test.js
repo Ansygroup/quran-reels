@@ -148,12 +148,12 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
   const need = ["acctStateLabel", "acctEnabled", "acctSteps", "acctKpis", "acctNextRun", "selContentMode", "selReciter", "selBackground"];
   const miss = need.filter((id) => !html.includes(`id="${id}"`) && !ui.includes(`id="${id}"`) && !ui.includes(`"${id}"`));
   chk("كل عناصر التصميم الجديد موجودة في الماركب أو الرسم", miss.length === 0, miss.join(", "));
-  chk("مفتاح التشغيل يستدعي الحفظ فورًا (بلا زر منفصل)", /t\.id !== "acctEnabled"[\s\S]{0,200}saveSettings\(\{ enabled: want/.test(ui), "publish.js");
+  chk("مفتاح التشغيل يستدعي الحفظ فورًا (بلا زر منفصل)", /t\.id !== "acctEnabled"[\s\S]{0,600}this\.api\("set_enabled"/.test(ui), "publish.js");
   chk("مستمع واحد مفوَّض (لا تكرار مستمعات بعد كل رسم)", /if \(this\._wired\) return;/.test(ui) && /root\.addEventListener\("click"/.test(ui));
 
   /* 10) الشارة الجديدة للنسخ */
   chk("نسخة الواجهة مرفوعة في الماركب والكاش",
-    /publish\.js\?v=32/.test(html) && /qr-v38/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
+    /publish\.js\?v=33/.test(html) && /qr-v39/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

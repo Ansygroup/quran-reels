@@ -267,6 +267,33 @@ const handler = async (req, res) => {
     if (req.method !== "POST") return json(res, 405, { error: "method" });
     const body = await readBody(req);
 
+    if (body.action === "set_enabled") {
+      if (typeof body.enabled !== "boolean") return json(res, 400, { error: "حالة الأتمتة غير صالحة" });
+      let guard = "";
+      if (body.enabled) {
+        // نفحص الإعداد المحفوظ لا التعديلات غير المحفوظة، ونمنع التفعيل إذا تغيّر أثناء الفحص.
+        const current = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
+        if (!current) return json(res, 409, { error: "احفظ إعدادات النشر الأول قبل تفعيل الأتمتة" });
+        const problem = validatePlatforms(current.platforms);
+        if (problem) return json(res, 400, { error: problem });
+        if (!current.updated_at) return json(res, 409, { error: "تعذّر تأكيد الإعدادات المحفوظة — حدّث الصفحة" });
+        const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=platform`);
+        if (!Array.isArray(connected)) throw new Error("تعذّر التحقق من القنوات المرتبطة");
+        const missing = current.platforms.filter(p => !connected.some(c => c.platform === p));
+        if (missing.length) return json(res, 409, { error: `المنصات المختارة غير مرتبطة (${missing.join(", ")}) — اربطها أولًا` });
+        guard = `&updated_at=eq.${encodeURIComponent(current.updated_at)}`;
+      }
+      // الإيقاف لا يعتمد على صلاحية الإعدادات ولا يكتب حقول القنوات أو المحتوى.
+      const changed = await rest(`/rest/v1/autopilot?user_id=eq.${encodeURIComponent(uid)}${guard}&select=enabled`, {
+        method: "PATCH", headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ enabled: body.enabled, updated_at: new Date().toISOString() }),
+      });
+      if (!Array.isArray(changed) || changed.length !== 1 || changed[0].enabled !== body.enabled) {
+        return json(res, 409, { error: "الإعدادات اتغيرت أو مش موجودة — حدّث الصفحة وحاول تاني" });
+      }
+      return json(res, 200, { ok: true, enabled: changed[0].enabled });
+    }
+
     if (body.action === "save") {
       const templateInput = body.template && typeof body.template === "object" ? body.template : {};
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
