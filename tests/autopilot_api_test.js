@@ -188,7 +188,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("connectedPlatforms يعيد المنصات المرتبطة فقط", set1 instanceof Set && set1.has("youtube") && !set1.has("tiktok"),
     [...(set1 || [])].join(","));
   const autoSrc2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("generateAndPublish يفلتر المنصات بالربط", /requested\.filter\(p => connectedSet\.has\(p\)\)/.test(autoSrc2));
+  chk("generateAndPublish يوقف عند منصة مختارة غير مرتبطة", /requested\.filter\(p => !connectedSet\.has\(p\)\)/.test(autoSrc2) && /if \(missing\.length\)/.test(autoSrc2));
   const apiSrc2 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
   chk("run_all لا يشمل إلا المنصات المرتبطة", /platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
 

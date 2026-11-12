@@ -21,8 +21,7 @@ module.exports = async (req, res) => {
         [JSON.stringify({ error: reason, source: "cron_publish", at: new Date().toISOString() })]);
     } catch { /* لا نُسقط الكرون بسبب التسجيل */ }
   }
-  /* صفّ بقي 'publishing' بعد إنهاء الدالة في تشغيل سابق لا يلتقطه أي مسار:
-   * نُعيده 'failed' أولًا حتى يُعاد نشره بدل أن يضيع اليوم بصمت. */
+  /* نُظهر الصف العالق كفشل يحتاج مراجعة، لا نفترض أن الرفع لم ينجح. */
   let reclaimed = 0;
   try { reclaimed = await reclaimStalePublishing({ minutes: 20 }); } catch { reclaimed = 0; }
   const rows = await q(

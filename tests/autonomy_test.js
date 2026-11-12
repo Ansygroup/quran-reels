@@ -176,6 +176,7 @@ const mkRoute = (url) => {
   impl.q = async (sql, params) => { dbCalls.push({ sql, params }); return []; };
   const closed = await T.closeStaleRuns(45);
   chk("ينظّف autopilot_runs العالقة", closed === true && dbCalls.some((c) => /status='rendering'/.test(c.sql) && /completed_at=now\(\)/.test(c.sql)));
+  chk("التجهيز العالق يتحول لفشل تحذيري مع بقاء مسار الفيديو", dbCalls.some(c => /where status='queued'/.test(c.sql) && /غير مؤكدة/.test(c.params[0]) && !/video_path/.test(c.sql)));
   const staleCall = dbCalls.find((c) => /status='rendering'/.test(c.sql)) || { params: [] };
   const windowMin = (staleCall.params[1] ? Date.now() - Date.parse(staleCall.params[1]) : 0) / 60000;
   /* طبقة db تُترجم إلى PostgREST ولا تفهم `now() - ($2 || ' minutes')::interval`،
@@ -375,12 +376,10 @@ const mkRoute = (url) => {
   pub.calls.length = 0; dbCalls.length = 0;
   pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id });
   const cResume = await T.catchUpDaily();
-  chk("فشل النشر فقط ⇒ إعادة نشر بلا إعادة توليد",
-    cResume.length === 1 && cResume[0].ok === true && cResume[0].skipped === "rendered-cached" && cResume[0].resumed === true,
-    JSON.stringify(cResume).slice(0, 240));
-  chk("إعادة النشر تستخدم صفّ القائمة نفسه", pub.calls.length === 1 && pub.calls[0].id === "q1");
-  chk("التشغيل يُصحَّح إلى published بالرابط",
-    sqlCalls.some((q) => /update autopilot_runs set status='published'/.test(String(q))));
+  chk("فشل نشر غير مؤكد ⇒ يتوقف بلا إعادة نشر أو توليد",
+    cResume.length === 1 && cResume[0].ok === false && cResume[0].skipped === "publish-failed" && pub.calls.length === 0,
+    JSON.stringify(cResume));
+  chk("لا يُعلن التشغيل منشورًا بلا دليل", !sqlCalls.some((q) => /update autopilot_runs set status='published'/.test(String(q))));
 
   /* فشل جزئي: منصة نجحت وأخرى لا ⇒ لا إعادة توليد (كي لا يتكرر المنشور) */
   impl.q = async (sql) => (/from publish_queue/i.test(sql)
@@ -390,7 +389,7 @@ const mkRoute = (url) => {
   let pubSeq = 0;
   pub.impl = async (row) => (++pubSeq === 1 ? { ok: true, url: "https://youtu.be/ok" } : { ok: false, error: "token" });
   const cPartial = await T.catchUpDaily();
-  chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "partial-publish" && cPartial[0].ok === false, JSON.stringify(cPartial).slice(0, 240));
+  chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "publish-failed" && cPartial[0].ok === false && pub.calls.length === 0, JSON.stringify(cPartial).slice(0, 240));
 
   // اليوم منشور جزئيًا؛ نعيد المنصة الفاشلة فقط من الفيديو نفسه.
   impl.q = async (sql) => {
@@ -402,7 +401,7 @@ const mkRoute = (url) => {
   pub.calls.length = 0;
   pub.impl = async (row) => ({ ok: true, url: "https://example.test/" + row.id });
   const resumedPartial = await T.catchUpDaily();
-  chk("منشور جزئيًا ⇒ يعيد المنصة الفاشلة بلا توليد أو إعادة الناجحة", resumedPartial.length === 1 && resumedPartial[0].skipped === "rendered-cached" && pub.calls.length === 1 && pub.calls[0].id === "tiktok-failed", JSON.stringify(resumedPartial));
+  chk("منشور جزئيًا ⇒ لا يخمّن نتيجة المنصة الفاشلة", resumedPartial.length === 1 && resumedPartial[0].skipped === "publish-failed" && pub.calls.length === 0, JSON.stringify(resumedPartial));
 
   /* فشل النشر كله ⇒ الفيديو الجاهز يبقى ولا نعيد توليده */
   impl.q = async (sql) => (/from publish_queue/i.test(sql)
@@ -412,7 +411,7 @@ const mkRoute = (url) => {
   pub.impl = async () => ({ ok: false, error: "token" });
   global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button>' });
   const cFull = await T.catchUpDaily();
-  chk("فشل النشر كله ⇒ لا إعادة توليد", cFull.length === 1 && cFull[0].skipped === "publish-failed" && pub.calls.length === 1, JSON.stringify(cFull).slice(0, 240));
+  chk("فشل النشر كله ⇒ لا إعادة توليد", cFull.length === 1 && cFull[0].skipped === "publish-failed" && pub.calls.length === 0, JSON.stringify(cFull).slice(0, 240));
 
   /* لا صفوف فاشلة ⇒ لا استدعاء للنشر */
   impl.q = async (sql) => (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
@@ -459,8 +458,28 @@ const mkRoute = (url) => {
   pub.calls.length = 0;
   const cPub = await T.catchUpDaily();
   chk("نُشر شيء اليوم ⇒ لا توليد ولا تكرار",
-    cPub.length === 1 && cPub[0].skipped === "published-cached" && cPub[0].ok === true && pub.calls.length === 0,
+    cPub.length === 1 && cPub[0].skipped === "review-needed" && cPub[0].ok === false && pub.calls.length === 0,
     JSON.stringify(cPub).slice(0, 240));
+
+  // أثر فيديو محفوظ أو صف مجدول قديم يمنع الإنقاذ حتى مع غياب صف منشور.
+  const today = A.cairoDate();
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"], all_channels: true }];
+    if (/from publish_queue/i.test(sql) && !/status='failed'|status='published'/i.test(sql)) return [{ id: "scheduled", video_path: `u1/autopilot/${today}-old.mp4` }];
+    return [];
+  };
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: `daily:u1:${today}` }] : [];
+  pub.calls.length = 0;
+  const oldScheduled = await T.catchUpDaily();
+  chk("صف مجدول قديم يمنع فيديو بديل", oldScheduled[0].skipped === "review-needed" && pub.calls.length === 0, JSON.stringify(oldScheduled));
+  impl.q = async sql => /from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : [];
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", video_path: `u1/autopilot/${today}-old.mp4` }] : [];
+  const lostReceipt = await T.catchUpDaily();
+  chk("مسار فيديو محفوظ يمنع الإنقاذ حتى لو الإدراج غير ظاهر", lostReceipt[0].skipped === "review-needed" && pub.calls.length === 0, JSON.stringify(lostReceipt));
+  const prev = A.dayShift(today, -1);
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ run_date: today, status: "published" }, { run_date: prev, status: "failed", video_path: `u1/autopilot/${prev}-old.mp4` }] : [];
+  const oldVideo = await T.backfillDaily({ lookback: 1 });
+  chk("مسار فيديو محفوظ يمنع التعويض لنفس اليوم", oldVideo[0].skipped === "review-needed" && oldVideo[0].day === prev, JSON.stringify(oldVideo));
 
   /* التعويض لا يعيد يومًا نُشر فيه شيء فعليًا */
   impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [

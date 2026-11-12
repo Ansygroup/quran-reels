@@ -54,5 +54,8 @@ global.fetch = async (url, opts = {}) => {
   mode = "fail_first"; requests = []; patches = []; calls.length = 0;
   const run = await A.generateAndPublish("u1", { runType: "daily", config: { platforms: ["youtube"], all_channels: true } });
   assert.equal(run.ok, false); assert.match(run.error, /503/); assert(patches.some(p => p.status === "failed" && /503/.test(p.error))); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
+  mode = "normal"; requests = []; patches = [];
+  const missing = await A.generateAndPublish("u1", { runType: "daily", config: { platforms: ["youtube", "tiktok"], all_channels: true } });
+  assert.equal(missing.ok, false); assert.match(missing.error, /tiktok/); assert(patches.some(p => p.status === "failed")); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
   console.log("ALL OK: 205 قنوات عبر الصفحات، فشل مغلق، واستقلال محاولة كل قناة محاكيًا");
 })().catch(e => { console.error(e); process.exitCode = 1; });

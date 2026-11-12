@@ -206,7 +206,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("التشغيل يستخدم planTargets ويمرّر connection_id",
     /planTargets\(platforms, connsByPlatform/.test(autoSrc) &&
     (/connection_id, video_path: storagePath/.test(autoSrc) || /connection_id: connectionId, video_path: storagePath/.test(autoSrc)) &&
-    /ensureQueueRow\(\{ userId, platform, connectionId: connection_id/.test(autoSrc));
+    /queueTargets\(run.id, userId, storagePath, rendered.filename, targets/.test(autoSrc));
   chk("يقرأ كل القنوات فقط عند تفعيل الخيار", /runConfig\?\.all_channels === true/.test(autoSrc) && /connectionsFor\(userId, platform\)/.test(autoSrc));
   const apiSrc = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
   chk("الـAPI يحفظ all_channels ويعيده", /all_channels = body\.all_channels === true/.test(apiSrc) && /all_channels: config\.all_channels === true/.test(apiSrc));
