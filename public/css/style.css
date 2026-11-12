@@ -820,3 +820,8 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   .acct-grid2,.acct-grid3{grid-template-columns:1fr}
   .chan-card .chan-acts{width:100%}
 }
+
+/* مراحل حقيقية يسجلها الخادم، بلا نسبة تقديرية. */
+.acct-progress .progress-steps,.acct-progress .progress-channels{margin:12px 0;padding-inline-start:1.5rem;display:grid;gap:.5rem}
+.acct-progress .progress-steps{list-style:none;padding-inline-start:0}
+.acct-progress .progress-channels a{color:var(--gold,#c99838);text-decoration:underline}

@@ -100,6 +100,7 @@ window.PublishApp = {
     
     this.renderAccount(data);
     this.bindEvents(uid);
+    this.startProgressPolling();
     // حالة الربط الحقيقية — تُقرأ من op=list (الخادم لا يرسل التوكنات أبدًا)
     await this.renderConnections(await window.AuthApp.getToken());
     this.reportLinkedFlag();
@@ -125,7 +126,7 @@ window.PublishApp = {
     if (/invalid_grant|expired or revoked|unauthorized_client/i.test(t)) {
       return "انتهت صلاحية ربط " + (/tiktok/i.test(t) ? "تيك توك" : /\bx\b|twitter/i.test(t) ? "X" : "يوتيوب") + " — أعد الربط من بطاقة القنوات";
     }
-    if (/quotaExceeded|exceeded your quota/i.test(t)) return "تجاوز الحد اليومي للرفع على يوتيوب — يُعاد تلقائيًا";
+    if (/quotaExceeded|exceeded your quota/i.test(t)) return "تجاوز الحد اليومي للرفع على يوتيوب — راجع النتيجة قبل إعادة المحاولة";
     return t;
   },
 
@@ -346,6 +347,58 @@ window.PublishApp = {
       <p class="hint">«تشغيل الآن» يُنتج فيديو وينشره فورًا (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>`;
 
     this.renderPlatformChecks(data);
+  },
+
+  /* نعرض فقط المراحل التي سجّلها الخادم وحالة كل صف نشر فعلي. */
+  renderProgress(data = {}) {
+    const wrap = document.getElementById("acctProgress");
+    if (!wrap) return;
+    const head = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div>';
+    if (this._progressWaiting) { wrap.innerHTML = head + '<p class="hint">⏳ بنستنى الخادم يبدأ التشغيل ويسجّل أول خطوة…</p>'; return; }
+    const r = data.run;
+    if (!r) { wrap.innerHTML = head + '<p class="hint">مفيش تشغيل مسجّل لسه.</p>'; return; }
+    const labels = { checking: "فحص القنوات والإعدادات", preparing: "تجهيز الفيديو", audio: "فحص التلاوة", export: "إنشاء الفيديو", validating: "فحص الصوت والملف", storage: "حفظ الفيديو", queue: "تجهيز مهام القنوات", publishing: "محاولة النشر على القنوات" };
+    const states = { rendering: "⏳ جاري التجهيز", queued: "⏳ تجهيز أو نشر", published: "✅ التشغيل مكتمل", failed: "⚠️ التشغيل ما اكتملش" };
+    const events = (Array.isArray(data.events) ? data.events : []).filter(e => labels[e.stage]);
+    const steps = events.length ? `<ol class="progress-steps">${events.map((e, i) => `<li>${i === events.length - 1 ? "📍" : "✓"} ${this.esc(labels[e.stage])}</li>`).join("")}</ol>` : `<p class="hint">${data.events_available === false ? "تعذّر قراءة تفاصيل المراحل دلوقتي." : "تفاصيل المراحل مش متاحة للتشغيل ده."}</p>`;
+    const targetStates = { scheduled: "في الانتظار", publishing: "جاري النشر", published: "اتنشر", failed: "فشل أو النتيجة محتاجة مراجعة", draft: "مسودة" };
+    const targets = Array.isArray(data.targets) ? data.targets : [];
+    const channels = targets.length ? `<ul class="progress-channels">${targets.map(t => {
+      const name = `${PLATFORMS[t.platform] || t.platform || "منصة"} · ${t.channel || "قناة"}`;
+      const link = t.status === "published" && this.safeUrl(t.url) ? ` · <a href="${this.esc(this.safeUrl(t.url))}" target="_blank" rel="noopener">شوف الفيديو</a>` : "";
+      return `<li><b>${this.esc(name)}</b>: ${this.esc(targetStates[t.status] || "حالة غير معروفة")}${link}${t.error ? ` — ${this.esc(this.friendly(t.error))}` : ""}</li>`;
+    }).join("")}</ul>` : "";
+    const warning = data.targets_available === false ? '<p class="hint warn">تعذّر قراءة حالة القنوات دلوقتي.</p>' : data.targets_truncated ? '<p class="hint warn">قائمة القنوات المعروضة ممكن تكون ناقصة.</p>' : "";
+    const error = r.status === "failed" && r.error ? `<p class="hint warn">${this.esc(this.friendly(r.error))}</p>` : "";
+    const at = events.length && events[events.length - 1].at ? `آخر خطوة مسجّلة: ${this.esc(cairoClockLabel(events[events.length - 1].at))}. ` : "";
+    wrap.innerHTML = head + `<p><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + steps + channels + warning + error + `<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p>`;
+  },
+
+  startProgressPolling() {
+    if (this._progressTimer) clearTimeout(this._progressTimer);
+    this.pollProgress();
+  },
+  async pollProgress() {
+    if (this._progressBusy) return;
+    this._progressBusy = true;
+    try {
+      const token = await window.AuthApp.getToken();
+      if (!token) throw new Error("no session");
+      const res = await fetch("/api/autopilot?progress=1", { method: "GET", cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("unavailable");
+      const data = await res.json();
+      if (this._progressWaiting && data.run && data.run.id !== this._progressBaseline) this._progressWaiting = false;
+      if (data.run?.id) this._lastProgressRunId = data.run.id;
+      this.renderProgress(data);
+    } catch {
+      const wrap = document.getElementById("acctProgress");
+      if (wrap) wrap.innerHTML = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div><p class="hint warn">مش قادرين نحدّث الحالة دلوقتي؛ ده مش معناه إن التشغيل وقف. راجعها قبل ما تشغّل تاني.</p>';
+    } finally {
+      this._progressBusy = false;
+      if (this._progressTimer) clearTimeout(this._progressTimer);
+      const view = document.getElementById("view-account");
+      if (view && !view.hidden) this._progressTimer = setTimeout(() => this.pollProgress(), 5000);
+    }
   },
 
   /* ---------- سجل التشغيل ---------- */
@@ -731,6 +784,12 @@ window.PublishApp = {
   },
 
   async runNow(kind, btn) {
+    if (this._runPending) return;
+    this._runPending = true;
+    this._progressBaseline = this._lastProgressRunId || this.data?.runs?.[0]?.id || null;
+    this._progressWaiting = true;
+    this.renderProgress();
+    this.startProgressPolling();
     if (btn) { btn.disabled = true; }
     const old = btn ? btn.textContent : "";
     if (btn) btn.textContent = "⏳ جارٍ التشغيل…";
@@ -742,8 +801,11 @@ window.PublishApp = {
         setTimeout(() => this.init(), 1200);
       } else if (typeof toast === "function") toast(String(out.error || "تعذّر التشغيل"), "err");
     } catch {
-      if (typeof toast === "function") toast("تعذّر الاتصال بالخادم", "err");
+      if (typeof toast === "function") toast("الاتصال اتقطع؛ راجع حالة التشغيل قبل ما تحاول تاني", "err");
     }
+    this._runPending = false;
+    this._progressWaiting = false;
+    this.startProgressPolling();
     if (btn) { btn.disabled = false; btn.textContent = old; }
   },
 
