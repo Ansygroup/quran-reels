@@ -14,7 +14,9 @@ function toolCardHTML(t) {
 function renderHomeTools() {
   const wrap = $("#homeTools");
   if (!wrap) return;
-  wrap.innerHTML = TOOLS.slice(0, 12).map(toolCardHTML).join("");
+  // نعرض اختيارات شائعة فقط هنا، وكل الأدوات تظل في صفحة الأدوات.
+  const featured = ["prayer", "qibla", "adhkar", "zakat", "asma", "hadith"];
+  wrap.innerHTML = featured.map(id => TOOLS.find(t => t.id === id)).filter(Boolean).map(toolCardHTML).join("");
 }
 
 function renderAllTools(filter = "") {
