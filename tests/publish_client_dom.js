@@ -277,6 +277,10 @@ window.fetch = async (url, opts = {}) => {
   window.PublishApp.reportLinkedFlag();
   if (!/نشر الفيديو الجاهز تلقائيًا/.test(d.getElementById("acctNotice").textContent)) fail("لا تظهر نتيجة المحاولة التلقائية الناجحة");
   else ok("نتيجة المحاولة التلقائية الناجحة تظهر في اللوحة");
+  window.history.replaceState(null, "", "/#/account?linked=youtube&channel=nondefault");
+  window.PublishApp.reportLinkedFlag();
+  if (!/مش الافتراضية/.test(d.getElementById("acctNotice").textContent)) fail("لم يُشرح أن القناة المربوطة ليست الافتراضية");
+  else ok("القناة غير الافتراضية يُشرح وضعها دون تعديل اختيار المستخدم");
   window.history.replaceState(null, "", "/#/account?linked=youtube&auto_resume=failed");
   window.PublishApp.reportLinkedFlag();
   if (!/لم تكتمل/.test(d.getElementById("acctNotice").textContent)) fail("لا يظهر فشل المحاولة التلقائية");

@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=27)", /publish\.js\?v=27/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=28)", /publish\.js\?v=28/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -111,7 +111,7 @@ if (!JSDOM) {
     chk("لينكد إن يظهر «قريبًا» بلا زر ربط", Boolean(li && /قريبًا/.test(li.textContent)));
 
     /* جلسة منتهية: البطاقة كانت تعرض «مرتبط» بلا تحذير رغم أن النشر يفشل بـinvalid_grant */
-    chk("اتصال بلا توكن تجديد يُنبّه «انتهت صلاحية الربط»", Boolean(yt && /انتهت صلاحية/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
+    chk("اتصال بلا توكن تجديد يُنبّه بغياب تصريح التجديد", Boolean(yt && /تصريح التجديد غير متاح/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
     chk("الخادم يبلّغ has_refresh منطقيًا (بلا توكن)", /has_refresh/.test(fs.readFileSync(path.join(ROOT, "lib", "soc_list.js"), "utf8")));
     chk("التحذير لا يعتمد على انتهاء access_token وحده", /has_refresh === false/.test(fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8")));
     chk("يوتيوب المنتهي يعرض «إعادة الربط»", Boolean(window.document.querySelector('[data-soc="youtube"] [data-connect="youtube"]')));
