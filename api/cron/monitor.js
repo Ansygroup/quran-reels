@@ -38,6 +38,9 @@ module.exports = async (req, res) => {
     r.skipped === "published" ||
     r.skipped === "published-cached" ||
     r.skipped === "rendered-cached" ||
+    /* dueConfigs يستثني من أنهى يومه قبل الدخول في الحلقة، فيُبلَّغ عنه بهذه */
+    r.skipped === "already-settled" ||
+    r.skipped === "all-settled" ||
     (r.ok === true && r.resumed === true)
   );
   const todaySettled = rescue.length > 0 && rescue.every(settled);

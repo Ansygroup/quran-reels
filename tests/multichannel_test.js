@@ -145,12 +145,12 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   /* 6) الواجهة: شارة افتراضية + إضافة قناة + ربط المعالج */
   const ui = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("بطاقة القنوات تعرض شارة ⭐ افتراضية", /⭐ افتراضية/.test(ui));
-  chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{c\.id\}"/.test(ui) && /op=default/.test(ui));
+  chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
   chk("تلميح أن النشر على القناة الافتراضية", /يُنشر على القناة الافتراضية/.test(ui));
-  chk("الكاش مكسور (v=24 / qr-v26) في الماركب والخدمة",
-    /publish\.js\?v=24/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v26/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("الكاش مكسور (v=25 / qr-v27) في الماركب والخدمة",
+    /publish\.js\?v=25/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v27/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
@@ -208,7 +208,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("الـAPI يحفظ all_channels ويعيده", /all_channels = body\.all_channels === true/.test(apiSrc) && /all_channels: config\.all_channels === true/.test(apiSrc));
   const uiSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("الواجهة تُظهر المفتاح عند تعدد القنوات وترسله",
-    /chkAllChannels/.test(uiSrc) && /multiChannel \?/.test(uiSrc) && /all_channels: Boolean\(document\.getElementById\("chkAllChannels"\)/.test(uiSrc));
+    /chkAllChannels/.test(uiSrc) && /(multi|multiChannel)\s*\?/.test(uiSrc) && /all_channels: q2\("chkAllChannels"\)/.test(uiSrc));
   chk("ترحيل all_channels موجود", fs.existsSync(path.join(ROOT, "sql", "migrations", "20261112_autopilot_all_channels.sql")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);

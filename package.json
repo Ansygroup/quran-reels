@@ -10,7 +10,7 @@
   },
   "scripts": {
     "test": "node tests/run.js",
-    "pretest": "node tests/functions_limit.js && node tests/homepage_test.js && node tests/sitemap_test.js && node tests/site_boot_test.js && node tests/login_ui_test.js && node tests/autopilot_api_test.js && node tests/account_connect_test.js && node tests/cron_publish_test.js && node tests/cron_monitor_test.js && node tests/retry_publish_test.js && node tests/db_shim_test.js\n",
+    "pretest": "node tests/functions_limit.js && node tests/homepage_test.js && node tests/sitemap_test.js && node tests/site_boot_test.js && node tests/login_ui_test.js && node tests/autopilot_api_test.js && node tests/account_connect_test.js && node tests/cron_publish_test.js && node tests/cron_monitor_test.js && node tests/retry_publish_test.js && node tests/db_shim_test.js && node tests/automation_test.js && node tests/automation_db_test.js",
     "test:limits": "node tests/functions_limit.js",
     "verify:deploy": "node scripts/check_deploy.js",
     "test:dom": "node tests/publish_client_dom.js",
@@ -34,6 +34,7 @@
     "test:autopilot": "node tests/autopilot_unit.js",
     "test:cron": "node tests/cron_publish_test.js && node tests/cron_monitor_test.js",
     "test:retry": "node tests/retry_publish_test.js",
-    "test:db": "node tests/db_shim_test.js"
+    "test:db": "node tests/db_shim_test.js",
+    "test:automation": "node tests/automation_test.js"
   }
 }
