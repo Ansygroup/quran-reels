@@ -379,7 +379,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const rec2 = await libAuto2.__test.recordSelfTest({ ok: false, deep: false });
   chk("فشل التسجيل لا يرمي (best effort)", rec2 === false);
   const apiSrc6 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
-  chk("الـAPI يعيد recorded مع التقرير", /recorded = await recordSelfTest\(report\)/.test(apiSrc6) && /recorded }/.test(apiSrc6));
+  chk("الـAPI يعيد recorded مع التقرير", /recorded = await recordSelfTest\(report, uid\)/.test(apiSrc6) && /recorded }/.test(apiSrc6));
   chk("ملف ترحيل الجدول موجود ومحميّ", fs.existsSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql")) &&
     /enable row level security/.test(fs.readFileSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql"), "utf8")));
 
@@ -387,7 +387,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   setDb({
     q1: async () => null,
     rest: async (p) => {
-      if (/system_checks/.test(p)) return [{ kind: "render_selftest_deep", ok: true, detail: { ms: 9000 }, created_at: "2026-11-11T15:20:00Z" }];
+      if (/system_checks/.test(p)) return [{ kind: "render_selftest_deep", ok: true, detail: { ms: 9000, user_id: "u9" }, created_at: "2026-11-11T15:20:00Z" }];
       if (/autopilot_runs/.test(p)) return [];
       if (/social_connections/.test(p)) return [];
       return [];
@@ -396,9 +396,16 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const acct = await T.accountData("u9");
   chk("accountData يحمل last_check", Boolean(acct.last_check && acct.last_check.kind === "render_selftest_deep"), JSON.stringify(acct.last_check));
   chk("lastSelfTest يقرأ أحدث صف بترتيب تنازلي",
-    (await T.lastSelfTest()) !== null);
+    (await T.lastSelfTest("u9")) !== null);
   setDb({ rest: async () => { throw new Error("table missing"); } });
-  chk("غياب الجدول لا يُسقط اللوحة (last_check = null)", (await T.lastSelfTest()) === null);
+  chk("غياب الجدول لا يُسقط اللوحة (last_check = null)", (await T.lastSelfTest("u9")) === null);
+  let checkQuery = "";
+  setDb({ rest: async (p) => { checkQuery = p; return [{ kind: "render_failure", detail: { user_id: "other", error: "private" } }]; } });
+  chk("آخر فحص لا يكشف تفاصيل مستخدم آخر", (await T.lastSelfTest("u9")) === null && /detail->>user_id=eq.u9/.test(checkQuery) && /kind=in.\(render_selftest,render_selftest_deep\)/.test(checkQuery));
+  const scoped = [];
+  setDb({ rest: async (p, opts) => { scoped.push({ p, opts }); return []; } });
+  await libAuto2.__test.recordSelfTest({ ok: true }, "u9");
+  chk("فحص المستخدم محفوظ بمعرّفه", JSON.parse(scoped[0].opts.body).detail.user_id === "u9");
   const pubSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("اللوحة تعرض «آخر فحص محفوظ»", /acctLastCheck/.test(pubSrc) && /آخر \$\{kind\} محفوظ/.test(pubSrc));
   chk("نص الفحص يذكر هل حُفظت النتيجة", /data\.recorded \?/.test(pubSrc));

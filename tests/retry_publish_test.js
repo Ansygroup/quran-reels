@@ -33,11 +33,15 @@ Module._load = function (request) {
 /* بديل قاعدة البيانات */
 const sql = [];
 let qRows = [];
+let publishedRows = [];
 let reclaimRows = [];
 const impl = { q: async () => [], rest: async () => [] };
 impl.q = async (text, params) => {
   sql.push({ text, params });
   if (/status='publishing'/.test(text)) return reclaimRows;
+  if (/from publish_queue/.test(text) && /status='published'/.test(text)) {
+    return publishedRows.filter(r => r.platform === params[1] && (!/connection_id=\$4/.test(text) || r.connection_id === params[3]) && (!/connection_id is null/.test(text) || !r.connection_id));
+  }
   return /from publish_queue/.test(text) ? qRows : [];
 };
 const dbStub = { q: (...a) => impl.q(...a), q1: async () => null, rest: (...a) => impl.rest(...a) };
@@ -56,7 +60,7 @@ require.cache[pubPath] = {
 const A = require(path.join(ROOT, "lib", "autopilot.js"));
 const T = A.__test;
 
-const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimRows = []; pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id }); };
+const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; publishedRows = []; reclaimRows = []; pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id }); };
 
 (async () => {
   chk("retryPublishFailed مُصدَّرة للاختبار", typeof T.retryPublishFailed === "function");
@@ -99,6 +103,35 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimR
   const channels = await T.retryPublishFailed("u1", "2026-11-12");
   chk("إعادة النشر تحفظ القناتين وتحذف المكرر لنفس القناة فقط", pub.calls.join(",") === "c1,c2" && channels.duplicates === 1, JSON.stringify(channels));
 
+  reset();
+  qRows = [
+    { id: "fail-same", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "fail-other", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" },
+  ];
+  publishedRows = [{ id: "pub", platform: "youtube", connection_id: "channel1" }];
+  const partial = await T.retryPublishFailed("u1", "2026-11-12");
+  chk("منشور على قناة ⇒ ينشر الفاشل على القناة الأخرى فقط", pub.calls.join(",") === "fail-other" && partial.blocked === 1 && partial.failed === 1, JSON.stringify(partial));
+  reset();
+  qRows = [{ id: "ambiguous", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" }];
+  publishedRows = [{ id: "pub-default", platform: "youtube", connection_id: null }];
+  const uncertain = await T.retryPublishFailed("u1", "2026-11-12");
+  chk("منشور لقناة افتراضية غير محددة ⇒ لا تخمين ولا رفع", pub.calls.length === 0 && uncertain.blocked === 1, JSON.stringify(uncertain));
+
+  reset();
+  qRows = [{ id: "unknown", platform: "youtube", connection_id: "c1", video_path: "u/autopilot/2026-11-12-a.mp4" }];
+  const oldQ = impl.q;
+  impl.q = async (text, params) => { if (/status='published'/.test(text)) throw new Error("db unavailable"); return oldQ(text, params); };
+  let blockedOnDb = false;
+  try { await T.retryPublishFailed("u1", "2026-11-12"); } catch { blockedOnDb = true; }
+  impl.q = oldQ;
+  chk("تعذّر فحص المنشورات السابقة ⇒ لا نداء نشر", blockedOnDb && pub.calls.length === 0);
+
+  reset();
+  qRows = Array.from({ length: 50 }, (_, id) => ({ id: String(id), platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }));
+  let capBlocked = false;
+  try { await T.retryPublishFailed("u1", "2026-11-12"); } catch { capBlocked = true; }
+  chk("بلوغ حد القراءة يوقف المحاولة بدل إعلان اكتمال ناقص", capBlocked && pub.calls.length === 0);
+
   /* 4) فشل النشر لا يرمي ويُحصى */
   reset();
   qRows = [{ id: "f1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }];
@@ -131,6 +164,18 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimR
   const reused = await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/x.mp4", videoName: "v.mp4", meta: { title: "t", caption: "c", hashtags: "#a" } });
   chk("صفّ قائم يُعاد استخدامه بلا إدراج جديد",
     reused && reused.id === "q1" && reused.status === "scheduled" && posts.length === 0, JSON.stringify({ reused, posts: posts.length }));
+
+  reset();
+  let conflictInserts = 0;
+  impl.rest = async (p, opts = {}) => {
+    if (!opts.method) return [{ id: "q1", status: "failed" }];
+    if (opts.method === "PATCH") return [];
+    if (opts.method === "POST") conflictInserts++;
+    return [];
+  };
+  let conflictBlocked = false;
+  try { await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/x.mp4", videoName: "v", meta: {} }); } catch { conflictBlocked = true; }
+  chk("تغير حالة الصف أثناء التحضير لا ينشئ بديلًا", conflictBlocked && conflictInserts === 0);
 
   reset();
   const posts2 = [];
