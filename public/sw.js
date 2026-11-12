@@ -1,9 +1,9 @@
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v41";
+const CACHE = "qr-v42";
 const SHELL = [
   "/",
-  "/css/style.css?v=13",
-  "/js/data.js?v=3",
+  "/css/style.css?v=14",
+  "/js/data.js?v=4",
   "/js/core.js?v=4",
   "/js/quran.js?v=4",
   "/js/reel.js?v=5",
@@ -13,7 +13,7 @@ const SHELL = [
   "/js/tools-b.js?v=3",
     "/js/tools-c.js?v=3",
     "/js/auth.js?v=3",
-    "/js/publish.js?v=34",
+    "/js/publish.js?v=35",
     "/js/app.js?v=6",
   "/data/quran-uthmani.json",
   "/data/adhkar.json",

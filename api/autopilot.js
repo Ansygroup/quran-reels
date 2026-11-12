@@ -1,4 +1,6 @@
 /* Account dashboard API: safe settings, private run history, and manual generation. */
+const crypto = require("node:crypto");
+const { validateImage, validId, loadBackground } = require("../lib/private_background");
 const { validateTemplate } = require("../lib/reel_settings");
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
@@ -34,9 +36,12 @@ async function readBody(req) {
   let text = "";
   for await (const part of req) {
     text += part;
-    if (text.length > 20000) throw new Error("الطلب أكبر من المسموح");
+    if (text.length > 720000) throw new Error("الطلب أكبر من المسموح");
   }
-  try { return JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
+  let parsed;
+  try { parsed = JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
+  if (text.length > 20000 && !(parsed?.action === "save" && typeof parsed.custom_image === "string")) throw new Error("الطلب أكبر من المسموح");
+  return parsed;
 }
 
 /* دعم توليد البوست من المقالات.
@@ -259,6 +264,13 @@ const handler = async (req, res) => {
   try {
     if (req.method === "GET") {
       const url = new URL(req.url || "/api/autopilot", "http://local");
+      if (url.searchParams.get("background") === "1") {
+        res.setHeader("Cache-Control", "no-store");
+        const current = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
+        const t = parseTemplate(current?.template);
+        if (t.background !== "custom" || !validId(t.background_image_id)) return json(res, 404, { error: "لا توجد صورة محفوظة" });
+        return json(res, 200, { image_id: t.background_image_id, image: await loadBackground(rest, uid, t.background_image_id) });
+      }
       if (url.searchParams.get("progress") === "1") {
         res.setHeader("Cache-Control", "no-store");
         return json(res, 200, await latestProgress(uid));
@@ -298,8 +310,14 @@ const handler = async (req, res) => {
     if (body.action === "save") {
       const templateInput = body.template && typeof body.template === "object" ? body.template : {};
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
-      const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
-      const templateError = validateTemplate(templateInput);
+      const background = templateInput.background === "custom" ? "custom" : (BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate");
+      let imageId = templateInput.background_image_id, imageData = null;
+      if (background === "custom" && body.custom_image !== undefined) {
+        try { imageData = validateImage(body.custom_image); } catch (e) { return json(res, 400, { error: e.message }); }
+        imageId = crypto.randomUUID();
+      } else if (body.custom_image !== undefined) return json(res, 400, { error: "اختار الصورة كخلفية أولًا" });
+      const templateForValidation = { ...templateInput, ...(background === "custom" ? { background_image_id: imageId } : {}) };
+      const templateError = validateTemplate(templateForValidation);
       if (templateError) return json(res, 400, { error: templateError });
       const enabled = body.enabled === true;
       
@@ -320,24 +338,31 @@ const handler = async (req, res) => {
       const reciterId = String(templateInput.reciter || "");
       const wantFixed = templateInput.reciter_mode === "fixed" && RECITERS.some((r) => r.id === reciterId);
       if (templateInput.reciter_mode === "fixed" && !wantFixed) return json(res, 400, { error: "اختار قارئًا صالحًا" });
-      if (templateInput.background && !BACKGROUND_IDS.has(templateInput.background)) return json(res, 400, { error: "اختار خلفية صالحة للأتمتة" });
+      if (templateInput.background && templateInput.background !== "custom" && !BACKGROUND_IDS.has(templateInput.background)) return json(res, 400, { error: "اختار خلفية صالحة للأتمتة" });
       const template = {
         content_mode,
         reciter_mode: wantFixed ? "fixed" : "rotate",
         reciter: wantFixed ? reciterId : "",
         background,
+        ...(background === "custom" ? { background_image_id: imageId } : {}),
         privacy: "public",
         ...(content_mode === "fixed" ? { surah: templateInput.surah, from: templateInput.from, to: templateInput.to } : {}),
         ...(templateInput.design !== undefined ? { design: templateInput.design } : {}),
       };
       /* all_channels: انشر على كل القنوات المرتبطة (افتراضي: القناة الافتراضية فقط) */
       const all_channels = body.all_channels === true;
-      const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify({ user_id: uid, enabled, at_utc: "04:15:00", platforms, template, all_channels, updated_at: new Date().toISOString() }),
-      });
-      const config = Array.isArray(saved) ? saved[0] : saved;
+      const configInput = { user_id: uid, enabled, at_utc: "04:15:00", platforms, template, all_channels, updated_at: new Date().toISOString() };
+      let saved;
+      if (background === "custom") {
+        try {
+          saved = await rest("/rest/v1/rpc/save_custom_reel", { method: "POST", body: JSON.stringify({ p_config: configInput, p_image_id: imageId, p_jpeg_base64: imageData }) });
+        } catch (e) {
+          if (/background not found/i.test(String(e?.message))) return json(res, 409, { error: "الصورة اتغيّرت أو اتحذفت — حدّث الصفحة قبل الحفظ" });
+          return json(res, 503, { error: "تعذّر تأكيد حفظ الصورة والإعدادات — حدّث الصفحة قبل المحاولة" });
+        }
+      } else saved = await rest("/rest/v1/autopilot?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify(configInput) });
+      const config = Array.isArray(saved) && saved.length === 1 ? saved[0] : null;
+      if (!config || config.user_id !== uid || (background === "custom" && config.template?.background_image_id !== imageId)) throw new Error("تعذّر تأكيد حفظ الإعدادات — حدّث الصفحة قبل المحاولة");
       return json(res, 200, { ok: true, config: { ...config, template: parseTemplate(config?.template) } });
     }
 
