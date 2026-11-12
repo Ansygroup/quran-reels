@@ -49,7 +49,7 @@ const server = http.createServer((req, res) => {
         await page.waitForFunction(() => document.querySelector('#selSurah')?.options.length === 114);
         const measurements = await page.evaluate(() => {
           const rect = (s) => document.querySelector(s).getBoundingClientRect();
-          const out = [...document.querySelectorAll('#create *')].filter((e) => {
+          const out = [...document.querySelectorAll('#create *, .home-features *, #tools *, #library *, #steps *, #faq *')].filter((e) => {
             const r = e.getBoundingClientRect();
             return r.width > 0 && r.height > 0 && (r.left < -1 || r.right > window.innerWidth + 1);
           }).map(e => e.id || e.className || e.tagName);
@@ -68,10 +68,22 @@ const server = http.createServer((req, res) => {
         }
         assert.equal(await page.locator('#selSurah').inputValue(), originalSurah);
         assert.equal(await page.locator('#btnCreate').isVisible(), true);
+        assert.equal(await page.locator('#homeTools .tool-card').count(), 6);
+        assert.equal(await page.locator('#library a').count(), 1);
+        assert.equal(await page.locator('#library a').getAttribute('href'), '/articles/');
+        assert.equal(await page.locator('#steps .step-card').count(), 4);
+        assert.ok(await page.locator('#faqList .faq-item').count() >= 10);
+        await page.locator('#faqList .faq-q').first().click();
+        assert.equal(await page.locator('#faqList .faq-item').first().evaluate(e => e.classList.contains('open')), true);
+        if (process.env.HOME_UI_SCREENSHOTS) await page.screenshot({ path: path.join(process.env.HOME_UI_SCREENSHOTS, `${name}.png`), fullPage: true });
+        await page.locator('#tools .tools-more a').click();
+        await page.waitForFunction(() => !document.querySelector('#view-tools').hidden);
+        const allToolCount = await page.evaluate(() => TOOLS.length);
+        assert.ok(allToolCount >= 32);
+        assert.equal(await page.locator('#toolsGridAll .tool-card').count(), allToolCount);
         assert.equal(writes, 0);
         assert.deepEqual(errors, []);
-        if (process.env.HOME_UI_SCREENSHOTS) await page.screenshot({ path: path.join(process.env.HOME_UI_SCREENSHOTS, `${name}.png`), fullPage: true });
-        console.log(`OK ${name}: ${JSON.stringify(measurements)}, 7 tabs, no writes or page errors`);
+        console.log(`OK ${name}: ${JSON.stringify(measurements)}, 7 tabs, 6 featured tools, full tool list, FAQ, no writes or page errors`);
       } finally { await browser.close(); }
     }
   } finally { server.close(); }
