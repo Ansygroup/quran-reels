@@ -429,7 +429,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=26/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=27/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -498,10 +498,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v26 / sw qr-v28)",
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v27 / sw qr-v29)",
     /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v28/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v29/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
@@ -602,8 +602,8 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     Array.isArray(acctRe3.reauth) && acctRe3.reauth.length === 0, JSON.stringify(acctRe3.reauth));
 
   const pubSrc4 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
-  chk("اللوحة ترسم تنبيه إعادة الربط وتشرح عدم إعادة التوليد",
-    /acctReauth/.test(pubSrc4) && /فيديو جديد/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
+  chk("اللوحة تشرح المحاولة التلقائية بعد إعادة الربط",
+    /acctReauth/.test(pubSrc4) && /هيحاول ينشر الفيديو الجاهز بعد الربط/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
   chk("اللوحة فيها زر «انشر الفيديو الجاهز» بإجراء retry_publish",
     /btnRetryPublish/.test(pubSrc4) && /retry_publish/.test(pubSrc4) && /retry_publish/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
 
