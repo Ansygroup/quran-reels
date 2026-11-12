@@ -202,7 +202,7 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; publishe
   try { await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: "c1", storagePath: "x", meta: {} }); } catch { rejected = true; }
   chk("فشل فحص التكرار لا يُدرج صفًا جديدًا", rejected && writes === 0);
 
-  impl.rest = async () => [{ id: "fb", platform: "facebook" }, { id: "ig", platform: "instagram" }];
+  impl.rest = async (p) => p.includes("platform=eq.instagram") ? [{ id: "ig", platform: "instagram" }] : [{ id: "fb", platform: "facebook" }];
   const igConns = await T.connectionsFor("u1", "instagram");
   chk("قنوات إنستغرام لا تشمل صفوف فيسبوك", igConns.length === 1 && igConns[0].id === "ig");
 

@@ -194,9 +194,12 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
     JSON.stringify(PT(["youtube"], two, false)) === JSON.stringify([{ platform: "youtube", connection_id: null }]));
   const on = PT(["youtube"], two, true);
   chk("مفعّل ⇒ مهمة لكل قناة مع connection_id", on.length === 2 && on[0].connection_id === "y1" && on[1].connection_id === "y2", JSON.stringify(on));
-  chk("مفعّل بلا قنوات ⇒ تراجع لمهمة واحدة", PT(["youtube"], {}, true).length === 1);
-  const mixed = PT(["youtube", "tiktok"], { youtube: [{ id: "y1" }], tiktok: [] }, true);
-  chk("قنوات ناقصة لمنصة لا تُسقط الباقي", mixed.length === 2 && mixed[1].connection_id === null, JSON.stringify(mixed));
+  let emptyBlocked = false;
+  try { PT(["youtube"], {}, true); } catch { emptyBlocked = true; }
+  chk("مفعّل بلا قنوات ⇒ يوقف بدل قناة افتراضية مجهولة", emptyBlocked);
+  let mixedBlocked = false;
+  try { PT(["youtube", "tiktok"], { youtube: [{ id: "y1" }], tiktok: [] }, true); } catch { mixedBlocked = true; }
+  chk("قائمة قنوات ناقصة تمنع الإعلان عن نشر كامل", mixedBlocked);
   chk("قائمة منصات فارغة ⇒ لا أهداف", PT([], {}, true).length === 0 && PT(null, {}, true).length === 0);
 
   const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
