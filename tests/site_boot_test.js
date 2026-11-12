@@ -106,6 +106,17 @@ setTimeout(async () => {
   chk("رابط كل الأدوات ظاهر", Boolean(d.querySelector('#tools a[href="#/tools"]')));
   chk("المكتبة لها رابط فعلي واحد دون تصنيفات وهمية", d.querySelectorAll("#library a").length === 1 && d.querySelector("#library a").getAttribute("href") === "/articles/" && fs.existsSync(path.join(PUBLIC, "articles/index.html")));
   chk("الخطوات والأسئلة محفوظة", d.querySelectorAll("#steps .step-card").length === 4 && d.querySelectorAll("#faq .faq-item").length >= 10);
+  // كل سؤال يربط إجابته ويعلن حالتها، دون التأثير على بقية الأسئلة.
+  const faqItems = [...d.querySelectorAll("#faqList .faq-item")];
+  chk("كل سؤال مرتبط بإجابة مخفية وحالته مغلقة", faqItems.every(item => {
+    const button = item.querySelector(".faq-q"), answer = item.querySelector(".faq-a");
+    return button.getAttribute("aria-expanded") === "false" && answer.hidden && button.getAttribute("aria-controls") === answer.id && d.getElementById(answer.id) === answer;
+  }));
+  const faqButton = faqItems[0].querySelector(".faq-q"), faqAnswer = faqItems[0].querySelector(".faq-a");
+  faqButton.click();
+  chk("فتح السؤال يحدّث الحالة ويُظهر الإجابة وحدها", faqButton.getAttribute("aria-expanded") === "true" && !faqAnswer.hidden && faqItems[1].querySelector(".faq-a").hidden);
+  faqButton.click();
+  chk("إغلاق السؤال يعيد إخفاء الإجابة", faqButton.getAttribute("aria-expanded") === "false" && faqAnswer.hidden);
 
   chk("السنة في الفوتر تُملأ (#year)", /^\d{4}$/.test((d.getElementById("year")?.textContent || "").trim()), d.getElementById("year")?.textContent);
   chk("شريط الكوكيز موجود", Boolean(d.getElementById("cookieBar") && d.getElementById("cookieOk")));

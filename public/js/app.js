@@ -37,10 +37,10 @@ function renderAllTools(filter = "") {
 function renderFaq() {
   const wrap = $("#faqList");
   if (!wrap) return;
-  wrap.innerHTML = FAQ.map(([q, a]) => `
+  wrap.innerHTML = FAQ.map(([q, a], i) => `
     <div class="faq-item">
-      <button class="faq-q">${esc(q)} <span class="caret">▼</span></button>
-      <div class="faq-a"><div>${esc(a)}</div></div>
+      <button type="button" class="faq-q" aria-expanded="false" aria-controls="faq-answer-${i}">${esc(q)} <span class="caret" aria-hidden="true">▼</span></button>
+      <div class="faq-a" id="faq-answer-${i}" hidden><div>${esc(a)}</div></div>
     </div>`).join("");
   accordionify(wrap);
 }
