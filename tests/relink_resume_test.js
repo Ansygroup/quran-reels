@@ -8,14 +8,14 @@ process.env.SUPABASE_SERVICE_KEY = "test";
 process.env.SITE_ORIGIN = "https://example.test";
 process.env.TOKEN_ENC_KEY = "test";
 process.env.GOOGLE_CLIENT_ID = "client"; process.env.GOOGLE_CLIENT_SECRET = "secret";
-const { seal } = require("../lib/crypt");
+const { seal, open } = require("../lib/crypt");
 const oauth = require("../lib/oauth");
 const callback = require("../lib/cb_youtube");
 const { resumeAfterRelink } = require("../lib/relink_resume");
-let tables, uploads, requests, failReads, switchDefaultAtClaim;
+let tables, uploads, requests, failReads, switchDefaultAtClaim, grantRefresh, channelId, failPrevious;
 const iso = new Date(Date.now() - 1000).toISOString();
 function reset() {
-  uploads = 0; requests = []; failReads = false; switchDefaultAtClaim = false;
+  uploads = 0; requests = []; failReads = false; switchDefaultAtClaim = false; grantRefresh = "new-refresh"; channelId = "UC1"; failPrevious = false;
   tables = {
     autopilot: [{ user_id: "u1", enabled: true, platforms: ["youtube"] }],
     social_connections: [{ id: "c1", user_id: "u1", platform: "youtube", account_id: "UC1", is_default: true, access_token: seal("old"), refresh_token: seal("r"), expires_at: 1, updated_at: iso }],
@@ -42,8 +42,8 @@ function match(row, params) {
 global.fetch = async (url, opts = {}) => {
   const u = new URL(url), method = opts.method || "GET";
   requests.push({ url: u, method });
-  if (u.hostname === "oauth2.googleapis.com") return result({ access_token: "fresh", refresh_token: "new-refresh", expires_in: 3600 });
-  if (u.hostname === "www.googleapis.com" && u.pathname.includes("/channels")) return result({ items: [{ id: "UC1", snippet: { title: "test" } }] });
+  if (u.hostname === "oauth2.googleapis.com") return result({ access_token: "fresh", refresh_token: grantRefresh, expires_in: 3600 });
+  if (u.hostname === "www.googleapis.com" && u.pathname.includes("/channels")) return result({ items: [{ id: channelId, snippet: { title: "test" } }] });
   if (u.hostname === "www.googleapis.com" && u.pathname.includes("/upload/")) return { ok: true, headers: { get: () => "https://upload.example/session" } };
   if (u.hostname === "upload.example") { uploads++; return result({ id: "vid1" }); }
   if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) return method === "HEAD" ? { ok: true, headers: { get: () => "4" } } : { ok: true, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer };
@@ -51,6 +51,7 @@ global.fetch = async (url, opts = {}) => {
   const name = u.pathname.split("/").at(-1);
   if (!tables[name]) throw new Error("table " + name);
   if (failReads && method === "GET" && name === "publish_queue") throw new Error("DB unavailable");
+  if (failPrevious && method === "GET" && name === "social_connections" && u.searchParams.get("select") === "refresh_token") throw new Error("DB unavailable");
   let selected = tables[name].filter(r => match(r, u.searchParams));
   const order = u.searchParams.get("order") || "";
   if (order.includes("created_at.desc")) selected.sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -88,7 +89,20 @@ async function link() {
   reset(); tables.publish_queue[0].connection_id = "other-channel"; await link(); assert.equal(uploads, 0);
   reset(); tables.autopilot[0].platforms = ["tiktok"]; assert.equal((await resumeAfterRelink("u1", "youtube", "UC1")).status, "skipped"); assert.equal(uploads, 0);
   reset(); failReads = true; assert.match(await link(), /auto_resume=failed/); assert.equal(uploads, 0);
+  // جوجل قد تحذف refresh_token من الرد؛ يبقى توكن نفس القناة ولا تُحذف صلاحيته.
+  reset(); tables.autopilot[0].enabled = false; grantRefresh = undefined;
+  const oldToken = tables.social_connections[0].refresh_token;
+  await link(); assert.equal(tables.social_connections[0].refresh_token, oldToken); assert.equal(open(oldToken), "r");
+  assert(tables.social_connections[0].expires_at > Date.now() + 3500000);
+  reset(); grantRefresh = undefined; tables.social_connections = []; await link();
+  assert.equal(tables.social_connections[0].refresh_token, ""); assert(tables.social_connections[0].expires_at > Date.now() + 3500000);
+  reset(); channelId = null; assert.match(await link(), /linked=youtube_err.*w=channel/); assert.equal(open(tables.social_connections[0].access_token), "old");
+  reset(); grantRefresh = undefined; failPrevious = true; assert.match(await link(), /linked=youtube_err.*w=store/); assert.equal(open(tables.social_connections[0].access_token), "old");
+  reset(); tables.autopilot[0].enabled = false; channelId = "UC2";
+  tables.social_connections.push({ ...tables.social_connections[0], id: "c2", account_id: "UC2", is_default: false });
+  assert.match(await link(), /channel=nondefault/); assert.equal(tables.social_connections[0].is_default, true); assert.equal(tables.social_connections[1].is_default, false);
+
   reset(); const vals = await Promise.all([resumeAfterRelink("u1", "youtube", "UC1"), resumeAfterRelink("u1", "youtube", "UC1")]);
   assert.equal(uploads, 1); assert.equal(vals.filter(v => v.status === "published").length, 1);
-  console.log("ALL OK: ربط OAuth ⇒ رفع تلقائي واحد؛ الإيقاف والغموض والمستخدم الآخر وفشل القاعدة تمنع الرفع");
+  console.log("ALL OK: OAuth والرفع المحاكى، حفظ توكن التجديد، صلاحية الوصول، وتوضيح القناة غير الافتراضية");
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -473,7 +473,7 @@ window.PublishApp = {
             <span class="chan-ic">${ICONS[p.key] || "🔗"}</span>
             <span class="chan-info">
               <b>${this.esc(String(c.account_name || "مرتبط").slice(0, 40))}</b>
-              <small class="${bad ? "warn" : "ok"}">${bad ? "⚠️ انتهت صلاحية الربط — أعد الربط لتُنشر الفيديوهات" : "✅ الجلسة تتجدد تلقائيًا"}</small>
+              <small class="${bad ? "warn" : "ok"}">${bad ? (reauthList.includes(c.platform) ? "⚠️ انتهت صلاحية الربط — أعد ربط القناة" : "⚠️ تصريح التجديد غير متاح — أعد ربط القناة") : "✅ الحساب مرتبط"}</small>
             </span>
             <span class="chan-acts">
               ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost btn-sm" data-default="${this.esc(c.id)}">⭐ اجعلها الافتراضية</button>`}
@@ -544,6 +544,7 @@ window.PublishApp = {
         no_code: "لم يصل رمز التفويض من المزوّد — ابدأ الربط من جديد من نفس المتصفح.",
         state: "انتهت صلاحية جلسة التفويض أو مُنعت كوكيز الطرف الأول — أعد المحاولة الآن من نفس المتصفح دون فتح النافذة في تبويب آخر.",
         token: "وصل الرمز لكن تبادله فشل — تحقّق من أسرار التطبيق (Client ID/Secret) وعنوان إعادة التوجيه المسجّل.",
+        channel: "جوجل لم ترجع قناة يوتيوب واضحة. تأكد إن الحساب عنده قناة ووافق على صلاحية قراءتها، ثم أعد الربط.",
         err: "لم يصل رمز التفويض — أعد المحاولة من نفس المتصفح.",
       };
       const notice = document.getElementById("acctNotice");
@@ -553,8 +554,9 @@ window.PublishApp = {
           : /auto_resume=failed/.test(raw) ? `⚠️ تم ربط ${label}، لكن محاولة نشر الفيديو الجاهز لم تكتمل. راجع السجل.`
           : `✅ تم ربط ${label}. راجع حالة الأتمتة من أعلى الصفحة.`)
         : `⚠️ لم يكتمل ربط ${label}${whyKey ? " (" + whyKey + ")" : ""}: ${WHY[whyKey] || "أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة."}`;
-      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
-      if (typeof toast === "function") toast(msg);
+      const channelHint = ok && /[?&]channel=nondefault(?:&|$)/.test(raw) ? " القناة دي مش الافتراضية؛ في وضع قناة واحدة، لو عايز تنشر عليها اختار «اجعلها الافتراضية» من بطاقة القنوات." : "";
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg + channelHint; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
+      if (typeof toast === "function") toast(msg + channelHint);
       // تنظيف الرابط حتى لا تتكرر الرسالة عند كل تحديث
       try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
     } catch { /* تجاهل */ }
