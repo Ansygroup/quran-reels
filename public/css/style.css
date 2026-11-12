@@ -410,9 +410,10 @@ button{cursor:pointer;background:none;border:none}
   width:100%;display:flex;justify-content:space-between;gap:14px;align-items:center;
   padding:17px 20px;font-weight:700;font-size:.99rem;text-align:right;
 }
+.faq-q:focus-visible{outline:3px solid var(--gold);outline-offset:-4px}
 .faq-q .caret{color:var(--gold);transition:.3s;font-size:.9rem}
 .faq-item.open .caret{transform:rotate(180deg)}
-.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease;color:var(--muted);font-size:.93rem}
+.faq-a{color:var(--muted);font-size:.93rem}
 .faq-a > div{padding:0 20px 18px}
 
 /* ---------- tool page ---------- */
