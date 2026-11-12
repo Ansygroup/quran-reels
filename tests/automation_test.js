@@ -123,7 +123,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
     !/from autopilot where enabled='true' order by updated_at asc limit 3/.test(src), "autopilot.js");
   chk("التشغيل اليومي والإنقاذ والتعويض تستخدم dueConfigs",
     /const \{ picks: list, settled \} = await dueConfigs\(cairoDate\(\), limit\)/.test(src) &&
-    /const \{ picks: list, settled \} = await dueConfigs\(runDay, limit\)/.test(src) &&
+    /const \{ picks: list, settled, pending \} = await dueConfigs\(runDay, limit\)/.test(src) &&
     /const \{ all \} = await dueConfigs\(cairoDate\(\), 1\)/.test(src), "autopilot.js");
 
   /* 8) اختيار القارئ صار قابلًا للحفظ */

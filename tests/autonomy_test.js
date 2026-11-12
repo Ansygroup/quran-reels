@@ -471,6 +471,43 @@ const mkRoute = (url) => {
   const has11 = await T.dayHasPublish("u1", "2026-11-11");
   chk("dayHasPublish تخصّ اليوم المطلوب (لا «أي صفّ منشور»)", has12 === true && has11 === false, JSON.stringify({ has12, has11 }));
 
+  // بقية الدفعة لا تختفي من تقرير الإنقاذ حين تنتهي أول ثلاث بلا توليد.
+  impl.q = async (sql) => /from autopilot where enabled/i.test(sql)
+    ? Array.from({ length: 5 }, (_, i) => ({ user_id: "u" + i, platforms: ["youtube"] })) : [];
+  impl.rest = async (p) => /autopilot_runs/.test(p) && /user_id=eq/.test(p) ? [{ status: "published" }] : [];
+  const waiting = await T.catchUpDaily();
+  chk("الإنقاذ يبلّغ عن الحسابات المتبقية خارج الدفعة", waiting.some(r => r.skipped === "deferred" && r.count === 2) && waiting.filter(r => r.skipped === "published").length === 3, JSON.stringify(waiting));
+
+  /* القاعدة غير متاحة لا تعني أن اليوم فارغًا؛ نتوقف قبل الرندر والنشر. */
+  let networkCalls = 0;
+  global.fetch = async () => { networkCalls++; throw new Error("unexpected preflight"); };
+  const config = { user_id: "u1", enabled: true, platforms: ["youtube"] };
+  impl.q = async (sql) => /from autopilot where enabled/i.test(sql) ? [config] : [];
+  impl.rest = async (p) => {
+    if (/autopilot_runs/.test(p) && /user_id=eq/.test(p)) throw new Error("db down");
+    return [];
+  };
+  const checkFail = await T.catchUpDaily();
+  chk("تعذّر قراءة تشغيل المستخدم ⇒ توقف بلا توليد", checkFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  impl.rest = async () => [];
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [config];
+    if (/from publish_queue/i.test(sql) && /status='published'/i.test(sql)) throw new Error("db down");
+    return [];
+  };
+  const publishedFail = await T.catchUpDaily();
+  chk("تعذّر فحص المنشورات ⇒ توقف بلا توليد", publishedFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [config];
+    if (/from publish_queue/i.test(sql) && /status='failed'/i.test(sql)) throw new Error("db down");
+    return [];
+  };
+  const failedFail = await T.catchUpDaily();
+  chk("تعذّر فحص الفيديو الجاهز ⇒ توقف بلا توليد", failedFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  const retryFail = await A.publishReadyToday("u1");
+  chk("تعذّر قاعدة الفيديو الجاهز لا يُعرض كغياب فيديو", retryFail.ok === false && /تعذّر قراءة/.test(retryFail.error));
+  global.fetch = savedFetch;
+
   chk("dayHasPublish متاحة ومحصورة بصفوف published",
     typeof T.dayHasPublish === "function" && /status='published'/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
   impl.q = async () => [];
