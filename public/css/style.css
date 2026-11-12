@@ -865,3 +865,34 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .chan-more summary:focus-visible{outline:2px solid var(--gold);outline-offset:5px;border-radius:4px}
 .chan-more summary small{color:var(--muted);font-weight:400}
 .chan-more-list{display:flex;flex-direction:column;gap:16px;margin-top:18px}
+
+/* واجهة الصانع: نقلّل التكرار ونترك المعاينة والإعدادات كلها متاحة. */
+#view-home .hero{padding:58px 0 34px}
+#view-home .hero-badge{margin-bottom:18px}
+#view-home .hero h1{max-width:760px}
+#view-home .hero-sub{max-width:610px;line-height:1.9}
+#view-home .hero-cta{margin-top:24px;gap:10px}
+#view-home .stats{grid-template-columns:repeat(3,minmax(0,1fr));max-width:680px;margin-top:32px;gap:10px}
+#view-home .stat{padding:12px 8px}
+#view-home #create .section-head{margin-bottom:28px}
+#view-home .creator-grid{gap:28px}
+#view-home .preview-label{display:flex;justify-content:space-between;align-items:center;margin:0 4px 10px;font-size:.88rem;font-weight:700}
+#view-home .preview-label span{font-size:.76rem;color:var(--emerald);font-weight:500}
+#view-home .controls-col .panel{padding:26px;border-radius:22px}
+#view-home .step-tab{min-height:42px}
+#view-home .step-tab:focus-visible,#view-home .icon-btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:1080px){
+  /* تصغير المعاينة في العمود الواحد يقرّب الإعدادات دون إخفاء الفيديو. */
+  #view-home .preview-col{max-width:280px}
+}
+@media(max-width:560px){
+  #view-home .hero{padding:36px 0 24px}
+  #view-home .hero-ayah{font-size:1.5rem}
+  #view-home .hero-sub{margin-top:12px}
+  #view-home .stats{margin-top:26px;gap:7px}
+  #view-home .stat span{font-size:.72rem}
+  #view-home .preview-col{max-width:220px}
+  #view-home .controls-col .panel{padding:18px}
+  #view-home .steps-tabs{gap:6px}
+  #view-home .step-tab{padding:8px 12px}
+}
