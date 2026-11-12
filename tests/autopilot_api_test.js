@@ -422,7 +422,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /lastDailyLine\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=22/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=23/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -491,10 +491,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v22 / sw qr-v24)",
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v23 / sw qr-v25)",
     /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v24/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v25/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
@@ -539,19 +539,20 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     pubLib.__test.isReauthError("", "Token has been expired or revoked.") === true &&
     pubLib.__test.isReauthError("429") === false);
   const pubSrc3 = fs.readFileSync(path.join(ROOT, "lib", "publish.js"), "utf8");
-  chk("فشل التجديد الدائم يضع علامة needs_reauth ويشرح الخطوة",
-    /markReauth\(conn\.id/.test(pubSrc3) && /انتهت صلاحية ربط/.test(pubSrc3) && /needs_reauth/.test(pubSrc3) &&
-    /clearReauth\(conn\.id\)/.test(pubSrc3));
+  chk("فشل التجديد الدائم يسجّل reauth_needed ويشرح الخطوة",
+    /markReauth\(conn,/.test(pubSrc3) && /انتهت صلاحية ربط/.test(pubSrc3) &&
+    /insert into system_checks \(kind, ok, detail\) values \('reauth_needed'/.test(pubSrc3) &&
+    !/needs_reauth/.test(pubSrc3));
 
   setDb({
     q1: async () => null,
     rest: async (p2) => {
-      if (/social_connections/.test(p2)) return [{ id: "c1", platform: "youtube", account_name: "Psych", meta: { needs_reauth: true } }];
+      if (/system_checks/.test(p2)) return [{ detail: { platform: "youtube", reason: "invalid_grant" }, created_at: "2026-11-12T04:32:00Z" }];
       return [];
     },
   });
   const acctRe = await T.accountData("u9");
-  chk("accountData يبلّغ عن منصة تحتاج إعادة ربط (من meta)",
+  chk("accountData يبلّغ عن منصة من system_checks(reauth_needed)",
     Array.isArray(acctRe.reauth) && acctRe.reauth.includes("youtube"), JSON.stringify(acctRe.reauth));
 
   setDb({

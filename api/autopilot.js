@@ -130,7 +130,7 @@ async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
   // دعم تعدد القنوات
-  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name,meta`);
+  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
@@ -157,28 +157,30 @@ async function accountData(uid) {
     // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
     last_daily: await lastDaily(uid),
     // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
-    reauth: await reauthPlatforms(uid, connections),
+    reauth: await reauthPlatforms(uid),
   };
 }
 
-/* منصات تحتاج إعادة ربط: علامة meta (تُكتب عند فشل التجديد) أو آخر خطأ نشر
- * من نوع invalid_grant — الثاني يغطي الأخطاء التي وقعت قبل وجود العلامة. */
+/* منصات تحتاج إعادة ربط. المصدران: صفوف system_checks(kind='reauth_needed')
+ * التي يكتبها lib/publish عند فشل تجديد دائم، وآخر أخطاء النشر (invalid_grant)
+ * — الثاني يغطي ما وقع قبل وجود العلامة. (social_connections.meta مشفّر،
+ * فلا يصلح لعلامة تُقرأ — درس 2026-11-12.) */
 const REAUTH_RE = /invalid_grant|invalid_client|unauthorized_client|expired or revoked/i;
-async function reauthPlatforms(uid, connections) {
+async function reauthPlatforms(uid) {
   const out = new Set();
-  for (const c of Array.isArray(connections) ? connections : []) {
-    const meta = c && c.meta;
-    const flag = meta && typeof meta === "object" ? meta.needs_reauth : false;
-    if (flag === true || flag === "true") out.add(c.platform);
-  }
-  if (!out.size) {
-    try {
-      const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,error&order=created_at.desc&limit=20`);
-      for (const r of Array.isArray(rows) ? rows : []) {
-        if (r && r.platform && REAUTH_RE.test(String(r.error || ""))) out.add(r.platform);
-      }
-    } catch { /* لا نُسقط اللوحة */ }
-  }
+  try {
+    const checks = await rest(`/rest/v1/system_checks?kind=eq.reauth_needed&select=detail,created_at&order=created_at.desc&limit=5`);
+    for (const c of Array.isArray(checks) ? checks : []) {
+      const d = c && c.detail && typeof c.detail === "object" ? c.detail : {};
+      if (d.platform) out.add(String(d.platform));
+    }
+  } catch { /* لا نُسقط اللوحة */ }
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,error&order=created_at.desc&limit=20`);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (r && r.platform && REAUTH_RE.test(String(r.error || ""))) out.add(r.platform);
+    }
+  } catch { /* لا نُسقط اللوحة */ }
   return [...out];
 }
 
