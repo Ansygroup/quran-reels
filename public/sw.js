@@ -1,28 +1,20 @@
-/* Monetag SW verification — zoneId 12144958 (كمل#27) */
-self.options = {
-    "domain": "3nbf4.com",
-    "zoneId": 12144958
-}
-self.lary = ""
-importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
-
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v20";
+const CACHE = "qr-v43";
 const SHELL = [
   "/",
-  "/css/style.css?v=4",
-  "/js/data.js?v=3",
-  "/js/core.js?v=3",
+  "/css/style.css?v=14",
+  "/js/data.js?v=5",
+  "/js/core.js?v=4",
   "/js/quran.js?v=4",
-  "/js/reel.js?v=3",
-  "/js/creator.js?v=4",
+  "/js/reel.js?v=5",
+  "/js/creator.js?v=7",
   "/js/tools.js?v=3",
   "/js/tools-a.js?v=3",
   "/js/tools-b.js?v=3",
     "/js/tools-c.js?v=3",
     "/js/auth.js?v=3",
-    "/js/publish.js?v=19",
-    "/js/app.js?v=3",
+    "/js/publish.js?v=35",
+    "/js/app.js?v=6",
   "/data/quran-uthmani.json",
   "/data/adhkar.json",
   "/data/names.json",
@@ -36,7 +28,8 @@ self.addEventListener("install", e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
     // كل ملف على حدة — فشل واحد لا يمنع تثبيت البقية
-    await Promise.all(SHELL.map(u => c.add(u).catch(() => {})));
+    // تجاهل كاش المتصفح عند تجهيز النسخة الجديدة حتى لا نحتفظ بصفحة قديمة.
+    await Promise.all(SHELL.map(u => c.add(new Request(u, { cache: "reload" })).catch(() => {})));
     await self.skipWaiting();
   })());
 });
@@ -46,6 +39,13 @@ self.addEventListener("activate", e => {
     caches
       .keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      // اشتراك الإشعارات القديم كان للإعلانات فقط؛ نلغيه عند تحديث العامل.
+      .then(async () => {
+        try {
+          const sub = await self.registration?.pushManager?.getSubscription();
+          if (sub) await sub.unsubscribe();
+        } catch { /* قد يرفض المتصفح؛ لا نمنع عمل الأوفلاين */ }
+      })
       .then(() => self.clients.claim())
   );
 });
