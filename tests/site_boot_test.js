@@ -87,6 +87,26 @@ setTimeout(async () => {
   const reciter = d.getElementById("selReciter");
   chk("قائمة القرّاء مملوءة", reciter && reciter.options.length > 10, reciter ? `${reciter.options.length}` : "لا يوجد #selReciter");
 
+  // كل التبويبات ما زالت تعمل بعد ترتيب الصانع، مع الاحتفاظ باختيار السورة.
+  const tabs = [...d.querySelectorAll("#stepTabs .step-tab")];
+  const beforeSurah = surah.value;
+  const tabResults = tabs.map((tab) => {
+    tab.click();
+    const pane = d.getElementById("pane-" + tab.dataset.pane);
+    return Boolean(pane && pane.classList.contains("active") && tab.classList.contains("active") && d.querySelectorAll(".step-pane.active").length === 1);
+  });
+  chk("تبويبات الصانع السبعة تعمل دون تغيير السورة", tabs.length === 7 && tabResults.every(Boolean) && surah.value === beforeSurah);
+  tabs[0]?.click();
+  chk("المعاينة وأزرارها وزر الإنشاء متاحة", ["reelCanvas", "btnPlay", "btnPrevAyah", "btnNextAyah", "btnCreate"].every((id) => Boolean(d.getElementById(id))));
+  chk("الصفحة لا تعرض مقارنة سرعة غير مثبتة", !d.querySelector("#view-home .hero").textContent.includes("أسرع بـ١٠"));
+
+  // الصفحة تختصر الأدوات المختارة، لكن رابط جميع الأدوات والمكتبة يظل صالحًا.
+  const featuredTools = [...d.querySelectorAll("#homeTools .tool-card")];
+  chk("الرئيسية تعرض ست أدوات مختارة", featuredTools.length === 6 && featuredTools.some(a => a.getAttribute("href") === "#/tool/zakat"));
+  chk("رابط كل الأدوات ظاهر", Boolean(d.querySelector('#tools a[href="#/tools"]')));
+  chk("المكتبة لها رابط فعلي واحد دون تصنيفات وهمية", d.querySelectorAll("#library a").length === 1 && d.querySelector("#library a").getAttribute("href") === "/articles/" && fs.existsSync(path.join(PUBLIC, "articles/index.html")));
+  chk("الخطوات والأسئلة محفوظة", d.querySelectorAll("#steps .step-card").length === 4 && d.querySelectorAll("#faq .faq-item").length >= 10);
+
   chk("السنة في الفوتر تُملأ (#year)", /^\d{4}$/.test((d.getElementById("year")?.textContent || "").trim()), d.getElementById("year")?.textContent);
   chk("شريط الكوكيز موجود", Boolean(d.getElementById("cookieBar") && d.getElementById("cookieOk")));
   chk("زر الدخول ونافذته موجودان", Boolean(d.getElementById("authBtn") && d.getElementById("loginOverlay")));
@@ -110,8 +130,29 @@ setTimeout(async () => {
   /* الراوتر: تغيير الهاش يجب أن يبدّل العرض */
   w.location.hash = "#/tools";
   w.dispatchEvent(new w.Event("hashchange"));
-  setTimeout(() => {
+  setTimeout(async () => {
     chk("الراوتر يعمل: #/tools يظهر صفحة الأدوات", d.getElementById("view-tools").hidden === false && home.hidden === true);
+    chk("صفحة جميع الأدوات ما زالت تعرض القائمة الكاملة", d.querySelectorAll("#toolsGridAll .tool-card").length >= 32);
+    const fullCount = d.querySelectorAll("#toolsGridAll .tool-card").length;
+    const search = d.getElementById("toolsSearch"), clear = d.getElementById("toolsClear");
+    const find = async (text) => { search.value = text; search.dispatchEvent(new w.Event("input", { bubbles: true })); await new Promise(r => setTimeout(r, 210)); };
+    await find("أذكار");
+    chk("بحث الأدوات يطبّع الهمزات ويعرض النتائج", d.querySelectorAll("#toolsGridAll .tool-card").length > 0 && !clear.hidden && /من/.test(d.getElementById("toolsResults").textContent));
+    await find("baby-names");
+    chk("بحث المعرّف المركب يعمل", d.querySelectorAll("#toolsGridAll .tool-card").length === 1 && d.querySelector('#toolsGridAll a[href="#/tool/baby-names"]'));
+    await find("لا يوجد اسم بهذا الشكل مطلقا");
+    chk("عدم وجود نتيجة ظاهر بجانب القائمة", !d.getElementById("toolsEmpty").hidden && d.querySelectorAll("#toolsGridAll .tool-card").length === 0);
+    clear.click();
+    await new Promise(r => setTimeout(r, 210));
+    chk("مسح البحث يعيد القائمة ويركز على الحقل", search.value === "" && clear.hidden && d.activeElement === search && d.getElementById("toolsEmpty").hidden && d.querySelectorAll("#toolsGridAll .tool-card").length === fullCount);
+    // نختبر المسح قبل انقضاء مهلة البحث حتى لا تعود النتائج القديمة متأخرة.
+    await find("أذكار");
+    search.value = "baby-names";
+    search.dispatchEvent(new w.Event("input", { bubbles: true }));
+    clear.click();
+    await new Promise(r => setTimeout(r, 210));
+    chk("المسح السريع يلغي نتائج البحث المؤجل", search.value === "" && d.querySelectorAll("#toolsGridAll .tool-card").length === fullCount && clear.hidden);
+
     chk("لا استثناءات بعد التنقّل", bootErrors.length === 0, bootErrors.join(" | "));
     console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
     if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
