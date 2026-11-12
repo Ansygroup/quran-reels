@@ -130,9 +130,29 @@ setTimeout(async () => {
   /* الراوتر: تغيير الهاش يجب أن يبدّل العرض */
   w.location.hash = "#/tools";
   w.dispatchEvent(new w.Event("hashchange"));
-  setTimeout(() => {
+  setTimeout(async () => {
     chk("الراوتر يعمل: #/tools يظهر صفحة الأدوات", d.getElementById("view-tools").hidden === false && home.hidden === true);
     chk("صفحة جميع الأدوات ما زالت تعرض القائمة الكاملة", d.querySelectorAll("#toolsGridAll .tool-card").length >= 32);
+    const fullCount = d.querySelectorAll("#toolsGridAll .tool-card").length;
+    const search = d.getElementById("toolsSearch"), clear = d.getElementById("toolsClear");
+    const find = async (text) => { search.value = text; search.dispatchEvent(new w.Event("input", { bubbles: true })); await new Promise(r => setTimeout(r, 210)); };
+    await find("أذكار");
+    chk("بحث الأدوات يطبّع الهمزات ويعرض النتائج", d.querySelectorAll("#toolsGridAll .tool-card").length > 0 && !clear.hidden && /من/.test(d.getElementById("toolsResults").textContent));
+    await find("baby-names");
+    chk("بحث المعرّف المركب يعمل", d.querySelectorAll("#toolsGridAll .tool-card").length === 1 && d.querySelector('#toolsGridAll a[href="#/tool/baby-names"]'));
+    await find("لا يوجد اسم بهذا الشكل مطلقا");
+    chk("عدم وجود نتيجة ظاهر بجانب القائمة", !d.getElementById("toolsEmpty").hidden && d.querySelectorAll("#toolsGridAll .tool-card").length === 0);
+    clear.click();
+    await new Promise(r => setTimeout(r, 210));
+    chk("مسح البحث يعيد القائمة ويركز على الحقل", search.value === "" && clear.hidden && d.activeElement === search && d.getElementById("toolsEmpty").hidden && d.querySelectorAll("#toolsGridAll .tool-card").length === fullCount);
+    // نختبر المسح قبل انقضاء مهلة البحث حتى لا تعود النتائج القديمة متأخرة.
+    await find("أذكار");
+    search.value = "baby-names";
+    search.dispatchEvent(new w.Event("input", { bubbles: true }));
+    clear.click();
+    await new Promise(r => setTimeout(r, 210));
+    chk("المسح السريع يلغي نتائج البحث المؤجل", search.value === "" && d.querySelectorAll("#toolsGridAll .tool-card").length === fullCount && clear.hidden);
+
     chk("لا استثناءات بعد التنقّل", bootErrors.length === 0, bootErrors.join(" | "));
     console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
     if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

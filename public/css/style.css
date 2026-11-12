@@ -918,3 +918,30 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   #view-home #steps .steps-flow{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   #view-home #steps .step-card{padding:16px 12px}
 }
+
+/* صفحة الأدوات: البحث والنتائج في مكان واضح مع إبقاء كل الروابط متاحة. */
+#view-tools .tools-page{padding:42px 0 72px}
+#view-tools .tools-intro{text-align:center;padding:30px 20px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,rgba(25,67,52,.8),rgba(8,25,20,.9))}
+#view-tools .tools-intro h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.4}
+#view-tools .tools-intro p{color:var(--muted);margin-top:8px}
+#view-tools .tools-search{margin:22px auto 0;max-width:600px}
+#view-tools .tools-search .input{padding:14px 45px 14px 64px;background-color:rgba(0,0,0,.3)}
+#view-tools .tools-search input::-webkit-search-cancel-button{-webkit-appearance:none}
+#view-tools .tools-clear{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gold-3);font-size:.86rem;padding:6px 8px;border-radius:8px}
+#view-tools .tools-clear:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#view-tools .tools-list-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 2px 14px;flex-wrap:wrap}
+#view-tools .tools-list-head h2{font-size:1.12rem}
+#view-tools .tools-list-head p{font-size:.85rem;color:var(--muted)}
+#view-tools .tools-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#view-tools .tool-card{min-width:0;padding:20px;display:flex;flex-direction:column;gap:4px}
+#view-tools .tool-card .t-ic{margin-bottom:8px}
+#view-tools .tool-card:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+#view-tools .tools-empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-2);border-radius:16px}
+@media(max-width:900px){#view-tools .tools-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){
+  #view-tools .tools-page{padding:24px 0 48px}
+  #view-tools .tools-intro{padding:24px 16px}
+  #view-tools .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  #view-tools .tool-card{padding:15px}
+  #view-tools .tool-card h3{font-size:.94rem}
+}
