@@ -98,6 +98,7 @@ window.PublishApp = {
       return;
     }
     
+    if (typeof data.config?.enabled === "boolean") this._settingsUncertain = false;
     this.renderAccount(data);
     this.bindEvents(uid);
     this.startProgressPolling();
@@ -229,6 +230,13 @@ window.PublishApp = {
     const label = document.getElementById("acctStateLabel");
     const nextEl = document.getElementById("acctNextRun");
     const toggle = document.getElementById("acctEnabled");
+    if (this._settingsUncertain) {
+      if (toggle) toggle.disabled = true;
+      if (dot) dot.className = "acct-dot warn";
+      if (label) label.textContent = "حالة الأتمتة غير مؤكدة";
+      if (nextEl) nextEl.textContent = "حدّث الصفحة وتأكد من الحالة قبل المحاولة تاني";
+      return;
+    }
     if (toggle) toggle.checked = enabled;
 
     const next = this.nextRunInfo();
@@ -317,7 +325,7 @@ window.PublishApp = {
     wrap.innerHTML = `
       <div class="acct-sec-head">
         <h2>🎛️ التخصيص</h2>
-        <span class="hint">كل ما هنا يُحفظ ويُستخدم في التشغيل الآلي القادم — تقدر تغيّره في أي وقت</span>
+        <span class="hint">التعديلات هنا تحتاج تضغط «حفظ التعديلات»؛ مفتاح الأتمتة يستخدم الإعدادات المحفوظة</span>
       </div>
       <div class="acct-grid3">
         <div class="f-group"><label for="selContentMode">محتوى الفيديو</label>
@@ -339,7 +347,7 @@ window.PublishApp = {
         <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
       </div>` : ""}
       <div class="row gap-lg acct-actions">
-        <button class="btn btn-gold" id="autoSave" data-act="save">💾 حفظ التعديلات</button>
+        <button class="btn btn-gold" id="autoSave" data-act="save" ${this._settingsPending || this._settingsUncertain ? "disabled" : ""}>💾 حفظ التعديلات</button>
         <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
       </div>
       <details class="acct-more">
@@ -723,17 +731,32 @@ window.PublishApp = {
       const t = e.target;
       if (!t || t.id !== "acctEnabled") return;
       const want = Boolean(t.checked);
+      if (this._settingsPending || this._settingsUncertain) { t.checked = !want; return; }
+      this._settingsPending = true;
       t.disabled = true;
-      const out = await this.saveSettings({ enabled: want, silent: true });
-      t.disabled = false;
-      if (out && out.ok) {
-        t.checked = want;
+      const save = document.getElementById("autoSave");
+      if (save) save.disabled = true;
+      let out;
+      try { out = await this.api("set_enabled", { enabled: want }); }
+      catch { out = { ok: false, uncertain: true }; }
+      this._settingsPending = false;
+      if (save) save.disabled = false;
+      if (out.ok && out.enabled === want) {
+        t.disabled = false;
         this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), enabled: want } };
         this.renderStatus(this.data);
         this.renderSteps(this.data);
-        if (typeof toast === "function") toast(want ? "✅ الأتمتة شغّالة — الفيديو القادم تلقائي" : "⏸️ أوقفنا الأتمتة (تقدر ترجّعها في أي وقت)");
+        if (typeof toast === "function") toast(want ? "✅ الأتمتة مفعّلة بالإعدادات المحفوظة" : "⏸️ الأتمتة اتوقفت — إعدادات النشر محفوظة");
+      } else if (out.uncertain || out.status >= 500 || (out.ok && out.enabled !== want)) {
+        // قد يكون الخادم حفظ قبل انقطاع الرد؛ لا نعرض الحالة القديمة كأنها مؤكدة.
+        this._settingsUncertain = true;
+        if (save) save.disabled = true;
+        this.renderStatus(this.data);
+        if (typeof toast === "function") toast("تعذّر تأكيد الحالة؛ حدّث الصفحة وراجعها قبل المحاولة تاني", "err");
       } else {
+        t.disabled = false;
         t.checked = !want;
+        if (typeof toast === "function") toast(String(out.error || "تعذّر تغيير حالة الأتمتة"), "err");
       }
     });
   },
@@ -750,6 +773,7 @@ window.PublishApp = {
 
   /* حفظ كل التخصيصات (المحتوى/القارئ/الخلفية/المنصات/الحالة) */
   async saveSettings({ enabled, silent = false, btn = null } = {}) {
+    if (this._settingsPending || this._settingsUncertain) return { ok: false, error: "راجع حالة الأتمتة قبل الحفظ" };
     const q2 = (id) => document.getElementById(id);
     const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map((i) => i.dataset.platform);
     const reciter = q2("selReciter") ? q2("selReciter").value : "";
@@ -764,11 +788,16 @@ window.PublishApp = {
     const body = { enabled: enabledNow, platforms, template, all_channels: q2("chkAllChannels") ? Boolean(q2("chkAllChannels").checked) : Boolean(this.data?.config?.all_channels) };
 
     const old = btn ? btn.textContent : "";
+    const toggle = q2("acctEnabled");
+    this._settingsPending = true;
+    if (toggle) toggle.disabled = true;
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
     let out = { ok: false };
     try {
       out = await this.api("save", body);
     } catch { out = { ok: false, error: "تعذّر الاتصال بالخادم" }; }
+    this._settingsPending = false;
+    if (toggle) toggle.disabled = false;
     if (btn) { btn.disabled = false; btn.textContent = old; }
 
     if (out.ok) {
