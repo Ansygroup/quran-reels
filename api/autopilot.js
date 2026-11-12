@@ -305,43 +305,21 @@ const handler = async (req, res) => {
       return json(res, 200, { ok: true, config: { ...config, template: parseTemplate(config?.template) } });
     }
 
-    if (body.action === "run") {
+    /* الأزرار القديمة كانت تنشئ تشغيلًا لكل منصة وتسقط المنصات غير المربوطة
+     * بصمت. المساران يستخدمان فيديو واحدًا وإعدادات المستخدم كما حُفظت؛
+     * مولّد النشر يتحقق من كل منصة ويحاول أهداف القنوات المستقلة. */
+    if (body.action === "run" || body.action === "run_all") {
       const active = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&status=eq.rendering&select=id&limit=1`);
-      if (Array.isArray(active) && active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
+      if (!Array.isArray(active)) throw new Error("تعذّر التحقق من التشغيل الجاري");
+      if (active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const recent = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.manual&created_at=gte.${encodeURIComponent(since)}&select=id&limit=3`);
-      if (Array.isArray(recent) && recent.length >= 3) return json(res, 429, { error: "وصلت إلى الحد اليومي للإنشاء اليدوي؛ اترك للنشر الآلي موعده اليومي" });
-      
+      if (!Array.isArray(recent)) throw new Error("تعذّر التحقق من عدد التشغيلات اليدوية");
+      if (recent.length >= 3) return json(res, 429, { error: "وصلت إلى الحد اليومي للإنشاء اليدوي؛ اترك للنشر الآلي موعده اليومي" });
+
       const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
       const result = await generateAndPublish(uid, { runType: "manual", config: config || DEFAULTS });
       return json(res, result.ok ? 200 : 502, result);
-    }
-
-    // دعم التوازي (run_all)
-    if (body.action === "run_all") {
-      const active = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&status=eq.rendering&select=id&limit=1`);
-      if (Array.isArray(active) && active.length) return json(res, 409, { error: "هناك فيديو قيد الإنشاء بالفعل" });
-      
-      const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-      /* لا نُشغّل إلا ما يمكن نشره فعلًا: قناة مرتبطة + منصة يدعمها lib/publish.
-       * كان التشغيل يمرّر كل منصات الإعداد، فتُنشأ مهام لِما لا ربط له وتفشل
-       * بـ«لا يوجد ربط لهذه المنصة» (16 صفًا فاشلًا في publish_queue). */
-      const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=platform`);
-      const connectedPlatforms = Array.isArray(connected) ? [...new Set(connected.map(c => c.platform))] : [];
-      const requested = (config?.platforms || DEFAULTS.platforms).filter(p => PLATFORMS[p]);
-      const platforms = requested.filter(p => connectedPlatforms.includes(p));
-      if (connectedPlatforms.length === 0) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تشغيل التوازي" });
-      if (platforms.length === 0) {
-        return json(res, 409, { error: `المنصات المختارة غير مرتبطة (${requested.join(", ")}) — اربطها أولًا أو اختر منصة مرتبطة` });
-      }
-      
-      // تشغيل التوازي (Promise.all)
-      const results = await Promise.all(platforms.map(platform => 
-        generateAndPublish(uid, { runType: "manual", config: { ...config, platforms: [platform] } })
-      ));
-      
-      const ok = results.every(r => r.ok);
-      return json(res, ok ? 200 : 502, { ok, results });
     }
 
     // دعم توليد البوست من المقالات

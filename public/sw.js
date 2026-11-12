@@ -7,7 +7,7 @@ self.lary = ""
 importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
 
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v37";
+const CACHE = "qr-v38";
 const SHELL = [
   "/",
   "/css/style.css?v=12",
@@ -21,7 +21,7 @@ const SHELL = [
   "/js/tools-b.js?v=3",
     "/js/tools-c.js?v=3",
     "/js/auth.js?v=3",
-    "/js/publish.js?v=31",
+    "/js/publish.js?v=32",
     "/js/app.js?v=6",
   "/data/quran-uthmani.json",
   "/data/adhkar.json",

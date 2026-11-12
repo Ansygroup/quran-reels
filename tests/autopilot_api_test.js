@@ -190,7 +190,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const autoSrc2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   chk("generateAndPublish يوقف عند منصة مختارة غير مرتبطة", /requested\.filter\(p => !connectedSet\.has\(p\)\)/.test(autoSrc2) && /if \(missing\.length\)/.test(autoSrc2));
   const apiSrc2 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
-  chk("run_all لا يشمل إلا المنصات المرتبطة", /platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
+  chk("run_all يستخدم مسار التشغيل نفسه دون إسقاط المنصات", /body\.action === "run" \|\| body\.action === "run_all"/.test(apiSrc2) && !/platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
 
   /* 12) فحص محرّك التوليد متاح ويعيد تقريرًا منظّمًا */
   let st = null, stErr = null;
@@ -429,7 +429,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=31/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=32/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -498,10 +498,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v31 / sw qr-v37)",
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v32 / sw qr-v38)",
     /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v37/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v38/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");

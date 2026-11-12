@@ -88,7 +88,7 @@ window.fetch = async (url, opts = {}) => {
     method === "GET" ? ACCOUNT :
     action === "save" ? { ok: true, config: ACCOUNT.config } :
     action === "run" ? { ok: true, url: "https://youtu.be/x" } :
-    action === "run_all" ? { ok: true, results: [{ ok: true }, { ok: false }] } :
+    action === "run_all" ? { ok: true, run_id: "r3" } :
     action === "article_random" ? { ok: true, article_title: "مقال قرآني", url: "https://quran-reels.test/articles/1" } :
     { ok: true };
   return { ok: true, status: 200, json: async () => payload };
@@ -233,6 +233,9 @@ window.fetch = async (url, opts = {}) => {
     const bad = alerts.filter((a) => /خطأ|فشل|تعذّر/.test(a));
     if (bad.length) fail(`#${id}: تنبيه خطأ: ${bad[0].slice(0, 80)}`);
   }
+
+  if (!["autoRunAll", "quickRunAll"].every(id => d.getElementById(id)?.textContent.includes("الإعدادات المحفوظة"))) fail("تسمية التشغيل الإضافي لا توضّح الإعدادات المحفوظة");
+  else ok("التشغيل الإضافي يوضح أنه يستخدم الإعدادات المحفوظة");
 
   // النموذج السابق لم يكن يجدول فيديو؛ السجل محفوظ، والتحذيرات لا تُخفى داخل التشخيص.
   if (d.getElementById("schedSave") || d.getElementById("schedTitle")) fail("حقول الجدولة غير الفعالة ما زالت ظاهرة");
