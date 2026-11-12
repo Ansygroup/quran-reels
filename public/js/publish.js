@@ -345,7 +345,7 @@ window.PublishApp = {
       <details class="acct-more">
         <summary>خيارات إضافية</summary>
         <div class="row gap-lg acct-actions">
-          <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ على كل القنوات</button>
+          <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
           <button class="btn btn-ghost" id="autoGenArticle" data-act="article_random">${articleLabel}</button>
         </div>
       </details>
@@ -442,7 +442,7 @@ window.PublishApp = {
       <div class="row gap-lg wrap">
         <button class="btn btn-ghost" id="quickSelfTest" data-act="selftest">🔍 فحص محرّك التوليد</button>
         <button class="btn btn-ghost" id="quickRenderTest" data-act="selftest_deep">🎬 اختبار توليد فيديو</button>
-        <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل الكل الآن</button>
+        <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
         ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button>'}
       </div>`;
     // نتائج التشغيل والفحص والتنبيهات لا تختفي داخل التشخيص المغلق.
@@ -794,7 +794,7 @@ window.PublishApp = {
       const out = kind === "run_all" ? await this.api("run_all") : await this.api("run");
       if (out.ok) {
         const extra = Array.isArray(out.results) ? " · النتائج: " + out.results.map((r) => (r.ok ? "✅" : "❌")).join(" ") : "";
-        if (typeof toast === "function") toast("تم بدء التوليد — سيظهر في السجل أدناه" + extra);
+        if (typeof toast === "function") toast("اكتمل التشغيل — راجع حالة القنوات والسجل" + extra);
         setTimeout(() => this.init(), 1200);
       } else if (typeof toast === "function") toast(String(out.error || "تعذّر التشغيل"), "err");
     } catch {

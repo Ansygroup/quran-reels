@@ -29,6 +29,19 @@ w.fetch = async (url, opts={}) => {
   await app.pollProgress(); assert.match(html.textContent,/التشغيل مكتمل/); assert.match(html.textContent,/تعذّر قراءة تفاصيل/); assert.match(html.textContent,/تعذّر قراءة حالة القنوات/);
   resolvePost({ok:true,status:200,json:async()=>({ok:true})}); await task; assert.equal(btn.disabled,false); assert.equal(posts,1);
   await new Promise(r => setImmediate(r));
+  // النتيجة الجزئية تُعرض فشلًا، ولا تتحول رسالة النجاح لبدء وهمي.
+  const messages = []; w.toast = (text, kind) => messages.push({text, kind});
+  w.fetch = async (url, opts={}) => String(url).includes('progress=1')
+    ? {ok:true, json:async()=>status}
+    : {ok:false,status:502,json:async()=>({ok:false,error:'فشل هدف واحد'})};
+  await app.runNow('run_all', btn);
+  assert.deepEqual(messages.map(m=>m.text), ['فشل هدف واحد']); assert.equal(messages[0].kind,'err');
+  messages.length = 0;
+  w.fetch = async (url, opts={}) => String(url).includes('progress=1')
+    ? {ok:true,json:async()=>status} : {ok:true,status:200,json:async()=>({ok:true})};
+  await app.runNow('run_all', btn);
+  assert.match(messages[0].text,/اكتمل التشغيل/); assert.doesNotMatch(messages[0].text,/تم بدء/);
+  await new Promise(r => setImmediate(r));
   w.fetch = async () => { throw Error('offline'); }; await app.pollProgress(); assert.match(html.textContent,/ده مش معناه إن التشغيل وقف/);
   w.clearTimeout(timer); dom.window.close();
   console.log('ALL OK: live stages, two channel outcomes, pending-run guard, escaped UI and offline warning (mock network)');
