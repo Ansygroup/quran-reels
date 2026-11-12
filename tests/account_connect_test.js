@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=34)", /publish\.js\?v=34/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=35)", /publish\.js\?v=35/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));

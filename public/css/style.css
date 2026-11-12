@@ -954,3 +954,5 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 @media(max-width:760px){.acct-reel-editor{grid-template-columns:1fr}.acct-preview{max-width:200px}}
 .acct-reel-controls [hidden]{display:none}
 .acct-preview [hidden]{display:none}.acct-preview audio{display:block;width:100%;margin-top:8px}
+/* Keep the account image picker within narrow mobile cards. */
+#acctBackgroundFile{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}

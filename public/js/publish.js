@@ -315,14 +315,15 @@ window.PublishApp = {
     const d = template.design || { translation: "none", showTrans: false, style: "card", ratio: "9:16", quality: 1080, accent: "gold", fontSize: 100, showWatermark: true, motion: true, dedText: "" };
     const opt = (values, selected) => values.map(([v, label]) => `<option value="${this.esc(v)}" ${String(v) === String(selected) ? "selected" : ""}>${this.esc(label)}</option>`).join("");
     const BGS = {
-      rotate: "تتغيّر تلقائيًا", "grad-emerald": "تدرّج زمردي", "grad-gold": "تدرّج ذهبي", "grad-dawn": "تدرّج الفجر", "grad-night": "تدرّج ليلي",
+      rotate: "تتغيّر تلقائيًا", custom: "صورة من جهازي", "grad-emerald": "تدرّج زمردي", "grad-gold": "تدرّج ذهبي", "grad-dawn": "تدرّج الفجر", "grad-night": "تدرّج ليلي",
       "bg-mosque-night": "مسجد ليلًا", "bg-starry-desert": "صحراء بنجوم", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "غابة وأشعة",
       "bg-geometric-islamic": "زخرفة إسلامية", "bg-mountains-dawn": "جبال الفجر", "bg-mosque-silhouette": "ظلّ مسجد",
       "bg-garden-tulips": "حديقة", "bg-arabesque-dark": "أرابيسك", "bg-heavenly-clouds": "سحاب",
     };
     const modes = (Array.isArray(options.content_modes) && options.content_modes.length ? options.content_modes : Object.keys(MODES));
     const reciters = Array.isArray(options.reciters) ? options.reciters : (Array.isArray(data.reciters) ? data.reciters : []);
-    const bgs = Array.isArray(options.backgrounds) && options.backgrounds.length ? options.backgrounds : Object.keys(BGS);
+    const suppliedBgs = Array.isArray(options.backgrounds) && options.backgrounds.length ? options.backgrounds : Object.keys(BGS);
+    const bgs = [...new Set([...suppliedBgs, "custom"])];
 
     this._autoDirty = false;
     wrap.innerHTML = `
@@ -344,6 +345,7 @@ window.PublishApp = {
           <select id="selBackground">${bgs.map((b) => `<option value="${this.esc(b)}" ${template.background === b ? "selected" : ""}>${this.esc(BGS[b] || b)}</option>`).join("")}</select>
         </div>
       </div>
+      <div class="f-group"><label for="acctBackgroundFile">صورة من الجهاز (JPEG أو PNG، حتى ١٠ ميجابايت)</label><input id="acctBackgroundFile" type="file" accept="image/jpeg,image/png"><p class="hint">تُعرض محليًا أولًا، وعند اختيار «صورة من جهازي» والضغط على حفظ تُصغّر وتُرفع إلى حسابك بشكل خاص لتعمل الأتمتة حتى والموقع مغلق. قد تظهر في الفيديو المنشور. عند حفظ خلفية أخرى تُحذف الصورة المحفوظة؛ قد يكون تشغيل بدأ بالفعل قد استخدمها.</p></div>
       <div class="acct-reel-editor">
         <div class="acct-preview"><div class="preview-label">معاينة الشكل <span>● مباشرة</span></div><div class="phone-screen" id="acctPreviewScreen"><canvas id="acctPreviewCanvas" width="405" height="720" aria-label="معاينة شكل الريل"></canvas></div><p class="hint" id="acctPreviewNote">المعاينة صورة تقريبية؛ الاختيارات التلقائية تتحدد وقت التشغيل.</p><div id="acctAudioPreview" hidden><label for="acctAudio">استمع لأول آية بالقارئ المختار</label><audio id="acctAudio" controls preload="none"></audio></div></div>
         <div class="acct-reel-controls">
@@ -364,7 +366,7 @@ window.PublishApp = {
           </div>
           <div class="f-group"><label for="acctDed">الإهداء (اختياري)</label><input id="acctDed" maxlength="180" value="${this.esc(d.dedText)}" placeholder="اكتب الإهداء"></div>
           <div class="plat-checks"><label class="chk"><input id="acctShowTrans" type="checkbox" ${d.showTrans ? "checked" : ""}> إظهار الترجمة</label><label class="chk"><input id="acctWatermark" type="checkbox" ${d.showWatermark ? "checked" : ""}> العلامة المائية</label><label class="chk"><input id="acctMotion" type="checkbox" ${d.motion ? "checked" : ""}> حركة الخلفية</label></div>
-          <p class="hint">الخلفيات المتاحة هنا من مكتبة الموقع؛ صورة جهازك خاصة بالصانع اليدوي ومش متاحة للأتمتة.</p>
+
         </div>
       </div>
       <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
@@ -436,8 +438,28 @@ window.PublishApp = {
         const renderer = new ReelRenderer(cv);
         const bg = get("selBackground").value;
         const selectedBg = BACKGROUNDS.find(b => b.id === bg) || BACKGROUNDS[0];
-        await renderer.setBackground(selectedBg);
-        if (selectedBg.file && !renderer.bgImg) throw new Error("background unavailable");
+        let customUrl = null, tempUrl = null;
+        try {
+          if (bg === "custom") {
+            const file = get("acctBackgroundFile").files[0];
+            if (file) {
+              if (!['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error("invalid image");
+              customUrl = tempUrl = URL.createObjectURL(file);
+            } else {
+              const id = this.data?.config?.template?.background_image_id;
+              if (!id) throw new Error("select image");
+              if (!this._bgPreviewCache || this._bgPreviewCache.id !== id) {
+                const response = await fetch("/api/autopilot?background=1", { cache:"no-store", headers:{ Authorization:`Bearer ${await window.AuthApp.getToken()}` } });
+                const result = await response.json();
+                if (!response.ok || result.image_id !== id || typeof result.image !== "string" || !result.image.startsWith("data:image/jpeg;base64,")) throw new Error("background unavailable");
+                this._bgPreviewCache = { id, image: result.image };
+              }
+              customUrl = this._bgPreviewCache.image;
+            }
+          }
+          await renderer.setBackground(selectedBg, customUrl);
+        } finally { if (tempUrl) URL.revokeObjectURL(tempUrl); }
+        if ((selectedBg.file || bg === "custom") && !renderer.bgImg) throw new Error("background unavailable");
         if (!current(token)) return;
         renderer.setConfig({ verses:[{s,a:from,text:Quran.ayah(s,from)}], index:0, ayahElapsed:99, surahName:"سورة " + Quran.shortName(s),
           reciterName: get("acctReciter").selectedOptions[0]?.textContent || "تلقائي", style: enabled ? get("acctStyle").value : "card",
@@ -448,11 +470,12 @@ window.PublishApp = {
           dedMode: enabled && get("acctDed").value ? "custom" : "none", dedText: enabled ? get("acctDed").value : "" });
         renderer.draw();
         get("acctPreviewNote").textContent = fixed && bg !== "rotate" && enabled && get("acctReciter").value ? "معاينة تقريبية لأول آية؛ التلاوة والحركة تظهر في الفيديو." : "دي عيّنة للشكل؛ السورة أو القارئ أو الخلفية أو الأسلوب التلقائي بيتحدد وقت التشغيل.";
-      } catch { if (current(token)) get("acctPreviewNote").textContent = "تعذّر تحميل المعاينة أو الترجمة؛ جرّب تاني قبل الحفظ."; }
+      } catch { if (current(token)) { const cv = get("acctPreviewCanvas"); cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height); get("acctPreviewNote").textContent = "تعذّر تحميل المعاينة أو الصورة أو الترجمة؛ جرّب تاني قبل الحفظ."; } }
     };
     const changed = e => {
       this._autoDirty = true;
       this._autoEditRevision = (this._autoEditRevision || 0) + 1;
+      if (e.target.id === "acctBackgroundFile" && e.target.files?.length) get("selBackground").value = "custom";
       if (/^acct(?:Style|Translation|Ratio|Quality|Accent|Font|Ded|ShowTrans|Watermark|Motion)$/.test(e.target.id)) get("acctDesignEnabled").checked = true;
       if (e.target.id === "acctTranslation") get("acctShowTrans").checked = e.target.value !== "none";
       update();
@@ -872,6 +895,26 @@ window.PublishApp = {
     return { ok: res.ok, status: res.status, ...data };
   },
 
+  // Normalize the user-selected image locally. Canvas drops EXIF / location metadata.
+  async prepareAccountImage(file) {
+    if (!file || !['image/jpeg','image/png'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error("اختار صورة JPEG أو PNG بحجم لا يتجاوز ١٠ ميجابايت");
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error("تعذّر قراءة الصورة")); img.src = url; });
+      if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth * img.naturalHeight > 40000000) throw new Error("أبعاد الصورة أكبر من المسموح");
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = canvas.getContext("2d"); if (!ctx) throw new Error("تعذّر تجهيز الصورة");
+      ctx.fillStyle = "#000"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      for (const quality of [0.88, 0.75, 0.6, 0.45, 0.3]) {
+        const data = canvas.toDataURL("image/jpeg", quality);
+        if (data.startsWith("data:image/jpeg;base64,") && data.length <= 699075) return data;
+      }
+      throw new Error("الصورة كبيرة حتى بعد تصغيرها؛ جرّب صورة أخرى");
+    } finally { URL.revokeObjectURL(url); }
+  },
+
   /* حفظ كل التخصيصات (المحتوى/القارئ/الخلفية/المنصات/الحالة) */
   async saveSettings({ enabled, silent = false, btn = null } = {}) {
     if (this._settingsPending || this._settingsUncertain) return { ok: false, error: "راجع حالة الأتمتة قبل الحفظ" };
@@ -885,6 +928,11 @@ window.PublishApp = {
       reciter: reciter || "",
       privacy: "public",
     };
+    const imageFile = template.background === "custom" ? q2("acctBackgroundFile")?.files[0] : null;
+    if (template.background === "custom" && !imageFile) {
+      template.background_image_id = this.data?.config?.template?.background_image_id;
+      if (!template.background_image_id) { if (typeof toast === "function") toast("اختار صورة من جهازك أولًا", "err"); return { ok:false, error:"اختار صورة من جهازك أولًا" }; }
+    }
     if (template.content_mode === "fixed") {
       template.surah = Number(q2("acctSurah")?.value); template.from = Number(q2("acctFrom")?.value); template.to = Number(q2("acctTo")?.value);
       const count = typeof Quran !== "undefined" ? Quran.ayahCount(template.surah) : 0;
@@ -909,8 +957,9 @@ window.PublishApp = {
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
     let out = { ok: false };
     try {
+      if (imageFile) body.custom_image = await this.prepareAccountImage(imageFile);
       out = await this.api("save", body);
-    } catch { out = { ok: false, error: "تعذّر الاتصال بالخادم" }; }
+    } catch (e) { out = { ok: false, error: e?.message || "تعذّر الاتصال بالخادم" }; }
     this._settingsPending = false;
     if (toggle) toggle.disabled = false;
     if (btn) { btn.disabled = false; btn.textContent = old; }
@@ -918,7 +967,9 @@ window.PublishApp = {
     if (out.ok) {
       // لا نعتبر تعديلًا حدث أثناء طلب الحفظ جزءًا من الاستجابة السابقة.
       this._autoDirty = (this._autoEditRevision || 0) !== editRevision;
-      this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template, all_channels: body.all_channels } };
+      this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template: out.config?.template || template, all_channels: body.all_channels } };
+      if (imageFile && q2("acctBackgroundFile")?.files[0] === imageFile) q2("acctBackgroundFile").value = "";
+      this._bgPreviewCache = null;
       this.renderStatus(this.data);
       this.renderSteps(this.data);
       if (!silent && typeof toast === "function") toast("✅ تم حفظ التعديلات");
