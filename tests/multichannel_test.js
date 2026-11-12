@@ -148,9 +148,9 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{c\.id\}"/.test(ui) && /op=default/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
   chk("تلميح أن النشر على القناة الافتراضية", /يُنشر على القناة الافتراضية/.test(ui));
-  chk("الكاش مكسور (v=23 / qr-v25) في الماركب والخدمة",
-    /publish\.js\?v=23/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v25/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("الكاش مكسور (v=24 / qr-v26) في الماركب والخدمة",
+    /publish\.js\?v=24/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v26/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
@@ -188,7 +188,9 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
 
   const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   chk("التشغيل يستخدم planTargets ويمرّر connection_id",
-    /planTargets\(platforms, connsByPlatform/.test(autoSrc) && /connection_id, video_path: storagePath/.test(autoSrc));
+    /planTargets\(platforms, connsByPlatform/.test(autoSrc) &&
+    (/connection_id, video_path: storagePath/.test(autoSrc) || /connection_id: connectionId, video_path: storagePath/.test(autoSrc)) &&
+    /ensureQueueRow\(\{ userId, platform, connectionId: connection_id/.test(autoSrc));
   chk("يقرأ كل القنوات فقط عند تفعيل الخيار", /runConfig\?\.all_channels === true/.test(autoSrc) && /connectionsFor\(userId, platform\)/.test(autoSrc));
   const apiSrc = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
   chk("الـAPI يحفظ all_channels ويعيده", /all_channels = body\.all_channels === true/.test(apiSrc) && /all_channels: config\.all_channels === true/.test(apiSrc));
