@@ -126,6 +126,24 @@ async function lastDaily(uid) {
   } catch { return null; }
 }
 
+/* إحصاءات بطاقة الحالة: «كم فيديو نُشر؟ وآخر واحد إمتى؟» — كانت اللوحة
+ * تَعدّ التشغيلات فقط، فلا يعرف المستخدم حصيلة الأتمتة. */
+async function accountStats(uid) {
+  const out = { published: 0, failed: 0, scheduled: 0, last_url: null, last_published_at: null };
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&select=status,external_url,updated_at&order=updated_at.desc&limit=200`);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const st = String((r && r.status) || "");
+      if (st === "published") {
+        out.published++;
+        if (!out.last_published_at) { out.last_published_at = r.updated_at || null; out.last_url = r.external_url || null; }
+      } else if (st === "failed") out.failed++;
+      else if (st === "scheduled" || st === "publishing") out.scheduled++;
+    }
+  } catch { /* لا نُسقط اللوحة بسبب الإحصاء */ }
+  return out;
+}
+
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
@@ -158,6 +176,14 @@ async function accountData(uid) {
     last_daily: await lastDaily(uid),
     // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
     reauth: await reauthPlatforms(uid),
+    // حصيلة الأتمتة (منشور/فاشل/مجدول + آخر رابط) لبطاقة الحالة
+    stats: await accountStats(uid),
+    // تفضيلات قابلة للتحرير: الأنماط والخلفيات والقُرّاء المتاحون
+    options: {
+      content_modes: [...CONTENT_MODES],
+      backgrounds: [...BACKGROUND_IDS],
+      reciters: RECITERS.map((r) => ({ id: r.id, name: r.name })),
+    },
   };
 }
 
@@ -212,7 +238,16 @@ const handler = async (req, res) => {
         if (!platforms.some(p => connectedKeys.includes(p))) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تفعيل النشر الآلي" });
       }
       
-      const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
+      /* اختيار القارئ: كان مثبتًا على rotate فلا يمكن تخصيص الصوت إطلاقًا */
+      const reciterId = String(templateInput.reciter || "");
+      const wantFixed = templateInput.reciter_mode === "fixed" && RECITERS.some((r) => r.id === reciterId);
+      const template = {
+        content_mode,
+        reciter_mode: wantFixed ? "fixed" : "rotate",
+        reciter: wantFixed ? reciterId : "",
+        background,
+        privacy: "public",
+      };
       /* all_channels: انشر على كل القنوات المرتبطة (افتراضي: القناة الافتراضية فقط) */
       const all_channels = body.all_channels === true;
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {

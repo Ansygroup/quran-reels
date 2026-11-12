@@ -131,9 +131,33 @@ window.fetch = async (url, opts = {}) => {
   if (rows.length !== ACCOUNT.runs.length) fail(`سجل التشغيل: ${rows.length} بدل ${ACCOUNT.runs.length}`);
   else ok(`سجل التشغيل عرض ${rows.length} مهمة`);
 
+  /* ---- التصميم الجديد: بطاقة حالة + خطوات + أرقام + لوحة تخصيص قابلة للتعديل ---- */
   const auto = d.getElementById("acctAuto");
-  if (!auto || !/لوحة الأتمتة/.test(auto.textContent)) fail("لوحة الأتمتة لم تُرسم");
-  else ok("لوحة الأتمتة رُسمت");
+  if (!auto || !/التخصيص/.test(auto.textContent)) fail("لوحة التخصيص لم تُرسم");
+  else ok("لوحة التخصيص رُسمت");
+
+  const stateLabel = d.getElementById("acctStateLabel");
+  const dot = d.getElementById("acctDot");
+  const toggle = d.getElementById("acctEnabled");
+  if (!stateLabel || !/./.test(stateLabel.textContent) || !dot || !toggle) fail("بطاقة الحالة غير مكتملة (حالة/نقطة/مفتاح)");
+  else ok("بطاقة الحالة تعرض الحالة ومفتاح التشغيل");
+
+  const steps = d.querySelectorAll("#acctSteps .acct-step");
+  if (steps.length !== 3) fail(`خطوات التشغيل: ${steps.length} بدل 3`);
+  else ok("خطوات التشغيل الثلاث مرسومة");
+
+  const kpis = d.querySelectorAll("#acctKpis .kpi");
+  if (kpis.length !== 4) fail(`أرقام الأتمتة: ${kpis.length} بدل 4`);
+  else ok("أرقام الأتمتة (منشور/طابور/فشل/آخر نشر) مرسومة");
+
+  const ids = ["selContentMode", "selReciter", "selBackground"];
+  const missing = ids.filter((id) => !d.getElementById(id));
+  if (missing.length) fail("عناصر التخصيص المفقودة: " + missing.join(", "));
+  else ok("اختيار المحتوى والقارئ والخلفية موجودة (قابلة للتعديل)");
+
+  const recOpts = [...d.querySelectorAll("#selReciter option")].map((o) => o.value);
+  if (recOpts[0] !== "" || recOpts.length < 2) fail("قائمة القُرّاء لا تبدأ بـ«تلقائي» أو فارغة: " + JSON.stringify(recOpts.slice(0, 3)));
+  else ok("قائمة القُرّاء تتيح «تلقائي» وقارئًا محدّدًا");
 
   if (!/يوتيوب/.test((d.getElementById("acctAuto") || {}).textContent || "")) fail("اسم القناة/المنصة لم يظهر");
   else ok("اسم القناة المرتبطة ظهر");
@@ -157,6 +181,15 @@ window.fetch = async (url, opts = {}) => {
   const disabled = [...d.querySelectorAll("#acctPlatforms input[data-platform]")].filter((i) => i.disabled).map((i) => i.dataset.platform);
   if (disabled.sort().join(",") !== "linkedin,telegram,whatsapp") fail("تعطيل المنصات غير المدعومة ناقص: " + disabled.join(","));
   else ok("المنصات غير المدعومة (linkedin/telegram/whatsapp) معطّلة في الواجهة");
+
+  // حالة الربط ليست هي اختيار المستخدم للمنصات.
+  window.PublishApp.renderPlatformChecks({ ...ACCOUNT, platforms: ["youtube", "facebook"], config: { ...ACCOUNT.config, platforms: ["youtube"] } });
+  if (d.querySelector('#plat-facebook').checked || !d.querySelector('#plat-youtube').checked) fail("اختيار المنصات لا يعكس الإعداد المحفوظ");
+  else ok("اختيار المنصات يعكس الإعداد المحفوظ لا مجرد الربط");
+  window.PublishApp.renderHistory([{ status: "published", external_url: "javascript:alert(1)" }]);
+  if (d.querySelector('#queueList a')) fail("رابط غير آمن في السجل");
+  else ok("روابط السجل ترفض javascript:");
+  window.PublishApp.renderHistory(ACCOUNT.runs);
 
   const saveBtn = d.getElementById("autoSave");
   if (saveBtn) {
