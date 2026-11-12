@@ -2,7 +2,7 @@
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json, configured } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest } = require("../lib/autopilot");
+const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest, publishReadyToday } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
@@ -130,7 +130,7 @@ async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
   // دعم تعدد القنوات
-  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
+  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name,meta`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
@@ -156,7 +156,30 @@ async function accountData(uid) {
     last_check: await lastSelfTest(),
     // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
     last_daily: await lastDaily(uid),
+    // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
+    reauth: await reauthPlatforms(uid, connections),
   };
+}
+
+/* منصات تحتاج إعادة ربط: علامة meta (تُكتب عند فشل التجديد) أو آخر خطأ نشر
+ * من نوع invalid_grant — الثاني يغطي الأخطاء التي وقعت قبل وجود العلامة. */
+const REAUTH_RE = /invalid_grant|invalid_client|unauthorized_client|expired or revoked/i;
+async function reauthPlatforms(uid, connections) {
+  const out = new Set();
+  for (const c of Array.isArray(connections) ? connections : []) {
+    const meta = c && c.meta;
+    const flag = meta && typeof meta === "object" ? meta.needs_reauth : false;
+    if (flag === true || flag === "true") out.add(c.platform);
+  }
+  if (!out.size) {
+    try {
+      const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,error&order=created_at.desc&limit=20`);
+      for (const r of Array.isArray(rows) ? rows : []) {
+        if (r && r.platform && REAUTH_RE.test(String(r.error || ""))) out.add(r.platform);
+      }
+    } catch { /* لا نُسقط اللوحة */ }
+  }
+  return [...out];
 }
 
 const handler = async (req, res) => {
@@ -256,6 +279,12 @@ const handler = async (req, res) => {
       /* نحفظ النتيجة حتى تُقرأ لاحقًا من قاعدة البيانات بدل لقطة شاشة */
       const recorded = await recordSelfTest(report);
       return json(res, report.ok ? 200 : 502, { ...report, recorded });
+    }
+
+    if (body.action === "retry_publish") {
+      /* نشر الفيديو الجاهز فورًا بعد إعادة ربط القناة — بلا توليد جديد */
+      const out = await publishReadyToday(uid);
+      return json(res, out.ok ? 200 : 502, out);
     }
 
     return json(res, 400, { error: "إجراء غير معروف" });

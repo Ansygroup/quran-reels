@@ -77,6 +77,7 @@ window.alert = (m) => { alerts.push(String(m)); };
 
 // بدائل الشبكة والمصادقة
 window.QRAuth = { user: () => ({ id: "u1", email: "a@b.c" }), token: async () => "test-token" };
+window.AuthApp = { getToken: async () => "test-token", getUserId: () => "u1", user: () => ({ id: "u1", email: "a@b.c" }) };
 const calls = [];
 let action = "";
 window.fetch = async (url, opts = {}) => {
@@ -237,6 +238,33 @@ window.fetch = async (url, opts = {}) => {
   const audioLine = d.getElementById("acctLastCheck");
   if (!audioLine || !/التلاوة غير متاحة من الخادم/.test(audioLine.textContent)) fail("فشل الصوت لا يُسمّى في سطر آخر فحص");
   else ok("فشل تحميل التلاوة يُسمّى صريحًا في اللوحة");
+
+  // ربط منتهٍ: تنبيه صريح يقول ماذا يفعل المستخدم (وأن الفيديو الجاهز سيُنشر)
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
+  const re = d.getElementById("acctReauth");
+  if (!re) fail("لا تنبيه عند انتهاء ربط القناة (invalid_grant)");
+  else if (!/إعادة الربط/.test(re.textContent) || !/فيديو جديد/.test(re.textContent)) fail("تنبيه انتهاء الربط لا يشرح الخطوة التالية");
+  else ok("تنبيه انتهاء الربط يشرح إعادة الربط والنشر التلقائي");
+  // زر «انشر الفيديو الجاهز» يرسل الإجراء الصحيح
+  const retryBtn = d.getElementById("btnRetryPublish");
+  if (!retryBtn) fail("لا زر نشر للفيديو الجاهز مع ربط منتهٍ");
+  else {
+    calls.length = 0;
+    retryBtn.dispatchEvent(new window.Event("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 40));
+    const sent = calls.find((c) => /\/api\/autopilot/.test(String(c.url || "")));
+    let body = null;
+    try { body = sent && JSON.parse(sent.body); } catch { body = null; }
+    if (!body || body.action !== "retry_publish") fail("زر النشر الجاهز لا يرسل retry_publish: " + JSON.stringify(body));
+    else ok("زر «انشر الفيديو الجاهز» يرسل retry_publish");
+  }
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: [] });
+  if (d.getElementById("acctReauth")) fail("تنبيه انتهاء الربط يظهر بلا سبب");
+  else ok("لا تنبيه انتهاء ربط عند سلامة القنوات");
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["<b>x"] });
+  const reEsc = d.getElementById("acctReauth");
+  if (reEsc && reEsc.querySelector("b")) fail("تنبيه انتهاء الربط لم يُهرَّب");
+  else ok("تنبيه انتهاء الربط مُهرَّب");
 
   // بلا فشل توليد: لا صندوق تفاصيل فارغ
   window.PublishApp.renderAccount({ ...ACCOUNT, last_check: { kind: "render_selftest_deep", ok: true, created_at: "2026-11-11T05:00:00Z", detail: {} } });

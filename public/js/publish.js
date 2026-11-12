@@ -178,6 +178,17 @@ window.PublishApp = {
     };
     this.lastDiagBox = diagBox(data.last_check);
 
+    /* ربط منتهٍ (invalid_grant): الخطأ الخام لا يقول للمستخدم ماذا يفعل. هنا
+     * نقولها صريحة + أن الفيديو الجاهز سيُنشر بعد الربط بلا إعادة توليد. */
+    const reauthLine = (list) => {
+      const arr = (Array.isArray(list) ? list : []).filter((p) => typeof p === "string" && p);
+      if (!arr.length) return "";
+      const names = arr.map((p) => esc(PLATFORMS[p] || p)).join("، ");
+      return `<p class="hint warn" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة الحسابات أدناه، ثم «🔁 انشر الفيديو الجاهز» فلن يُولَّد فيديو جديد.</p>
+        <div class="row gap-lg"><button class="btn btn-gold" id="btnRetryPublish">🔁 انشر الفيديو الجاهز</button></div>`;
+    };
+    this.lastReauthLine = reauthLine(data.reauth);
+
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
     this.available = Array.isArray(data.available) && data.available.length
       ? data.available
@@ -195,11 +206,42 @@ window.PublishApp = {
           <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
           <button class="btn btn-ghost" id="quickRenderTest">🎬 اختبار توليد فيديو</button>
         </div>
+        ${this.lastReauthLine || ""}
         ${this.lastDailyLine || ""}
         ${this.lastCheckLine || ""}
         ${this.lastDiagBox || ""}
       `;
     }
+    /* زر نشر الفيديو الجاهز: يظهر فقط عند وجود منصة تحتاج إعادة ربط، ويستدعي
+     * إجراءً ينشر صفوف اليوم الفاشلة بدل إعادة التوليد من الصفر. */
+    const retryBtn = document.getElementById("btnRetryPublish");
+    if (retryBtn && !retryBtn._bound) {
+      retryBtn._bound = true;
+      retryBtn.addEventListener("click", async () => {
+        retryBtn.disabled = true;
+        const old = retryBtn.textContent;
+        retryBtn.textContent = "⏳ جارٍ النشر…";
+        try {
+          const res = await fetch("/api/autopilot", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+            body: JSON.stringify({ action: "retry_publish" }),
+          });
+          const j = await res.json().catch(() => ({}));
+          if (j && j.ok) {
+            if (typeof toast === "function") toast("تم نشر الفيديو الجاهز ✅");
+            location.reload();
+            return;
+          }
+          if (typeof toast === "function") toast(String((j && j.error) || "تعذّر النشر — أعد الربط أولًا"), "err");
+        } catch {
+          if (typeof toast === "function") toast("تعذّر الاتصال بالخادم", "err");
+        }
+        retryBtn.disabled = false;
+        retryBtn.textContent = old;
+      });
+    }
+
 
     // بطاقة الربط (تعدد القنوات)
     const acctPlatforms = document.getElementById("acctPlatforms");
