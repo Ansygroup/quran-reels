@@ -205,6 +205,7 @@ window.PublishApp = {
         <div class="row gap-lg"><button class="btn btn-gold" id="btnRetryPublish">🔁 انشر الفيديو الجاهز</button></div>`;
     };
     this.lastReauthLine = reauthLine(data.reauth);
+    this.reauth = Array.isArray(data.reauth) ? data.reauth.slice() : [];
 
     // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
     this.available = Array.isArray(data.available) && data.available.length
@@ -373,14 +374,18 @@ window.PublishApp = {
        * فالزر كان يعيد المستخدم إلى ?setup=meta بلا أي تفسير. */
       const ready = p.ready !== false;
       const head = `<b style="min-width:96px">${p.name}</b>`;
-      const expired = (c) => Boolean(c.expires_at && Number(c.expires_at) < Date.now());
+      /* تحذير «أعد الربط» صار للحالات الحقيقية فقط: منصة تحتاج إعادة ربط أو
+       * اتصال بلا توكن تجديد. صلاحية access_token تنتهي كل ساعة وتُجدَّد تلقائيًا،
+       * فكان التحذير يظهر كل يوم بلا سبب ويفقد معناه. */
+      const reauthList = Array.isArray(this.reauth) ? this.reauth : [];
+      const expired = (c) => reauthList.includes(c.platform) || c.has_refresh === false;
       if (mine.length) {
         /* كل قناة في سطرها: الشارة «⭐ افتراضية» أو زر تعيينها، + إضافة قناة أخرى.
          * (قبل ذلك كان النشر يذهب دائمًا لأحدث قناة بلا أي اختيار ظاهر) */
         const chan = (c) => `<span class="soc-chan" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
           <span style="color:${expired(c) ? "#ffcf8b" : "#7ee0a2"}">${expired(c) ? "⚠️" : "✅"} ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
           ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost" data-default="${c.id}">⭐ اجعلها الافتراضية</button>`}
-          ${expired(c) ? '<small class="hint">انتهت صلاحية الجلسة — أعد الربط لتُنشر الفيديوهات</small>' : ""}
+          ${expired(c) ? '<small class="hint">انتهت صلاحية الربط — أعد الربط لتُنشر الفيديوهات</small>' : '<small class="hint">الجلسة تتجدد تلقائيًا</small>'}
           <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>
           ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">🔄 إعادة الربط</button>` : ""}
         </span>`;
