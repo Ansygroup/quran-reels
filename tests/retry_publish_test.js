@@ -69,62 +69,16 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; publishe
   reset();
   chk("بلا صفوف فاشلة يعيد null", (await T.retryPublishFailed("u1", "2026-11-12")) === null);
 
-  /* 2) صفّان لنفس المنصة ⇒ نشر واحد + تحويل الثاني إلى draft */
+  /* النتيجة المجهولة لا تُعاد آليًا حتى لو وُجد صفان أو منصتان. */
   reset();
   qRows = [
-    { id: "r1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" },
-    { id: "r2", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "r1", platform: "youtube", connection_id: "c1", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "r2", platform: "youtube", connection_id: "c1", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "r3", platform: "youtube", connection_id: "c2", video_path: "u/autopilot/2026-11-12-a.mp4" },
   ];
-  const out2 = await T.retryPublishFailed("u1", "2026-11-12");
-  chk("صفّان لنفس المنصة ⇒ نشر واحد فقط",
-    pub.calls.length === 1 && pub.calls[0] === "r1", JSON.stringify(pub.calls));
-  chk("الصفّ المكرر يُحوَّل إلى draft (حالة مسموحة) مع سبب",
-    sql.some((s) => /update publish_queue set status='draft'/.test(s.text) && Array.isArray(s.params[0]) && s.params[0][0] === "r2"),
-    JSON.stringify(sql.map((s) => s.text.slice(0, 50))));
-  chk("النتيجة تُبلغ عن المكرر",
-    out2 && out2.published.length === 1 && out2.duplicates === 1 && out2.attempted === 1,
-    JSON.stringify(out2));
-
-  /* 3) منصتان مختلفتان ⇒ نشر كلتيهما */
-  reset();
-  qRows = [
-    { id: "a1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" },
-    { id: "a2", platform: "instagram", video_path: "u/autopilot/2026-11-12-a.mp4" },
-  ];
-  const out3 = await T.retryPublishFailed("u1", "2026-11-12");
-  chk("منصتان مختلفتان ⇒ نشر مرتين", pub.calls.length === 2 && out3.published.length === 2, JSON.stringify(out3));
-
-  reset();
-  qRows = [
-    { id: "c1", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
-    { id: "c2", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" },
-    { id: "c3", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
-  ];
-  const channels = await T.retryPublishFailed("u1", "2026-11-12");
-  chk("إعادة النشر تحفظ القناتين وتحذف المكرر لنفس القناة فقط", pub.calls.join(",") === "c1,c2" && channels.duplicates === 1, JSON.stringify(channels));
-
-  reset();
-  qRows = [
-    { id: "fail-same", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
-    { id: "fail-other", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" },
-  ];
-  publishedRows = [{ id: "pub", platform: "youtube", connection_id: "channel1" }];
-  const partial = await T.retryPublishFailed("u1", "2026-11-12");
-  chk("منشور على قناة ⇒ ينشر الفاشل على القناة الأخرى فقط", pub.calls.join(",") === "fail-other" && partial.blocked === 1 && partial.failed === 1, JSON.stringify(partial));
-  reset();
-  qRows = [{ id: "ambiguous", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" }];
-  publishedRows = [{ id: "pub-default", platform: "youtube", connection_id: null }];
-  const uncertain = await T.retryPublishFailed("u1", "2026-11-12");
-  chk("منشور لقناة افتراضية غير محددة ⇒ لا تخمين ولا رفع", pub.calls.length === 0 && uncertain.blocked === 1, JSON.stringify(uncertain));
-
-  reset();
-  qRows = [{ id: "unknown", platform: "youtube", connection_id: "c1", video_path: "u/autopilot/2026-11-12-a.mp4" }];
-  const oldQ = impl.q;
-  impl.q = async (text, params) => { if (/status='published'/.test(text)) throw new Error("db unavailable"); return oldQ(text, params); };
-  let blockedOnDb = false;
-  try { await T.retryPublishFailed("u1", "2026-11-12"); } catch { blockedOnDb = true; }
-  impl.q = oldQ;
-  chk("تعذّر فحص المنشورات السابقة ⇒ لا نداء نشر", blockedOnDb && pub.calls.length === 0);
+  const blocked = await T.retryPublishFailed("u1", "2026-11-12");
+  chk("صفوف الفشل الغامضة تُحجب ولا يُرفع أي منها", pub.calls.length === 0 && blocked.blocked === 3 && blocked.failed === 3);
+  chk("لا تعديل اعتباطي للصفوف المكررة", !sql.some(s => /set status='draft'/.test(s.text)));
 
   reset();
   qRows = Array.from({ length: 50 }, (_, id) => ({ id: String(id), platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }));
