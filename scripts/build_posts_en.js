@@ -18,8 +18,7 @@ for (const s of SPECS) {
 }
 const GENERATED = "<!-- generated -->";
 const HEAD_EXTRA = `<script defer src="/_vercel/insights/script.js" data-sdkn="@vercel/analytics" data-sdkv="1.5.0"></script>
-<script defer src="/_vercel/speed-insights/script.js"></script>
-<script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>`;
+<script defer src="/_vercel/speed-insights/script.js"></script>`;
 
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function faqJsonLd(faq){return JSON.stringify({"@context":"https://schema.org","@type":"FAQPage","mainEntity":faq.map(([q,a])=>({"@type":"Question","name":q,"acceptedAnswer":{"@type":"Answer","text":a}}))}).replace(/</g,"\\u003c");}
