@@ -78,6 +78,7 @@ window.PublishApp = {
       window.QRAuthUI?.open();
       const notice = document.getElementById("acctNotice");
       if (notice) {
+        notice.hidden = false;
         notice.style.display = "block";
         notice.textContent = "سجّل الدخول لعرض لوحة النشر والأتمتة — بريدك + رابط سحري، أو جوجل.";
       }
@@ -90,7 +91,7 @@ window.PublishApp = {
     if (!res.ok) {
       if (res.status === 401) {
         const notice = document.getElementById("acctNotice");
-        if (notice) notice.textContent = "سجّل الدخول (من زر الحساب بالأعلى) لعرض لوحة النشر والأتمتة.";
+        if (notice) { notice.hidden = false; notice.textContent = "سجّل الدخول (من زر الحساب بالأعلى) لعرض لوحة النشر والأتمتة."; }
         return;
       }
       alert(data.error || "خطأ في تحميل البيانات");
@@ -99,144 +100,375 @@ window.PublishApp = {
     
     this.renderAccount(data);
     this.bindEvents(uid);
+    this.startProgressPolling();
     // حالة الربط الحقيقية — تُقرأ من op=list (الخادم لا يرسل التوكنات أبدًا)
     await this.renderConnections(await window.AuthApp.getToken());
     this.reportLinkedFlag();
   },
 
-  renderAccount(data = {}) {
-    // قيم افتراضية: بيانات ناقصة لا تُسقط الصفحة كلها (كانت الاستجابة {} كافية للانهيار)
-    const config = data.config || {};
-    const runs = Array.isArray(data.runs) ? data.runs : [];
-    const connected = Boolean(data.connected);
-    const platforms = Array.isArray(data.platforms) ? data.platforms : [];
-    const channel = data.channel || "لا توجد قنوات مرتبطة";
-    const reciters = Array.isArray(data.reciters) ? data.reciters : [];
-    const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
-    const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
-    /* آخر فحص محفوظ في القاعدة: «هل التوليد يعمل؟» يُجاب في اللوحة نفسها
-     * بدل لقطة شاشة تُنسى. النصوص من الخادم تُقصّ وتُهرَّب. */
-    const lastCheckLine = (c) => {
-      if (!c || !c.created_at) return "";
-      const when = new Date(c.created_at);
-      const stamp = Number.isNaN(when.getTime()) ? "" : when.toISOString().slice(0, 16).replace("T", " ") + " UTC";
-      const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي" : "فحص المحرّك";
-      const why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
-      const cls = c.ok ? "hint ok" : "hint warn";
-      return `<p class="${cls}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${why} · ${stamp}</p>`;
-    };
-    this.lastCheckLine = lastCheckLine(data.last_check);
+  /* ============================================================
+   * رسم لوحة «حسابي» — تصميم جديد (بطاقة حالة + خطوات + أرقام +
+   * تخصيص قابل للتعديل + سجل + تشخيص).
+   * كل الأجزاء تُبنى من نفس استجابة /api/autopilot، والنصوص تُهرَّب.
+   * ============================================================ */
+  esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  },
 
-    // الخادم يرسل available (مفتاح/اسم/هل النشر مدعوم) — لا نَعِد بما لا يُنشر
+  safeUrl(v) {
+    try { const u = new URL(String(v)); return ["http:", "https:"].includes(u.protocol) ? u.href : ""; }
+    catch { return ""; }
+  },
+
+  /* ترجمة الأسباب الخام (صفوف كُتبت قبل G44) إلى جملة مفهومة */
+  friendly(v) {
+    const t = String(v || "");
+    if (/invalid_grant|expired or revoked|unauthorized_client/i.test(t)) {
+      return "انتهت صلاحية ربط " + (/tiktok/i.test(t) ? "تيك توك" : /\bx\b|twitter/i.test(t) ? "X" : "يوتيوب") + " — أعد الربط من بطاقة القنوات";
+    }
+    if (/quotaExceeded|exceeded your quota/i.test(t)) return "تجاوز الحد اليومي للرفع على يوتيوب — راجع النتيجة قبل إعادة المحاولة";
+    return t;
+  },
+
+  /* موعد التشغيل القادم: 04:15 UTC = 06:15 القاهرة، كل يوم */
+  nextRunInfo(now = Date.now()) {
+    const d = new Date(now);
+    const at = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 4, 15, 0, 0));
+    if (at.getTime() <= now) at.setUTCDate(at.getUTCDate() + 1);
+    return { at, inMs: at.getTime() - now };
+  },
+
+  humanGap(ms) {
+    const mins = Math.max(0, Math.round(ms / 60000));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (!h) return `${m} دقيقة`;
+    return m ? `${h} ساعة و${m} دقيقة` : `${h} ساعة`;
+  },
+
+  articleLabel(data) {
+    const n = data && data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : 0;
+    return n ? `📚 توليد من مقال (${n.toLocaleString("ar-EG")} مقال)` : "📚 توليد من مقال";
+  },
+
+  /* ---------- سطر آخر تشغيل آلي ---------- */
+  dailyLine(d) {
+    if (!d || !d.run_date) return "";
+    const day = String(d.run_date).slice(0, 10);
+    const published = d.status === "published";
+    const running = d.status === "rendering";
+    const state = published ? "✅ منشور" : running ? "⏳ قيد التوليد" : "⚠️ فشل";
+    const why = !published && !running && d.error ? " — " + this.friendly(String(d.error).slice(0, 140)) : "";
+    const link = published && this.safeUrl(d.external_url)
+      ? ` · <a href="${this.esc(this.safeUrl(d.external_url))}" target="_blank" rel="noopener">رابط المنشور</a>` : "";
+    return `<p class="hint ${published ? "ok" : running ? "" : "warn"}" id="acctLastDaily">آخر تشغيل آلي (${this.esc(day)}): ${state}${this.esc(why)}${link} · تُجدول محاولة يومية 04:15 UTC</p>`;
+  },
+
+  /* ---------- سطر آخر فحص محفوظ ---------- */
+  checkLine(c) {
+    if (!c || !c.created_at) return "";
+    const when = new Date(c.created_at);
+    const stamp = Number.isNaN(when.getTime()) ? "" : when.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+    const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي"
+      : c.kind === "render_failure" ? "محاولة توليد آلية"
+      : c.kind === "autopilot_daily" ? "تشغيل آلي" : "فحص المحرّك";
+    let why = !c.ok && c.detail && c.detail.error ? " — " + this.friendly(String(c.detail.error).slice(0, 120)) : "";
+    const d = c.detail || {};
+    if (!c.ok && !why && d.audio_direct && d.audio_direct.ok === false) {
+      why = " — التلاوة غير متاحة من الخادم" + (d.audio_proxy && d.audio_proxy.ok ? " (المسار المباشر فقط)" : "");
+    }
+    if (!c.ok && d.export && d.export.stage && !/stage/.test(why)) {
+      why += (why ? " · " : " — ") + "توقّف عند «" + String(d.export.stage).slice(0, 60) + "»";
+    }
+    return `<p class="hint ${c.ok ? "ok" : "warn"}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${this.esc(why)} · ${stamp}</p>`;
+  },
+
+  /* ---------- تفاصيل آخر فشل توليد ---------- */
+  diagBox(c) {
+    const d = c && c.kind === "render_failure" && c.detail && c.detail.diag ? c.detail.diag : null;
+    if (!d) return "";
+    const last = d.last && typeof d.last === "object" ? d.last : {};
+    const stop = d.kind === "stall" ? "توقّف بلا تقدّم" : d.kind === "timeout" ? "تجاوز المهلة" : (d.kind || "فشل");
+    const rows = [
+      ["المرحلة", `${d.stage || "غير معروفة"} (${d.pct || "0%"})`],
+      ["نوع التوقّف", stop],
+      ["بدأ التصدير؟", last.exporting === true ? "نعم" : last.exporting === false ? "لا" : "غير معروف"],
+      ["الآيات المحددة", last.count == null ? "غير معروف" : String(last.count)],
+      ["حوار مفتوح", last.dialog ? "نعم" : "لا"],
+      ["آخر تنبيه", last.toast || "—"],
+      ["سبب إيقاف الدالة", last.abort || "—"],
+    ];
+    const errs = Array.isArray(d.errors) ? d.errors.slice(0, 3).map(String) : [];
+    return `<details class="hint warn" id="acctDiag"><summary>تفاصيل آخر محاولة توليد (اضغط للعرض)</summary><ul>${
+      rows.map(([k, v]) => `<li>${this.esc(k)}: ${this.esc(v)}</li>`).join("")
+    }${errs.length ? `<li>أخطاء الصفحة: ${this.esc(errs.join(" | "))}</li>` : ""}</ul></details>`;
+  },
+
+  /* ---------- تنبيه إعادة الربط + زر نشر الفيديو الجاهز ---------- */
+  reauthLineHTML(list) {
+    const arr = (Array.isArray(list) ? list : []).filter((p) => typeof p === "string" && p);
+    if (!Array.isArray(list)) {
+      const raw = `${(this.data && this.data.last_daily && this.data.last_daily.error) || ""} ${(this.data && this.data.last_check && this.data.last_check.detail && this.data.last_check.detail.error) || ""}`;
+      if (/invalid_grant|expired or revoked|unauthorized_client/i.test(raw)) {
+        arr.push(/tiktok/i.test(raw) ? "tiktok" : /youtube/i.test(raw) ? "youtube" : "youtube");
+      }
+    }
+    if (!arr.length) return "";
+    const names = arr.map((p) => this.esc(PLATFORMS[p] || p)).join("، ");
+    return `<div class="auto-warning" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة القنوات. لو المشكلة انتهاء تصريح يوتيوب، النظام هيحاول ينشر الفيديو الجاهز بعد الربط لو قدر يتحقق إنه آمن.
+      <div class="row gap-lg" style="margin-top:10px"><button class="btn btn-gold" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button></div></div>`;
+  },
+
+  /* ---------- بطاقة الحالة (أعلى الصفحة) ---------- */
+  renderStatus(data = {}) {
+    const config = data.config || {};
+    const enabled = config.enabled === true;
+    const conns = Array.isArray(this.connections) ? this.connections : [];
+    const reauth = Array.isArray(this.reauth) ? this.reauth : [];
+    const dot = document.getElementById("acctDot");
+    const label = document.getElementById("acctStateLabel");
+    const nextEl = document.getElementById("acctNextRun");
+    const toggle = document.getElementById("acctEnabled");
+    if (toggle) toggle.checked = enabled;
+
+    const next = this.nextRunInfo();
+    const nextTxt = `الموعد المجدول بعد ${this.humanGap(next.inMs)} · ${this.cairoClockLabel(next.at)} القاهرة`;
+
+    let state = "idle", title = "الأتمتة موقوفة", hint = "اضغط الزر لتفعيل النشر اليومي التلقائي";
+    if (!conns.length) { state = "idle"; title = "اربط قناة للبدء"; hint = "ما فيش قناة مرتبطة — الأتمتة لا تعمل قبل الربط"; }
+    else if (reauth.length) { state = "warn"; title = "يحتاج إعادة ربط: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "أعد الربط من بطاقة القنوات، وراجع حالة المحاولة الآلية"; }
+    else if (enabled) { state = "on"; title = "الأتمتة مفعّلة — محاولة نشر يومية"; hint = nextTxt; }
+
+    if (dot) { dot.className = "acct-dot " + state; }
+    if (label) label.textContent = title;
+    if (nextEl) nextEl.textContent = hint;
+  },
+
+  /* ---------- خطوات التشغيل ---------- */
+  renderSteps(data = {}) {
+    const wrap = document.getElementById("acctSteps");
+    if (!wrap) return;
+    const config = data.config || {};
+    const conns = Array.isArray(this.connections) ? this.connections : [];
+    const platforms = Array.isArray(config.platforms) ? config.platforms : [];
+    const steps = [
+      { n: 1, t: "اربط قناة", d: "يوتيوب / فيسبوك / إنستغرام / تيك توك / X", done: conns.length > 0 },
+      { n: 2, t: "اختر المنصات والمحتوى", d: platforms.length ? platforms.map((p) => PLATFORMS[p] || p).join(" · ") : "لم تُختَر منصة بعد", done: platforms.length > 0 },
+      { n: 3, t: "فعّل الأتمتة", d: config.enabled ? "محاولة تلقائية كل يوم 04:15 UTC" : "موقوفة — فعّلها من الزر بالأعلى", done: config.enabled === true },
+    ];
+    wrap.innerHTML = steps.map((s) => `
+      <div class="acct-step ${s.done ? "done" : ""}">
+        <span class="n">${s.done ? "✓" : s.n}</span>
+        <div><b>${this.esc(s.t)}</b><small>${this.esc(s.d)}</small></div>
+      </div>`).join("");
+  },
+
+  /* ---------- أرقام الأتمتة ---------- */
+  renderKpis(data = {}) {
+    const wrap = document.getElementById("acctKpis");
+    if (!wrap) return;
+    const st = data.stats || {};
+    const last = st.last_published_at ? new Date(st.last_published_at) : null;
+    const lastTxt = last && !Number.isNaN(last.getTime()) ? this.cairoClockLabel(last) : "—";
+    const kpi = (v, l, cls = "") => `<div class="kpi ${cls}"><b>${this.esc(v)}</b><span>${this.esc(l)}</span></div>`;
+    wrap.innerHTML =
+      kpi(st.published || 0, "منشور (آخر ٢٠٠)") +
+      kpi(st.scheduled || 0, "في الطابور (آخر ٢٠٠)") +
+      kpi(st.failed || 0, "فشل (آخر ٢٠٠)", (st.failed ? "warn" : "")) +
+      kpi(lastTxt, "آخر نشر");
+  },
+
+  /* ---------- صناديق اختيار المنصات ---------- */
+  renderPlatformChecks(data = {}) {
+    const wrap = document.getElementById("acctPlatforms");
+    if (!wrap) return;
+    const platforms = Array.isArray(data.config?.platforms) ? data.config.platforms : [];
+    wrap.innerHTML = this.available.map((p) => `
+      <label class="chk" title="${p.publish ? "" : "لا يوجد ربط/نشر لهذه المنصة بعد"}">
+        <input type="checkbox" id="plat-${p.key}" data-platform="${p.key}" ${platforms.includes(p.key) ? "checked" : ""}
+          ${p.publish ? "" : "disabled"}>
+        ${this.esc(p.name)}${p.publish ? "" : " <small>(قريبًا)</small>"}
+      </label>`).join("");
+  },
+
+  /* ---------- لوحة التخصيص ---------- */
+  renderAutoPanel(data = {}) {
+    const wrap = document.getElementById("acctAuto");
+    if (!wrap) return;
+    const config = data.config || {};
+    const template = config.template || {};
+    const options = data.options || {};
+    const articleLabel = this.articleLabel(data);
+    const chanCount = new Map();
+    for (const c of Array.isArray(this.connections) ? this.connections : []) chanCount.set(c.platform, (chanCount.get(c.platform) || 0) + 1);
+    const multi = [...chanCount.values()].some((n) => n > 1);
+
+    const MODES = { mix: "متنوّع (آيات وسور)", famous: "سور مشهورة", sequential: "بالترتيب (مصحف)", article: "من مقال" };
+    const BGS = {
+      rotate: "تتغيّر تلقائيًا", "grad-emerald": "تدرّج زمردي", "grad-gold": "تدرّج ذهبي", "grad-dawn": "تدرّج الفجر", "grad-night": "تدرّج ليلي",
+      "bg-mosque-night": "مسجد ليلًا", "bg-starry-desert": "صحراء بنجوم", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "غابة وأشعة",
+      "bg-geometric-islamic": "زخرفة إسلامية", "bg-mountains-dawn": "جبال الفجر", "bg-mosque-silhouette": "ظلّ مسجد",
+      "bg-garden-tulips": "حديقة", "bg-arabesque-dark": "أرابيسك", "bg-heavenly-clouds": "سحاب",
+    };
+    const modes = (Array.isArray(options.content_modes) && options.content_modes.length ? options.content_modes : Object.keys(MODES));
+    const reciters = Array.isArray(options.reciters) ? options.reciters : (Array.isArray(data.reciters) ? data.reciters : []);
+    const bgs = Array.isArray(options.backgrounds) && options.backgrounds.length ? options.backgrounds : Object.keys(BGS);
+
+    wrap.innerHTML = `
+      <div class="acct-sec-head">
+        <h2>🎛️ التخصيص</h2>
+        <span class="hint">كل ما هنا يُحفظ ويُستخدم في التشغيل الآلي القادم — تقدر تغيّره في أي وقت</span>
+      </div>
+      <div class="acct-grid3">
+        <div class="f-group"><label for="selContentMode">محتوى الفيديو</label>
+          <select id="selContentMode">${modes.map((m) => `<option value="${this.esc(m)}" ${template.content_mode === m ? "selected" : ""}>${this.esc(MODES[m] || m)}</option>`).join("")}</select>
+        </div>
+        <div class="f-group"><label for="selReciter">القارئ</label>
+          <select id="selReciter">
+            <option value="" ${template.reciter_mode !== "fixed" ? "selected" : ""}>تلقائي (يتنوّع كل يوم)</option>
+            ${reciters.map((r) => `<option value="${this.esc(r.id)}" ${template.reciter_mode === "fixed" && template.reciter === r.id ? "selected" : ""}>${this.esc(r.name || r.id)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="f-group"><label for="selBackground">الخلفية</label>
+          <select id="selBackground">${bgs.map((b) => `<option value="${this.esc(b)}" ${template.background === b ? "selected" : ""}>${this.esc(BGS[b] || b)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
+      ${multi ? `<div class="switch-row">
+        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل يُنشر على القناة الافتراضية (⭐) فقط · عندك ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
+        <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
+      </div>` : ""}
+      <div class="row gap-lg acct-actions">
+        <button class="btn btn-gold" id="autoSave" data-act="save">💾 حفظ التعديلات</button>
+        <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
+      </div>
+      <details class="acct-more">
+        <summary>خيارات إضافية</summary>
+        <div class="row gap-lg acct-actions">
+          <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
+          <button class="btn btn-ghost" id="autoGenArticle" data-act="article_random">${articleLabel}</button>
+        </div>
+      </details>
+      <p class="hint">«تشغيل الآن» يُنتج فيديو وينشره فورًا (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>`;
+
+    this.renderPlatformChecks(data);
+  },
+
+  /* نعرض فقط المراحل التي سجّلها الخادم وحالة كل صف نشر فعلي. */
+  renderProgress(data = {}) {
+    const wrap = document.getElementById("acctProgress");
+    if (!wrap) return;
+    const head = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div>';
+    if (this._progressWaiting) { wrap.innerHTML = head + '<p class="hint">⏳ بنستنى الخادم يبدأ التشغيل ويسجّل أول خطوة…</p>'; return; }
+    const r = data.run;
+    if (!r) { wrap.innerHTML = head + '<p class="hint">مفيش تشغيل مسجّل لسه.</p>'; return; }
+    const labels = { checking: "فحص القنوات والإعدادات", preparing: "تجهيز الفيديو", audio: "فحص التلاوة", export: "إنشاء الفيديو", validating: "فحص الصوت والملف", storage: "حفظ الفيديو", queue: "تجهيز مهام القنوات", publishing: "محاولة النشر على القنوات" };
+    const states = { rendering: "⏳ جاري التجهيز", queued: "⏳ تجهيز أو نشر", published: "✅ التشغيل مكتمل", failed: "⚠️ التشغيل ما اكتملش" };
+    const events = (Array.isArray(data.events) ? data.events : []).filter(e => labels[e.stage]);
+    const steps = events.length ? `<ol class="progress-steps">${events.map((e, i) => `<li>${i === events.length - 1 ? "📍" : "✓"} ${this.esc(labels[e.stage])}</li>`).join("")}</ol>` : `<p class="hint">${data.events_available === false ? "تعذّر قراءة تفاصيل المراحل دلوقتي." : "تفاصيل المراحل مش متاحة للتشغيل ده."}</p>`;
+    const targetStates = { scheduled: "في الانتظار", publishing: "جاري النشر", published: "اتنشر", failed: "فشل أو النتيجة محتاجة مراجعة", draft: "مسودة" };
+    const targets = Array.isArray(data.targets) ? data.targets : [];
+    const channels = targets.length ? `<ul class="progress-channels">${targets.map(t => {
+      const name = `${PLATFORMS[t.platform] || t.platform || "منصة"} · ${t.channel || "قناة"}`;
+      const link = t.status === "published" && this.safeUrl(t.url) ? ` · <a href="${this.esc(this.safeUrl(t.url))}" target="_blank" rel="noopener">شوف الفيديو</a>` : "";
+      return `<li><b>${this.esc(name)}</b>: ${this.esc(targetStates[t.status] || "حالة غير معروفة")}${link}${t.error ? ` — ${this.esc(this.friendly(t.error))}` : ""}</li>`;
+    }).join("")}</ul>` : "";
+    const warning = data.targets_available === false ? '<p class="hint warn">تعذّر قراءة حالة القنوات دلوقتي.</p>' : data.targets_truncated ? '<p class="hint warn">قائمة القنوات المعروضة ممكن تكون ناقصة.</p>' : "";
+    const error = r.status === "failed" && r.error ? `<p class="hint warn">${this.esc(this.friendly(r.error))}</p>` : "";
+    const at = events.length && events[events.length - 1].at ? `آخر خطوة مسجّلة: ${this.esc(cairoClockLabel(events[events.length - 1].at))}. ` : "";
+    wrap.innerHTML = head + `<p><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + steps + channels + warning + error + `<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p>`;
+  },
+
+  startProgressPolling() {
+    if (this._progressTimer) clearTimeout(this._progressTimer);
+    this.pollProgress();
+  },
+  async pollProgress() {
+    if (this._progressBusy) return;
+    this._progressBusy = true;
+    try {
+      const token = await window.AuthApp.getToken();
+      if (!token) throw new Error("no session");
+      const res = await fetch("/api/autopilot?progress=1", { method: "GET", cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("unavailable");
+      const data = await res.json();
+      if (this._progressWaiting && data.run && data.run.id !== this._progressBaseline) this._progressWaiting = false;
+      if (data.run?.id) this._lastProgressRunId = data.run.id;
+      this.renderProgress(data);
+    } catch {
+      const wrap = document.getElementById("acctProgress");
+      if (wrap) wrap.innerHTML = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div><p class="hint warn">مش قادرين نحدّث الحالة دلوقتي؛ ده مش معناه إن التشغيل وقف. راجعها قبل ما تشغّل تاني.</p>';
+    } finally {
+      this._progressBusy = false;
+      if (this._progressTimer) clearTimeout(this._progressTimer);
+      const view = document.getElementById("view-account");
+      if (view && !view.hidden) this._progressTimer = setTimeout(() => this.pollProgress(), 5000);
+    }
+  },
+
+  /* ---------- سجل التشغيل ---------- */
+  renderHistory(runs) {
+    const list = document.getElementById("queueList");
+    if (!list) return;
+    const rows = Array.isArray(runs) ? runs : [];
+    if (!rows.length) {
+      list.innerHTML = `<p class="hint">لا يوجد سجل بعد — أول تشغيل سيظهر هنا تلقائيًا.</p>`;
+      return;
+    }
+    list.innerHTML = rows.map((r) => {
+      const state = r.status === "published" ? "✅ منشور" : r.status === "rendering" ? "⏳ قيد الإنشاء" : "❌ فشل";
+      return `<div class="auto-run ${this.esc(r.status || "")}">
+        <div class="auto-run-head">
+          <span class="auto-run-title">${this.esc(r.title || `سورة ${String(r.recipe_key || "").split(":")[0] || "—"}`)}</span>
+          <span class="auto-run-date">${this.esc(this.cairoClockLabel(r.created_at))}</span>
+        </div>
+        <div class="auto-run-body">
+          <span class="auto-run-reciter">${this.esc(r.reciter || "غير معروف")}</span>
+          <span class="auto-run-status">${state}</span>
+          ${r.article_title ? `<span class="auto-run-article">📚 ${this.esc(r.article_title)}</span>` : ""}
+        </div>
+        ${this.safeUrl(r.external_url) ? `<div class="auto-run-url"><a href="${this.esc(this.safeUrl(r.external_url))}" target="_blank" rel="noopener">🔗 رابط النشر</a></div>` : ""}
+        ${r.error ? `<div class="auto-run-error">⚠️ ${this.esc(this.friendly(r.error))}</div>` : ""}
+      </div>`;
+    }).join("");
+  },
+
+  /* ---------- بطاقة التشخيص ---------- */
+  renderTools(data = {}) {
+    const wrap = document.getElementById("acctQuickActions");
+    if (!wrap) return;
+    wrap.hidden = false;
+    wrap.innerHTML = `
+      <div class="row gap-lg wrap">
+        <button class="btn btn-ghost" id="quickSelfTest" data-act="selftest">🔍 فحص محرّك التوليد</button>
+        <button class="btn btn-ghost" id="quickRenderTest" data-act="selftest_deep">🎬 اختبار توليد فيديو</button>
+        <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
+        ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button>'}
+      </div>`;
+    // نتائج التشغيل والفحص والتنبيهات لا تختفي داخل التشخيص المغلق.
+    const alerts = document.getElementById("acctAlerts");
+    if (alerts) alerts.innerHTML = `${this.lastDailyLine || ""}${this.lastReauthLine || ""}${this.lastCheckLine || ""}${this.lastDiagBox || ""}`;
+  },
+
+  renderAccount(data = {}) {
+    this.data = data;
+    const runs = Array.isArray(data.runs) ? data.runs : [];
     this.available = Array.isArray(data.available) && data.available.length
       ? data.available
       : ALL_PLATFORMS.map((k) => ({ key: k, name: PLATFORMS[k] || k, publish: true }));
-    
-    // بطاقة الإجراءات السريعة
-    const quickActions = document.getElementById("acctQuickActions");
-    if (quickActions) {
-      quickActions.hidden = false;
-      quickActions.innerHTML = `
-        <h2>⚡ إجراءات سريعة</h2>
-        <div class="row gap-lg">
-          <button class="btn btn-gold" id="quickGenArticle">${articleLabel}</button>
-          <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
-          <button class="btn btn-ghost" id="quickSelfTest">🔍 فحص محرّك التوليد</button>
-          <button class="btn btn-ghost" id="quickRenderTest">🎬 اختبار توليد فيديو</button>
-        </div>
-        ${this.lastCheckLine || ""}
-      `;
-    }
+    this.reauth = Array.isArray(data.reauth) ? data.reauth.slice() : [];
+    this.lastDailyLine = this.dailyLine(data.last_daily);
+    this.lastCheckLine = this.checkLine(data.last_check);
+    this.lastDiagBox = this.diagBox(data.last_check);
+    this.lastReauthLine = this.reauthLineHTML(data.reauth);
 
-    // بطاقة الربط (تعدد القنوات)
-    const acctPlatforms = document.getElementById("acctPlatforms");
-    if (acctPlatforms) {
-      acctPlatforms.innerHTML = this.available.map(p => `
-        <div class="f-group" style="flex:1">
-          <label>${p.name}${p.publish ? "" : " <small>(قريبًا)</small>"}</label>
-          <input type="checkbox" id="plat-${p.key}" ${platforms.includes(p.key) ? 'checked' : ''} data-platform="${p.key}"
-            ${p.publish ? "" : 'disabled title="لا يوجد ربط/نشر لهذه المنصة بعد"'} style="width:100%">
-        </div>
-      `).join("");
-    }
-
-    // جدول النشر
-    const acctQueue = document.getElementById("acctQueue");
-    if (acctQueue) {
-      // نملأ الحاوية الموجودة (#schedPlatforms) بالمدخلات فقط — بلا تكرار للمُعرّف
-      const platformInputs = this.available.map(p =>
-        `<div class="f-group" style="flex:1"><label><input type="checkbox" data-platform="${p.key}" ${p.publish ? "" : "disabled"}> ${p.name}</label></div>`
-      ).join("");
-      const schedWrap = acctQueue.querySelector("#schedPlatforms");
-      if (schedWrap) schedWrap.innerHTML = platformInputs;
-      
-      const queueList = document.getElementById("queueList");
-      if (queueList && Array.isArray(runs)) {
-        queueList.innerHTML = runs.map(r => `
-          <div class="auto-run ${r.status}">
-            <div class="auto-run-head">
-              <span class="auto-run-title">${r.title || `سورة ${r.recipe_key?.split(':')[0]}`}</span>
-              <span class="auto-run-date">${cairoClockLabel(r.created_at)}</span>
-            </div>
-            <div class="auto-run-body">
-              <span class="auto-run-reciter">${r.reciter || "غير معروف"}</span>
-              <span class="auto-run-status">${r.status === 'published' ? '✅ منشور' : r.status === 'rendering' ? '⏳ قيد الإنشاء' : '❌ فشل'}</span>
-              ${r.article_title ? `<span class="auto-run-article">📚 مقال: ${r.article_title}</span>` : ''}
-            </div>
-            ${r.external_url ? `<div class="auto-run-url"><a href="${r.external_url}" target="_blank">🔗 رابط النشر</a></div>` : ''}
-            ${r.error ? `<div class="auto-run-error">⚠️ ${r.error}</div>` : ''}
-          </div>
-        `).join("");
-      }
-    }
-
-    // لوحة الأتمتة (تعدد القنوات والتوازي والمقالات)
-    /* خيار «انشر على كل القنوات المرتبطة» — يظهر فقط عند ربط قناتين فأكثر لنفس المنصة */
-    const allChannelsOn = data.config && data.config.all_channels === true;
-    const chanCount = new Map();
-    for (const c of Array.isArray(this.connections) ? this.connections : []) chanCount.set(c.platform, (chanCount.get(c.platform) || 0) + 1);
-    const multiChannel = [...chanCount.values()].some((n) => n > 1);
-    const acctAuto = document.getElementById("acctAuto");
-    if (acctAuto) {
-      acctAuto.innerHTML = `
-        <h2>⚙️ لوحة الأتمتة اليومية</h2>
-        <div class="row gap-lg">
-          <div class="f-group" style="flex:1">
-            <label>الحالة</label>
-            <div class="status-badge ${config.enabled ? 'active' : 'inactive'}">${config.enabled ? '✅ مفعلة' : '❌ معطلة'}</div>
-          </div>
-          <div class="f-group" style="flex:1">
-            <label>الوقت (القاهرة)</label>
-            <div class="status-badge">${cairoClockLabel("04:15:00")}</div>
-          </div>
-          <div class="f-group" style="flex:1">
-            <label>المنصات</label>
-            <div class="status-badge">${channel || 'لا توجد قنوات'}</div>
-          </div>
-        </div>
-        ${multiChannel ? `<div class="switch-row" style="margin-top:14px">
-          <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل يُنشر على القناة الافتراضية (⭐) فقط · عندك ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${PLATFORMS[k] || k}: ${n}`).join(" · ")}</small></div>
-          <label class="switch"><input type="checkbox" id="chkAllChannels" ${allChannelsOn ? "checked" : ""}><i></i></label>
-        </div>` : ""}
-        <div class="row gap-lg" style="margin-top:12px">
-          <button class="btn btn-gold" id="autoSave">حفظ الإعدادات</button>
-          <button class="btn btn-em" id="autoRun">تشغيل الآن</button>
-          <button class="btn btn-em" id="autoRunAll">تشغيل التوازي (الكل)</button>
-          <button class="btn btn-gold" id="autoGenArticle">${articleLabel}</button>
-        </div>
-        
-        <!-- بطاقة المقال (العدد الحقيقي يأتي من الخادم) -->
-        <div id="acctArticles" class="card" style="margin-top:18px;display:none">
-          <h2>📚 مكتبة المقالات${articleCount ? ` (${articleCount.toLocaleString("ar-EG")})` : ""}</h2>
-          <div class="row gap-lg" id="articleCards">
-            <!-- سيتم ملؤها بواسطة JavaScript (نمط .article-card) -->
-          </div>
-        </div>
-      `;
-    }
-
+    this.renderStatus(data);
+    this.renderSteps(data);
+    this.renderKpis(data);
+    this.renderAutoPanel(data);
+    this.renderHistory(runs);
+    this.renderTools(data);
   },
-
 
   /* قائمة الحسابات المرتبطة + أزرار ربط/فك ربط لكل منصة */
   async renderConnections(token) {
@@ -244,6 +476,8 @@ window.PublishApp = {
     const wrap = document.getElementById("acctAccountsList");
     if (!card || !wrap) return;
     card.hidden = false;
+    // نحافظ على القسم المفتوح عند تحديث القنوات بعد ربط أو فك ربط.
+    const moreWasOpen = Boolean(wrap.querySelector("#acctMorePlatforms")?.open);
     wrap.innerHTML = '<p class="hint">جارٍ تحميل الحسابات المرتبطة…</p>';
 
     let conns = [];
@@ -251,52 +485,82 @@ window.PublishApp = {
       const res = await fetch("/api/gw?op=list", { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => ({}));
       conns = Array.isArray(data.connections) ? data.connections : [];
-    } catch { /* لا نُسقط الصفحة إن فشل الطلب */ }
+      if (!res.ok) throw new Error("connections unavailable");
+    } catch {
+      wrap.innerHTML = '<p class="hint warn">تعذّر تحميل الحسابات المرتبطة. حدّث الصفحة وحاول تاني.</p>';
+      return;
+    }
     this.connections = conns;
 
-    const row = (p) => {
+    const ICONS = { youtube: "▶️", facebook: "📘", instagram: "📸", tiktok: "🎵", x: "✖️", linkedin: "💼", telegram: "✈️", whatsapp: "💬" };
+    const reauthList = Array.isArray(this.reauth) ? this.reauth : [];
+    /* التحذير للحالات الحقيقية فقط: منصة تحتاج إعادة ربط أو اتصال بلا توكن
+     * تجديد. صلاحية access_token تنتهي كل ساعة وتُجدَّد تلقائيًا. */
+    const expired = (c) => reauthList.includes(c.platform) || c.has_refresh === false;
+    const selected = Array.isArray(this.data?.config?.platforms) ? this.data.config.platforms : [];
+
+    const block = (p) => {
       const mine = conns.filter((c) => c.platform === p.key);
       const prov = p.connect || CONNECT_PLATFORM[p.key];
-      /* ready من الخادم: هل مفاتيح المزوّد مضبوطة في هذه البيئة؟ إن لم تكن،
-       * فالزر كان يعيد المستخدم إلى ?setup=meta بلا أي تفسير. */
       const ready = p.ready !== false;
-      const head = `<b style="min-width:96px">${p.name}</b>`;
-      const expired = (c) => Boolean(c.expires_at && Number(c.expires_at) < Date.now());
+      const head = `<div class="chan-head"><span class="chan-ic">${ICONS[p.key] || "🔗"}</span><b>${this.esc(p.name)}</b></div>`;
+      const missing = !mine.length && selected.includes(p.key)
+        ? '<small class="hint warn">المنصة مختارة للنشر، لكن مفيش قناة مرتبطة بيها.</small>' : "";
+
       if (mine.length) {
-        /* كل قناة في سطرها: الشارة «⭐ افتراضية» أو زر تعيينها، + إضافة قناة أخرى.
-         * (قبل ذلك كان النشر يذهب دائمًا لأحدث قناة بلا أي اختيار ظاهر) */
-        const chan = (c) => `<span class="soc-chan" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%">
-          <span style="color:${expired(c) ? "#ffcf8b" : "#7ee0a2"}">${expired(c) ? "⚠️" : "✅"} ${String(c.account_name || "مرتبط").slice(0, 40)}</span>
-          ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost" data-default="${c.id}">⭐ اجعلها الافتراضية</button>`}
-          ${expired(c) ? '<small class="hint">انتهت صلاحية الجلسة — أعد الربط لتُنشر الفيديوهات</small>' : ""}
-          <button class="btn btn-ghost" data-unlink="${c.id}" data-platform="${p.key}">فك الربط</button>
-          ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">🔄 إعادة الربط</button>` : ""}
-        </span>`;
-        return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        const one = (c) => {
+          const bad = expired(c);
+          return `<div class="chan-card ${bad ? "off" : "on"}" data-soc="${this.esc(p.key)}" data-channel="${this.esc(c.id)}">
+            <span class="chan-ic">${ICONS[p.key] || "🔗"}</span>
+            <span class="chan-info">
+              <b>${this.esc(String(c.account_name || "مرتبط").slice(0, 40))}</b>
+              <small class="${bad ? "warn" : "ok"}">${bad ? (reauthList.includes(c.platform) ? "⚠️ انتهت صلاحية الربط — أعد ربط القناة" : "⚠️ تصريح التجديد غير متاح — أعد ربط القناة") : "✅ الحساب مرتبط"}</small>
+            </span>
+            <span class="chan-acts">
+              ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost btn-sm" data-default="${this.esc(c.id)}">⭐ اجعلها الافتراضية</button>`}
+              ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}">🔄 إعادة الربط</button>` : ""}
+              <button class="btn btn-ghost btn-sm" data-unlink="${this.esc(c.id)}" data-platform="${this.esc(p.key)}">فك الربط</button>
+            </span>
+          </div>`;
+        };
+        return `<div class="chan-group" data-soc="${this.esc(p.key)}">
           ${head}
-          ${mine.map(chan).join("")}
-          ${prov && ready ? `<button class="btn btn-ghost" data-connect="${p.key}">➕ إضافة قناة</button>` : ""}
-          <small class="hint">يُنشر على القناة الافتراضية (⭐). أضف قناة ثانية بتسجيل الدخول بحساب جوجل الذي يملكها.</small>
+          <div class="chan-list">${mine.map(one).join("")}</div>
+          <div class="chan-foot">
+            ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}">➕ إضافة قناة</button>` : ""}
+            <small class="hint">${this.data?.config?.all_channels ? "اختيارك الحالي: النشر على كل القنوات المرتبطة." : "اختيارك الحالي: النشر على القناة الافتراضية (⭐)."} أضف قناة ثانية بحساب صاحبها.</small>
+          </div>
         </div>`;
       }
       if (!prov) {
-        return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
-          ${head}<span class="hint">قريبًا — لا يوجد ربط/نشر لهذه المنصة بعد</span>
-        </div>`;
+        return `<div class="chan-group muted" data-soc="${this.esc(p.key)}">${head}${missing}
+          <small class="hint">قريبًا — لا يوجد ربط/نشر لهذه المنصة بعد</small></div>`;
       }
       if (!ready) {
-        return `<div class="soc-row" data-soc="${p.key}" data-notready="1" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          ${head}<span class="hint">الربط غير مهيأ على الخادم — مفاتيح ${prov === "meta" ? "META_APP_ID/SECRET" : prov.toUpperCase() + "_CLIENT_*"} غير مضبوطة</span>
-          <button class="btn btn-ghost" disabled title="أضف مفاتيح التطبيق في Vercel ثم أعد النشر">⚙️ غير مهيأ</button>
-        </div>`;
+        return `<div class="chan-group" data-soc="${this.esc(p.key)}" data-notready="1">${head}${missing}
+          <small class="hint">الربط غير مهيأ على الخادم — مفاتيح ${prov === "meta" ? "META_APP_ID/SECRET" : prov.toUpperCase() + "_CLIENT_*"} غير مضبوطة</small>
+          <button class="btn btn-ghost btn-sm" disabled title="أضف مفاتيح التطبيق في Vercel ثم أعد النشر">⚙️ غير مهيأ</button></div>`;
       }
-      return `<div class="soc-row" data-soc="${p.key}" style="display:flex;align-items:center;gap:10px">
-        ${head}<span class="hint">غير مرتبط</span>
-        <button class="btn btn-em" data-connect="${p.key}">🔗 اربط من ${p.name}</button>
-      </div>`;
+      return `<div class="chan-group" data-soc="${this.esc(p.key)}">${head}${missing}
+        <div class="chan-foot"><button class="btn btn-em btn-sm" data-connect="${this.esc(p.key)}">🔗 اربط من ${this.esc(p.name)}</button>
+        <small class="hint">بعد الربط تُضبط الأتمتة تلقائيًا؛ وقد تحتاج لإعادة الربط لو انتهت الصلاحية</small></div></div>`;
     };
 
-    wrap.innerHTML = this.available.map(row).join("");
+    // القنوات المرتبطة والمنصات المختارة بلا ربط تبقى ظاهرة؛ الباقي للفتح عند الحاجة.
+    const connected = (p) => conns.some((c) => c.platform === p.key);
+    const important = this.available.filter((p) => connected(p) || selected.includes(p.key));
+    const other = this.available.filter((p) => !connected(p) && !selected.includes(p.key));
+    const showInitially = conns.length ? important : [...important, ...other.filter((p) => p.publish && p.ready !== false)];
+    const secondary = other.filter((p) => !showInitially.includes(p));
+    wrap.innerHTML = showInitially.map(block).join("") + (secondary.length
+      ? `<details class="chan-more" id="acctMorePlatforms" ${moreWasOpen ? "open" : ""}>
+          <summary>ربط منصات تانية <small>(${secondary.length})</small></summary>
+          <div class="chan-more-list">${secondary.map(block).join("")}</div>
+        </details>` : "");
+    /* الحالة والخطوات تعتمد على القنوات، فنُعيد رسمهما بعد التحميل */
+    this.renderStatus(this.data || {});
+    this.renderSteps(this.data || {});
+    this.renderAutoPanel(this.data || {});
     return conns;
   },
 
@@ -311,7 +575,7 @@ window.PublishApp = {
         const label = prov === "meta" ? "فيسبوك/إنستغرام" : (PLATFORMS[prov] || prov);
         const notice0 = document.getElementById("acctNotice");
         const msg0 = `⚙️ ربط ${label} غير مهيأ بعد: مفاتيح التطبيق (${prov === "meta" ? "META_APP_ID وMETA_APP_SECRET" : prov.toUpperCase() + "_CLIENT_*"}) غير مضبوطة في Vercel. الربط متاح الآن ليوتيوب وتيك توك وX.`;
-        if (notice0) { notice0.style.display = "block"; notice0.textContent = msg0; notice0.style.color = "#ffcf8b"; }
+        if (notice0) { notice0.hidden = false; notice0.style.display = "block"; notice0.textContent = msg0; notice0.style.color = "#ffcf8b"; }
         if (typeof toast === "function") toast(msg0);
         try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
         return;
@@ -322,22 +586,28 @@ window.PublishApp = {
       /* الخادم يرسل linked=youtube_err مع ?w=<سبب> — نزيل _err للاسم ونشرح السبب.
        * (كانت الرسالة تعرض «youtube_err» حرفيًا وتطلب إعادة المحاولة بلا سبب.) */
       const base = flag.replace(/_err$/, "");
-      const ok = Boolean(CONNECT_PLATFORM[base]) && !/_err$/.test(flag) && flag !== "err";
+      const ok = (Boolean(CONNECT_PLATFORM[base]) || base === "meta") && !/_err$/.test(flag) && flag !== "err";
       const label = PLATFORMS[base] || (base === "meta" ? "فيسبوك/إنستغرام" : base);
       const whyKey = (raw.match(/[?&]w=([a-z_]+)/i) || [])[1] || "";
       const WHY = {
         denied: "لم توافق على كل الصلاحيات في شاشة جوجل/المزوّد (رفع الفيديوهات وقراءة القناة). إن كان التطبيق في وضع الاختبار فأضف حسابك كـ Test user ثم أعد المحاولة.",
+        store: "تعذّر حفظ الربط على الخادم — حاول تاني.",
         no_code: "لم يصل رمز التفويض من المزوّد — ابدأ الربط من جديد من نفس المتصفح.",
         state: "انتهت صلاحية جلسة التفويض أو مُنعت كوكيز الطرف الأول — أعد المحاولة الآن من نفس المتصفح دون فتح النافذة في تبويب آخر.",
         token: "وصل الرمز لكن تبادله فشل — تحقّق من أسرار التطبيق (Client ID/Secret) وعنوان إعادة التوجيه المسجّل.",
+        channel: "جوجل لم ترجع قناة يوتيوب واضحة. تأكد إن الحساب عنده قناة ووافق على صلاحية قراءتها، ثم أعد الربط.",
         err: "لم يصل رمز التفويض — أعد المحاولة من نفس المتصفح.",
       };
       const notice = document.getElementById("acctNotice");
       const msg = ok
-        ? `✅ تم ربط ${label} بنجاح — يمكنك الآن اختياره في الأتمتة أو جدولة فيديو عليه.`
+        ? (/auto_error=1/.test(raw) ? `⚠️ تم ربط ${label} لكن تعذّر تفعيل الأتمتة؛ احفظ الإعدادات يدويًا.`
+          : /auto_resume=published/.test(raw) ? `✅ تم ربط ${label} ونشر الفيديو الجاهز تلقائيًا.`
+          : /auto_resume=failed/.test(raw) ? `⚠️ تم ربط ${label}، لكن محاولة نشر الفيديو الجاهز لم تكتمل. راجع السجل.`
+          : `✅ تم ربط ${label}. راجع حالة الأتمتة من أعلى الصفحة.`)
         : `⚠️ لم يكتمل ربط ${label}${whyKey ? " (" + whyKey + ")" : ""}: ${WHY[whyKey] || "أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة."}`;
-      if (notice) { notice.style.display = "block"; notice.textContent = msg; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
-      if (typeof toast === "function") toast(msg);
+      const channelHint = ok && /[?&]channel=nondefault(?:&|$)/.test(raw) ? " القناة دي مش الافتراضية؛ في وضع قناة واحدة، لو عايز تنشر عليها اختار «اجعلها الافتراضية» من بطاقة القنوات." : "";
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg + channelHint; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
+      if (typeof toast === "function") toast(msg + channelHint);
       // تنظيف الرابط حتى لا تتكرر الرسالة عند كل تحديث
       try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
     } catch { /* تجاهل */ }
@@ -414,146 +684,208 @@ window.PublishApp = {
     else alert(msg);
   },
 
+  /* ============================================================
+   * ربط الأحداث — مستمع واحد مفوَّض على صفحة الحساب.
+   * (الطريقة القديمة: addEventListener لكل زر بعد كل رسم ⇒ مستمعات
+   * مكرّرة تُرسل الطلب مرتين، وأزرار جديدة بلا مستمع.)
+   * ============================================================ */
   bindEvents() {
     this.wireConnections();
-    // حفظ الإعدادات
-    document.getElementById("autoSave")?.addEventListener("click", async () => {
-      const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map(i => i.dataset.platform);
-      const template = {
-        content_mode: document.getElementById("selContentMode")?.value || "mix",
-        background: document.getElementById("selBackground")?.value || "rotate",
-        privacy: "public"
-      };
-      
-      const res = await fetch("/api/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-        body: JSON.stringify({ action: "save", enabled: true, platforms, template, all_channels: Boolean(document.getElementById("chkAllChannels")?.checked) })
-      });
-      const data = await res.json();
-      if (res.ok) alert("تم حفظ الإعدادات بنجاح!");
-      else alert(data.error || "خطأ في الحفظ");
-    });
+    if (this._wired) return;
+    const root = document.getElementById("view-account") || document;
+    this._wired = true;
 
-    // تشغيل الآن
-    document.getElementById("autoRun")?.addEventListener("click", async () => {
-      const res = await fetch("/api/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-        body: JSON.stringify({ action: "run" })
-      });
-      const data = await res.json();
-      if (res.ok) alert("تم بدء الإنشاء! تحقق من لوحة الأتمتة.");
-      else alert(data.error || "خطأ في التشغيل");
-    });
-
-    // تشغيل التوازي (run_all)
-    document.getElementById("autoRunAll")?.addEventListener("click", async () => {
-      const res = await fetch("/api/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-        body: JSON.stringify({ action: "run_all" })
-      });
-      const data = await res.json();
-      if (res.ok) alert(`تم بدء الإنشاء المتوازي! النتائج: ${(data.results || []).map(r => r.ok ? '✅' : '❌').join(", ") || "—"}`);
-      else alert(data.error || "خطأ في التشغيل المتوازي");
-    });
-
-    // توليد من مقال (العدد من الخادم)
-    document.getElementById("autoGenArticle")?.addEventListener("click", async () => {
-      const res = await fetch("/api/autopilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-        body: JSON.stringify({ action: "article_random" })
-      });
-      const data = await res.json();
-      if (res.ok) alert(`تم توليد البوست من المقال: ${data.article_title} | الرابط: ${data.url}`);
-      else alert(data.error || "خطأ في توليد المقال");
-    });
-
-    // زر الإجراءات السريعة (توليد من مقال)
-    document.getElementById("quickGenArticle")?.addEventListener("click", () => document.getElementById("autoGenArticle")?.click());
-
-    /* فحص محرّك التوليد: يخبر المستخدم فورًا هل النشر الآلي قادر على العمل،
-     * وبنص الخطأ الحقيقي (libnss3، مسار التنفيذ، زمن الإقلاع) بدل التخمين. */
-    /* فحص المحرّك مرّتين: سريع (يقلع المتصفح ويفتح الصفحة) وعميق
-     * (يُنتج فيديو قصيرًا فعليًا بلا رفع أو نشر) — الفرق بين «يقلع» و«ينتج». */
-    const runSelfTest = async (btn, deep) => {
-      const notice = document.getElementById("acctNotice");
-      const original = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = deep ? "⏳ جارٍ توليد فيديو تجريبي…" : "⏳ جارٍ الفحص…";
-      if (notice) {
-        notice.style.display = "block";
-        notice.style.color = "";
-        notice.textContent = deep
-          ? "نُنتج الآن فيديو قصيرًا على الخادم (آية واحدة) للتأكد أن التسجيل يعمل — قد يستغرق حتى دقيقتين."
-          : "نجرّب إطلاق المتصفح على الخادم…";
-      }
-      try {
-        const res = await fetch("/api/autopilot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-          body: JSON.stringify({ action: "selftest_render", deep }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (notice) {
-          notice.style.display = "block";
-          const secs = Math.round((data.ms || 0) / 100) / 10;
-          if (data.ok && deep) {
-            const ex = data.export || {};
-            /* نضيف حالة التلاوة (مباشرة وعبر الوسيط) لأن «تحضير التلاوة… 0%»
-             * هو أول ما يتعطّل عند تعذّر الوصول لملف الصوت. */
-            const a = data.audio_direct || {}, ap = data.audio_proxy || {};
-            const audio = `تلاوة: ${a.ok ? "✅ " + a.status + " · " + a.ms + "ms" : "⚠️ فشل" + (a.status ? " (" + a.status + ")" : "")}`
-              + ` · عبر الوسيط: ${ap.ok ? "✅" : "⚠️" + (ap.status ? " (" + ap.status + ")" : "")}`;
-            const failed = Array.isArray(data.failed_requests) && data.failed_requests.length
-              ? ` · طلبات فاشلة: ${data.failed_requests.length}` : "";
-            const saved = data.recorded ? " · محفوظ ✓" : " · لم تُحفظ النتيجة";
-            notice.textContent = ex.ok
-              ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""} · ${audio}${saved}`
-              : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${audio}${failed} — ${String(data.error || "").slice(0, 140)}${saved}`;
-            notice.style.color = ex.ok ? "#7ee0a2" : "#ffb4a2";
-          } else {
-            notice.textContent = data.ok
-              ? `✅ محرّك التوليد يعمل (Node ${data.node} · ${secs}ث · صفحة: ${String(data.page_title || "").slice(0, 60)})`
-              : `⚠️ محرّك التوليد لا يعمل: ${String(data.error || "سبب غير معروف").slice(0, 200)}`;
-            notice.style.color = data.ok ? "#7ee0a2" : "#ffb4a2";
-          }
-        }
-      } catch (error) {
-        if (notice) {
-          notice.style.display = "block";
-          notice.style.color = "#ffb4a2";
-          notice.textContent = "تعذّر تنفيذ الفحص: " + String(error?.message || error).slice(0, 120);
-        }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = original;
-      }
+    const ACTIONS = {
+      autoSave: "save", autoRun: "run", autoRunAll: "run_all",
+      autoGenArticle: "article_random", quickGenArticle: "article_random",
+      quickRunAll: "run_all", quickSelfTest: "selftest", quickRenderTest: "selftest_deep",
+      btnRetryPublish: "retry_publish",
     };
-    document.getElementById("quickSelfTest")?.addEventListener("click", (e) => runSelfTest(e.currentTarget, false));
-    document.getElementById("quickRenderTest")?.addEventListener("click", (e) => runSelfTest(e.currentTarget, true));
-    
-    // زر الإجراءات السريعة (توازي)
-    document.getElementById("quickRunAll")?.addEventListener("click", () => document.getElementById("autoRunAll")?.click());
 
-    // جدول النشر (حفظ)
-    document.getElementById("schedSave")?.addEventListener("click", async () => {
-      const title = document.getElementById("schedTitle")?.value;
-      const time = document.getElementById("schedTime")?.value;
-      const platforms = [...document.querySelectorAll("#schedPlatforms input[data-platform]:checked:not(:disabled)")].map(i => i.dataset.platform);
-      
-      if (!title || !time || platforms.length === 0) {
-        alert("يرجى ملء العنوان والوقت واختيار المنصات");
-        return;
-      }
-      
-      // الجدولة على الخادم تحتاج ملف الفيديو (video_path) وتتم من صانع الريلز عبر
-      // /api/publish — لا يوجد هنا حقل ملف، فنوضّح ذلك بدل إرسال طلب سيفشل.
-      alert("الجدولة من هذه البطاقة تحتاج فيديو مُصدَّرًا.\nأنشئ الفيديو ثم اضغط «جدولة للنشر» من صانع الريلز، أو استخدم «تشغيل الآن» للنشر الفوري.");
+    root.addEventListener("click", async (e) => {
+      const el = e.target.closest("[data-act], button, a");
+      if (!el || el.disabled) return;
+      /* أزرار الربط/الفك/الافتراضية يتولاها wireConnections */
+      if (el.dataset.connect || el.dataset.unlink || el.dataset.default !== undefined) return;
+      const act = el.dataset.act || ACTIONS[el.id];
+      if (!act) return;
+      e.preventDefault();
+      if (act === "save") return this.saveSettings({ btn: el });
+      if (act === "run" || act === "run_all") return this.runNow(act, el);
+      if (act === "article_random") return this.randomArticle(el);
+      if (act === "selftest") return this.runSelfTest(el, false);
+      if (act === "selftest_deep") return this.runSelfTest(el, true);
+      if (act === "retry_publish") return this.retryPublish(el);
     });
-  }
+
+    /* مفتاح التشغيل/الإيقاف في بطاقة الحالة: يُحفظ فورًا */
+    root.addEventListener("change", async (e) => {
+      const t = e.target;
+      if (!t || t.id !== "acctEnabled") return;
+      const want = Boolean(t.checked);
+      t.disabled = true;
+      const out = await this.saveSettings({ enabled: want, silent: true });
+      t.disabled = false;
+      if (out && out.ok) {
+        t.checked = want;
+        this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), enabled: want } };
+        this.renderStatus(this.data);
+        this.renderSteps(this.data);
+        if (typeof toast === "function") toast(want ? "✅ الأتمتة شغّالة — الفيديو القادم تلقائي" : "⏸️ أوقفنا الأتمتة (تقدر ترجّعها في أي وقت)");
+      } else {
+        t.checked = !want;
+      }
+    });
+  },
+
+  async api(action, payload = {}) {
+    const res = await fetch("/api/autopilot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, ...data };
+  },
+
+  /* حفظ كل التخصيصات (المحتوى/القارئ/الخلفية/المنصات/الحالة) */
+  async saveSettings({ enabled, silent = false, btn = null } = {}) {
+    const q2 = (id) => document.getElementById(id);
+    const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map((i) => i.dataset.platform);
+    const reciter = q2("selReciter") ? q2("selReciter").value : "";
+    const template = {
+      content_mode: q2("selContentMode") ? q2("selContentMode").value : "mix",
+      background: q2("selBackground") ? q2("selBackground").value : "rotate",
+      reciter_mode: reciter ? "fixed" : "rotate",
+      reciter: reciter || "",
+      privacy: "public",
+    };
+    const enabledNow = enabled !== undefined ? Boolean(enabled) : Boolean(q2("acctEnabled") && q2("acctEnabled").checked);
+    const body = { enabled: enabledNow, platforms, template, all_channels: q2("chkAllChannels") ? Boolean(q2("chkAllChannels").checked) : Boolean(this.data?.config?.all_channels) };
+
+    const old = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
+    let out = { ok: false };
+    try {
+      out = await this.api("save", body);
+    } catch { out = { ok: false, error: "تعذّر الاتصال بالخادم" }; }
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+
+    if (out.ok) {
+      this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template, all_channels: body.all_channels } };
+      this.renderStatus(this.data);
+      this.renderSteps(this.data);
+      if (!silent && typeof toast === "function") toast("✅ تم حفظ التعديلات");
+    } else if (typeof toast === "function") toast(String(out.error || "تعذّر الحفظ"), "err");
+    return out;
+  },
+
+  async runNow(kind, btn) {
+    if (this._runPending) return;
+    this._runPending = true;
+    this._progressBaseline = this._lastProgressRunId || this.data?.runs?.[0]?.id || null;
+    this._progressWaiting = true;
+    this.renderProgress();
+    this.startProgressPolling();
+    if (btn) { btn.disabled = true; }
+    const old = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "⏳ جارٍ التشغيل…";
+    try {
+      const out = kind === "run_all" ? await this.api("run_all") : await this.api("run");
+      if (out.ok) {
+        const extra = Array.isArray(out.results) ? " · النتائج: " + out.results.map((r) => (r.ok ? "✅" : "❌")).join(" ") : "";
+        if (typeof toast === "function") toast("اكتمل التشغيل — راجع حالة القنوات والسجل" + extra);
+        setTimeout(() => this.init(), 1200);
+      } else if (typeof toast === "function") toast(String(out.error || "تعذّر التشغيل"), "err");
+    } catch {
+      if (typeof toast === "function") toast("الاتصال اتقطع؛ راجع حالة التشغيل قبل ما تحاول تاني", "err");
+    }
+    this._runPending = false;
+    this._progressWaiting = false;
+    this.startProgressPolling();
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  },
+
+  async randomArticle(btn) {
+    if (btn) { btn.disabled = true; }
+    try {
+      const out = await this.api("article_random");
+      if (out.ok) {
+        if (typeof toast === "function") toast(`📚 ${out.article_title || "مقال"} — ${out.url || ""}`);
+        else alert(`📚 ${out.article_title || "مقال"} — ${out.url || ""}`);
+      } else if (typeof toast === "function") toast(String(out.error || "تعذّر التوليد من مقال"), "err");
+    } catch { }
+    if (btn) { btn.disabled = false; }
+  },
+
+  async retryPublish(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ النشر…"; }
+    try {
+      const out = await this.api("retry_publish");
+      if (out.ok) { if (typeof toast === "function") toast("تم نشر الفيديو الجاهز ✅"); return this.init(); }
+      if (typeof toast === "function") toast(String(out.error || "تعذّر النشر — أعد الربط أولًا"), "err");
+    } catch {
+      if (typeof toast === "function") toast("تعذّر الاتصال بالخادم", "err");
+    }
+    if (btn) { btn.disabled = false; btn.textContent = "🔁 انشر الفيديو الجاهز"; }
+  },
+
+  /* فحص محرّك التوليد: سريع (يقلع المتصفح) وعميق (يُنتج فيديو قصيرًا فعلًا) */
+  async runSelfTest(btn, deep) {
+    const notice = document.getElementById("acctNotice");
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = deep ? "⏳ جارٍ توليد فيديو تجريبي…" : "⏳ جارٍ الفحص…";
+    if (notice) {
+      notice.hidden = false;
+      notice.style.display = "block";
+      notice.style.color = "";
+      notice.textContent = deep
+        ? "نُنتج الآن فيديو قصيرًا على الخادم (آية واحدة) للتأكد أن التسجيل يعمل — قد يستغرق حتى دقيقتين."
+        : "نجرّب إطلاق المتصفح على الخادم…";
+    }
+    try {
+      const res = await fetch("/api/autopilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+        body: JSON.stringify({ action: "selftest_render", deep }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (notice) {
+        notice.hidden = false;
+        notice.style.display = "block";
+        const secs = Math.round((data.ms || 0) / 100) / 10;
+        if (data.ok && deep) {
+          const ex = data.export || {};
+          const a = data.audio_direct || {}, ap = data.audio_proxy || {};
+          const audio = `تلاوة: ${a.ok ? "✅ " + a.status + " · " + a.ms + "ms" : "⚠️ فشل" + (a.status ? " (" + a.status + ")" : "")}`
+            + ` · عبر الوسيط: ${ap.ok ? "✅" : "⚠️" + (ap.status ? " (" + ap.status + ")" : "")}`;
+          const failed = Array.isArray(data.failed_requests) && data.failed_requests.length
+            ? ` · طلبات فاشلة: ${data.failed_requests.length}` : "";
+          const saved = data.recorded ? " · محفوظ ✓" : " · لم تُحفظ النتيجة";
+          notice.textContent = ex.ok
+            ? `✅ توليد الفيديو يعمل: وصل إلى ${ex.pct || "100%"} في ${Math.round((ex.ms || 0) / 100) / 10}ث (المحرّك ${secs}ث)${ex.meta ? " · " + ex.meta : ""} · ${audio}${saved}`
+            : `⚠️ المحرّك يقلع لكن التصدير لم يكتمل: ${ex.stage || "مرحلة غير معروفة"} — ${audio}${failed} — ${String(data.error || "").slice(0, 140)}${saved}`;
+          notice.style.color = ex.ok ? "#7ee0a2" : "#ffb4a2";
+        } else {
+          notice.textContent = data.ok
+            ? `✅ محرّك التوليد يعمل (Node ${data.node} · ${secs}ث · صفحة: ${String(data.page_title || "").slice(0, 60)})`
+            : `⚠️ محرّك التوليد لا يعمل: ${String(data.error || "سبب غير معروف").slice(0, 200)}`;
+          notice.style.color = data.ok ? "#7ee0a2" : "#ffb4a2";
+        }
+      }
+    } catch (error) {
+      if (notice) {
+        notice.hidden = false;
+        notice.style.display = "block";
+        notice.style.color = "#ffb4a2";
+        notice.textContent = "تعذّر تنفيذ الفحص: " + String(error?.message || error).slice(0, 120);
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  },
 };
 
 
