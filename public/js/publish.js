@@ -476,6 +476,8 @@ window.PublishApp = {
     const wrap = document.getElementById("acctAccountsList");
     if (!card || !wrap) return;
     card.hidden = false;
+    // نحافظ على القسم المفتوح عند تحديث القنوات بعد ربط أو فك ربط.
+    const moreWasOpen = Boolean(wrap.querySelector("#acctMorePlatforms")?.open);
     wrap.innerHTML = '<p class="hint">جارٍ تحميل الحسابات المرتبطة…</p>';
 
     let conns = [];
@@ -495,12 +497,15 @@ window.PublishApp = {
     /* التحذير للحالات الحقيقية فقط: منصة تحتاج إعادة ربط أو اتصال بلا توكن
      * تجديد. صلاحية access_token تنتهي كل ساعة وتُجدَّد تلقائيًا. */
     const expired = (c) => reauthList.includes(c.platform) || c.has_refresh === false;
+    const selected = Array.isArray(this.data?.config?.platforms) ? this.data.config.platforms : [];
 
     const block = (p) => {
       const mine = conns.filter((c) => c.platform === p.key);
       const prov = p.connect || CONNECT_PLATFORM[p.key];
       const ready = p.ready !== false;
       const head = `<div class="chan-head"><span class="chan-ic">${ICONS[p.key] || "🔗"}</span><b>${this.esc(p.name)}</b></div>`;
+      const missing = !mine.length && selected.includes(p.key)
+        ? '<small class="hint warn">المنصة مختارة للنشر، لكن مفيش قناة مرتبطة بيها.</small>' : "";
 
       if (mine.length) {
         const one = (c) => {
@@ -528,20 +533,30 @@ window.PublishApp = {
         </div>`;
       }
       if (!prov) {
-        return `<div class="chan-group muted" data-soc="${this.esc(p.key)}">${head}
+        return `<div class="chan-group muted" data-soc="${this.esc(p.key)}">${head}${missing}
           <small class="hint">قريبًا — لا يوجد ربط/نشر لهذه المنصة بعد</small></div>`;
       }
       if (!ready) {
-        return `<div class="chan-group" data-soc="${this.esc(p.key)}" data-notready="1">${head}
+        return `<div class="chan-group" data-soc="${this.esc(p.key)}" data-notready="1">${head}${missing}
           <small class="hint">الربط غير مهيأ على الخادم — مفاتيح ${prov === "meta" ? "META_APP_ID/SECRET" : prov.toUpperCase() + "_CLIENT_*"} غير مضبوطة</small>
           <button class="btn btn-ghost btn-sm" disabled title="أضف مفاتيح التطبيق في Vercel ثم أعد النشر">⚙️ غير مهيأ</button></div>`;
       }
-      return `<div class="chan-group" data-soc="${this.esc(p.key)}">${head}
+      return `<div class="chan-group" data-soc="${this.esc(p.key)}">${head}${missing}
         <div class="chan-foot"><button class="btn btn-em btn-sm" data-connect="${this.esc(p.key)}">🔗 اربط من ${this.esc(p.name)}</button>
         <small class="hint">بعد الربط تُضبط الأتمتة تلقائيًا؛ وقد تحتاج لإعادة الربط لو انتهت الصلاحية</small></div></div>`;
     };
 
-    wrap.innerHTML = this.available.map(block).join("");
+    // القنوات المرتبطة والمنصات المختارة بلا ربط تبقى ظاهرة؛ الباقي للفتح عند الحاجة.
+    const connected = (p) => conns.some((c) => c.platform === p.key);
+    const important = this.available.filter((p) => connected(p) || selected.includes(p.key));
+    const other = this.available.filter((p) => !connected(p) && !selected.includes(p.key));
+    const showInitially = conns.length ? important : [...important, ...other.filter((p) => p.publish && p.ready !== false)];
+    const secondary = other.filter((p) => !showInitially.includes(p));
+    wrap.innerHTML = showInitially.map(block).join("") + (secondary.length
+      ? `<details class="chan-more" id="acctMorePlatforms" ${moreWasOpen ? "open" : ""}>
+          <summary>ربط منصات تانية <small>(${secondary.length})</small></summary>
+          <div class="chan-more-list">${secondary.map(block).join("")}</div>
+        </details>` : "");
     /* الحالة والخطوات تعتمد على القنوات، فنُعيد رسمهما بعد التحميل */
     this.renderStatus(this.data || {});
     this.renderSteps(this.data || {});
