@@ -357,6 +357,35 @@ window.fetch = async (url, opts = {}) => {
   if (!/النشر على القناة الافتراضية/.test(d.getElementById("acctAccountsList").textContent) || d.getElementById("chkAllChannels").checked) fail("وضع القناة الافتراضية لا يعكس الإعداد المحفوظ");
   else ok("تلميح القناة الافتراضية يعكس الإعداد عند إيقاف كل القنوات");
 
+  // القنوات المختارة أو التي تحتاج ربطًا لا تُدفن داخل قائمة المنصات الأخرى.
+  const groups = d.getElementById("acctAccountsList");
+  let morePlatforms = d.getElementById("acctMorePlatforms");
+  if (!morePlatforms || morePlatforms.open || morePlatforms.querySelector('[data-channel]') || !morePlatforms.querySelector('[data-connect="facebook"]')) fail("القنوات الأخرى ليست مجمّعة أو أخفت القنوات المرتبطة");
+  else ok("القنوات المرتبطة ظاهرة والمنصات الأخرى متاحة بقسم مطوي");
+  morePlatforms.open = true;
+  await window.PublishApp.renderConnections("test-token");
+  if (!d.getElementById("acctMorePlatforms").open) fail("تحديث القنوات أغلق القسم الذي فتحه المستخدم");
+  else ok("تحديث القنوات يحافظ على فتح قسم المنصات الأخرى");
+  window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, platforms: ["youtube", "facebook"] } });
+  await window.PublishApp.renderConnections("test-token");
+  const fbGroup = groups.querySelector('.chan-group[data-soc="facebook"]');
+  if (!fbGroup || fbGroup.closest('#acctMorePlatforms') || !/مختارة للنشر/.test(fbGroup.textContent)) fail("منصة مختارة غير مرتبطة لم تظهر مع تحذير");
+  else ok("المنصة المختارة بلا ربط تبقى ظاهرة مع تحذير");
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
+  await window.PublishApp.renderConnections("test-token");
+  const warningChannel = groups.querySelector('[data-channel="a"]');
+  if (!warningChannel || warningChannel.closest('#acctMorePlatforms') || !/أعد ربط القناة/.test(warningChannel.textContent)) fail("تحذير القناة المرتبطة لم يبق ظاهرًا");
+  else ok("تحذير إعادة ربط القناة يظل ظاهرًا");
+  window.fetch = async () => ({ ok: true, json: async () => ({ connections: [] }) });
+  window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, platforms: [] } });
+  await window.PublishApp.renderConnections("test-token");
+  if (!groups.querySelector('[data-connect="youtube"]') || groups.querySelector('[data-connect="youtube"]').closest('#acctMorePlatforms')) fail("المستخدم الجديد لا يرى زر ربط يوتيوب مباشرة");
+  else ok("المستخدم بلا قنوات يرى خيارات الربط المتاحة مباشرة");
+  window.fetch = async () => { throw Error("offline"); };
+  await window.PublishApp.renderConnections("test-token");
+  if (!/تعذّر تحميل الحسابات/.test(groups.textContent)) fail("فشل قراءة القنوات لا يظهر");
+  else ok("فشل تحميل القنوات يُعرض بوضوح");
+
   done();
 })();
 
