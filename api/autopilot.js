@@ -2,7 +2,7 @@
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json, configured } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest } = require("../lib/autopilot");
+const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest, publishReadyToday } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
@@ -110,18 +110,48 @@ async function loadRuns(uid) {
 }
 
 /* آخر نتيجة فحص محفوظة (system_checks) — اللوحة تعرضها بلا أن يضغط المستخدم شيئًا */
-async function lastSelfTest() {
+async function lastSelfTest(uid) {
+  if (!uid) return null;
   try {
-    const rows = await rest("/rest/v1/system_checks?select=kind,ok,detail,created_at&order=created_at.desc&limit=1");
+    // system_checks جدول مشترك بمفتاح خدمة: لا نعرض تفاصيل حساب آخر.
+    const rows = await rest(`/rest/v1/system_checks?detail->>user_id=eq.${encodeURIComponent(uid)}&kind=in.(render_selftest,render_selftest_deep)&select=kind,ok,detail,created_at&order=created_at.desc&limit=1`);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    return row?.detail?.user_id === uid && ["render_selftest", "render_selftest_deep"].includes(row.kind) ? row : null;
+  } catch { return null; /* لا نُسقط اللوحة عند تعذّر القراءة */ }
+}
+
+/* آخر تشغيل آلي (يومي/تعويض) — يُعرض في اللوحة بلا فتح قاعدة البيانات.
+ * «فشل صامت» كان يعني أن المستخدم لا يعرف إلا إذا فتح Supabase. */
+async function lastDaily(uid) {
+  try {
+    const rows = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&run_type=eq.daily&select=run_date,status,error,external_url,completed_at,created_at&order=created_at.desc&limit=1`);
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
-  } catch { return null; /* الجدول غير موجود بعد — لا نُسقط اللوحة */ }
+  } catch { return null; }
+}
+
+/* إحصاءات بطاقة الحالة: «كم فيديو نُشر؟ وآخر واحد إمتى؟» — كانت اللوحة
+ * تَعدّ التشغيلات فقط، فلا يعرف المستخدم حصيلة الأتمتة. */
+async function accountStats(uid) {
+  const out = { published: 0, failed: 0, scheduled: 0, last_url: null, last_published_at: null };
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&select=status,external_url,updated_at&order=updated_at.desc&limit=200`);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const st = String((r && r.status) || "");
+      if (st === "published") {
+        out.published++;
+        if (!out.last_published_at) { out.last_published_at = r.updated_at || null; out.last_url = r.external_url || null; }
+      } else if (st === "failed") out.failed++;
+      else if (st === "scheduled" || st === "publishing") out.scheduled++;
+    }
+  } catch { /* لا نُسقط اللوحة بسبب الإحصاء */ }
+  return out;
 }
 
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
   // دعم تعدد القنوات
-  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
+  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name,updated_at`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
@@ -144,8 +174,50 @@ async function accountData(uid) {
     // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
     articles: { count: repoArticles().length },
     // نتيجة آخر فحص توليد محفوظة (null إن لم يُجرَ فحص بعد)
-    last_check: await lastSelfTest(),
+    last_check: await lastSelfTest(uid),
+    // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
+    last_daily: await lastDaily(uid),
+    // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
+    reauth: await reauthPlatforms(uid, connections),
+    // حصيلة الأتمتة (منشور/فاشل/مجدول + آخر رابط) لبطاقة الحالة
+    stats: await accountStats(uid),
+    // تفضيلات قابلة للتحرير: الأنماط والخلفيات والقُرّاء المتاحون
+    options: {
+      content_modes: [...CONTENT_MODES],
+      backgrounds: [...BACKGROUND_IDS],
+      reciters: RECITERS.map((r) => ({ id: r.id, name: r.name })),
+    },
   };
+}
+
+/* منصات تحتاج إعادة ربط. المصدران: صفوف system_checks(kind='reauth_needed')
+ * التي يكتبها lib/publish عند فشل تجديد دائم، وآخر أخطاء النشر (invalid_grant)
+ * — الثاني يغطي ما وقع قبل وجود العلامة. (social_connections.meta مشفّر،
+ * فلا يصلح لعلامة تُقرأ — درس 2026-11-12.) */
+const REAUTH_RE = /invalid_grant|invalid_client|unauthorized_client|expired or revoked/i;
+async function reauthPlatforms(uid, connections = []) {
+  const out = new Set();
+  // لا نقرأ علامة حساب آخر: الربط الوحيد بين الفحص وصاحبه هو connection_id.
+  // تحديث القناة بعد فشل قديم يعني أن المستخدم أعاد الربط أو نجح التجديد.
+  for (const conn of Array.isArray(connections) ? connections : []) {
+    if (!conn?.id || !conn.platform) continue;
+    try {
+      const checks = await rest(`/rest/v1/system_checks?kind=eq.reauth_needed&detail->>connection_id=eq.${encodeURIComponent(conn.id)}&select=detail,created_at&order=created_at.desc&limit=1`);
+      const c = Array.isArray(checks) ? checks[0] : null;
+      if (c && c.detail?.connection_id === conn.id && c.detail?.platform === conn.platform &&
+          (!conn.updated_at || Date.parse(c.created_at) >= Date.parse(conn.updated_at))) out.add(conn.platform);
+    } catch { /* تظهر أخطاء النشر الخاصة بالمستخدم أدناه */ }
+  }
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,connection_id,error,updated_at&order=updated_at.desc&limit=20`);
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!r?.platform || !REAUTH_RE.test(String(r.error || ""))) continue;
+      const linked = (Array.isArray(connections) ? connections : []).filter(c => c.platform === r.platform && (!r.connection_id || c.id === r.connection_id));
+      // أخطاء الصفوف القديمة لا تتغلب على إعادة الربط الناجحة.
+      if (linked.some(c => !c.updated_at || !r.updated_at || Date.parse(r.updated_at) >= Date.parse(c.updated_at))) out.add(r.platform);
+    }
+  } catch { /* لا نُسقط اللوحة */ }
+  return [...out];
 }
 
 const handler = async (req, res) => {
@@ -176,7 +248,16 @@ const handler = async (req, res) => {
         if (!platforms.some(p => connectedKeys.includes(p))) return json(res, 409, { error: "اربط قناة واحدة على الأقل قبل تفعيل النشر الآلي" });
       }
       
-      const template = { content_mode, reciter_mode: "rotate", background, privacy: "public" };
+      /* اختيار القارئ: كان مثبتًا على rotate فلا يمكن تخصيص الصوت إطلاقًا */
+      const reciterId = String(templateInput.reciter || "");
+      const wantFixed = templateInput.reciter_mode === "fixed" && RECITERS.some((r) => r.id === reciterId);
+      const template = {
+        content_mode,
+        reciter_mode: wantFixed ? "fixed" : "rotate",
+        reciter: wantFixed ? reciterId : "",
+        background,
+        privacy: "public",
+      };
       /* all_channels: انشر على كل القنوات المرتبطة (افتراضي: القناة الافتراضية فقط) */
       const all_channels = body.all_channels === true;
       const saved = await rest("/rest/v1/autopilot?on_conflict=user_id", {
@@ -243,8 +324,14 @@ const handler = async (req, res) => {
       /* deep=true يُنتج فيديو قصيرًا فعليًا (بلا رفع أو نشر) — إثبات أن التسجيل يعمل */
       const report = await renderSelfTest({ deep: body.deep === true });
       /* نحفظ النتيجة حتى تُقرأ لاحقًا من قاعدة البيانات بدل لقطة شاشة */
-      const recorded = await recordSelfTest(report);
+      const recorded = await recordSelfTest(report, uid);
       return json(res, report.ok ? 200 : 502, { ...report, recorded });
+    }
+
+    if (body.action === "retry_publish") {
+      /* نشر الفيديو الجاهز فورًا بعد إعادة ربط القناة — بلا توليد جديد */
+      const out = await publishReadyToday(uid);
+      return json(res, out.ok ? 200 : 502, out);
     }
 
     return json(res, 400, { error: "إجراء غير معروف" });
@@ -255,4 +342,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest };
+module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
