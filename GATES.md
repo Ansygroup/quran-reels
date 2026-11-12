@@ -244,3 +244,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/autopilot_api_test.js && node tests/publish_client_dom.js
   EXPECT: `social_connections.meta` **نصّ مشفّر** فلا يُستخدم لعلامة تُقرأ؛ فشل التجديد الدائم يُسجّل `system_checks(kind='reauth_needed', ok=false, detail jsonb)` ويُطلق رسالة «انتهت صلاحية ربط …». `/api/autopilot` يستنتج `reauth` من `system_checks` **و** من آخر أخطاء النشر. واللوحة تُترجم الصفوف القديمة التي تحمل `invalid_grant` إلى «انتهت صلاحية ربط يوتيوب — أعد الربط» وتُظهر زر «انشر الفيديو الجاهز» حتى لو لم يُرسل الخادم حقل `reauth`.
   EVIDENCE: 2026-11-12 — G44 كتبت العلم في `meta` بدمج jsonb، والعمود نصّ مشفّر بـ`seal()` ففشل التحديث بصمت؛ واللوحة عرضت «invalid_grant» كما هي في صف التشغيل المحفوظ.
+- [ ] G46: لا نشر مكرر عند إعادة الربط — صفّ واحد لكل منصة في اليوم
+  CHECK: node tests/retry_publish_test.js && npm run pretest
+  EXPECT: `retryPublishFailed` يقرأ صفوف اليوم الفاشلة وينشر **الأول فقط لكل منصة**، ويحوّل الباقي إلى `draft` (الحالة المسموحة في قيد `publish_queue_status_check`) مع سبب «صفّ مكرر لنفس اليوم والمنصة»، ويعيد `{attempted, published, failed, duplicates}`. منصتان مختلفتان ⇒ نشر كلتيهما. `publishReadyToday` تعيد سببًا واضحًا إن لم يكن هناك فيديو جاهز.
+  EVIDENCE: 2026-11-12 — التشغيل الآلي أنشأ **صفَّين فاشلين ليوتيوب لنفس الملف** (04:31 و04:32)؛ نشرهما معًا بعد إعادة الربط كان سيضع فيديوين متطابقين على القناة.
