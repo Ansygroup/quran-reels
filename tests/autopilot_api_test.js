@@ -132,7 +132,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
 
   /* 8) lib/autopilot يفلتر غير القابل للنشر ولا يكرّر الخريطة */
   const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("lib/autopilot يفلتر المنصات بـ canPublish", /filter\(canPublish\)/.test(autoSrc));
+  chk("lib/autopilot يتحقق من المنصات بدل إسقاط غير المدعوم", /validatePlatforms\(requested\)/.test(autoSrc));
   chk("لا خريطة منصات مكرّرة في lib/autopilot", !/linkedin:\s*"لينكد إن"/.test(autoSrc),
     "ما زالت الخريطة القديمة موجودة");
 
