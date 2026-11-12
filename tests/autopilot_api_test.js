@@ -349,14 +349,14 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("acceptDialogs يلتقط الحوار المتأخر", clicked === true && calls >= 3, `clicked=${clicked} calls=${calls}`);
 
   /* 19) سبب الرفض من الصفحة نفسها + تقييد المدة قبل الإنشاء */
-  const libSrc6 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const libSrcG42 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   const creatorSrc = fs.readFileSync(path.join(ROOT, "public", "js", "creator.js"), "utf8");
   chk("Wait/تعريف: Creator.lastAbortReason يُسجَّل قبل كل خروج مبكر",
     /lastAbortReason/.test(creatorSrc) && (creatorSrc.match(/lastAbortReason = "/g) || []).length >= 4,
     String((creatorSrc.match(/lastAbortReason = "/g) || []).length) + " موضعًا");
-  chk("assertExportStarted يقرأ lastAbortReason", /st\.abort/.test(libSrc6) && /المولّد لم يبدأ التصدير/.test(libSrc6));
+  chk("assertExportStarted يقرأ lastAbortReason", /st\.abort/.test(libSrcG42) && /المولّد لم يبدأ التصدير/.test(libSrcG42));
   chk("renderRecipe يقيّد المدة قبل الإنشاء (لا حوار «المدة طويلة»)",
-    /totalDuration\(\)/.test(libSrc6) && /<= 240/.test(libSrc6));
+    /totalDuration\(\)/.test(libSrcG42) && /<= 240/.test(libSrcG42));
 
   const pAbort = { evaluate: async () => ({ exporting: false, running: false, toast: "", count: 2, abort: "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)" }) };
   let eAbort = null; try { await libAuto2.__test.assertExportStarted(pAbort); } catch (e) { eAbort = e; }
@@ -422,7 +422,79 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /lastDailyLine\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=20/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=21/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+
+  /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
+   * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
+   *  تحضّر الصوت ٨٥ ثانية لكل آية قبل أن تُظهر نافذة التصدير أصلًا). */
+  const libSrcAudio = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderRecipe يفحص التلاوة قبل الرندر ويفشل بسبب مسمّى",
+    /probeAudioForRecipe\(recipe, reciter\)/.test(libSrcAudio) && /التلاوة غير متاحة من الخادم:/.test(libSrcAudio) && /diag\.audio = audioProbe/.test(libSrcAudio));
+  chk("مساعدات الصوت مُصدَّرة للاختبار",
+    typeof libAuto2.__test.probeAudioForRecipe === "function" && typeof libAuto2.__test.describeProbe === "function");
+
+  const g42FetchBackup = global.fetch;
+  global.fetch = async () => ({ ok: false, status: 503, headers: { get: () => "" }, arrayBuffer: async () => new ArrayBuffer(0), text: async () => "down" });
+  const probeDown = await libAuto2.__test.probeAudioForRecipe({ s: 108, from: 1, to: 1 }, { id: "Alafasy_128kbps" });
+  chk("فحص الصوت يفشل بوضوح عند تعذّر المصدر",
+    probeDown.direct.ok === false && probeDown.proxy.ok === false && probeDown.direct.status === 503,
+    JSON.stringify(probeDown.direct));
+  global.fetch = async () => ({ ok: true, status: 206, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new ArrayBuffer(2048), text: async () => "" });
+  const probeUp = await libAuto2.__test.probeAudioForRecipe({ s: 108, from: 1, to: 2 }, { id: "Alafasy_128kbps" });
+  chk("فحص الصوت ينجح ويقيس أول وآخر آية",
+    probeUp.direct.ok === true && probeUp.proxy.ok === true && Boolean(probeUp.direct_last && probeUp.direct_last.ok),
+    JSON.stringify({ direct: probeUp.direct.ok, last: probeUp.direct_last && probeUp.direct_last.ok }));
+  chk("describeProbe يشرح النتيجة بجملة",
+    /^ok 206 2048B/.test(libAuto2.__test.describeProbe(probeUp.direct)) &&
+    /HTTP 503/.test(libAuto2.__test.describeProbe(probeDown.direct)));
+
+  /* اعتراض الصوت: فشل الجلب ⇒ 502 فورًا (لا انتظار /api/proxy 60s) */
+  let audioRouteHandler = null;
+  const audioFakePage = { route: async (matcher, handler) => { audioRouteHandler = handler; return true; } };
+  const stats = await libAuto2.__test.installAudioRoute(audioFakePage);
+  chk("installAudioRoute يعيد عدّادات", Boolean(stats && stats.ok === 0 && stats.miss === 0), JSON.stringify(stats));
+  global.fetch = async () => { throw new Error("ENOTFOUND everyayah.com"); };
+  let fulfilled = null;
+  await audioRouteHandler({
+    request: () => ({ url: () => "https://quran-reels.test/proxy?u=" + encodeURIComponent("https://everyayah.com/data/Alafasy_128kbps/108001.mp3") }),
+    fulfill: async (o) => { fulfilled = o; },
+    continue: async () => { fulfilled = { continued: true }; },
+    abort: async () => { fulfilled = { aborted: true }; },
+  });
+  chk("فشل الصوت ⇒ ردّ 502 فوري مع عدّاد",
+    fulfilled && fulfilled.status === 502 && stats.miss === 1 && Boolean(stats.lastMiss),
+    JSON.stringify({ status: fulfilled && fulfilled.status, miss: stats.miss, lastMiss: stats.lastMiss }));
+  let passed = null;
+  await audioRouteHandler({
+    request: () => ({ url: () => "https://quran-reels.test/proxy?u=" + encodeURIComponent("https://example.com/x.png") }),
+    fulfill: async (o) => { passed = o; },
+    continue: async () => { passed = { continued: true }; },
+  });
+  chk("مضيف غير صوتي يمرّ كما هو (لا وسيط مفتوح)", Boolean(passed && passed.continued), JSON.stringify(passed));
+  global.fetch = g42FetchBackup;
+
+  /* تشخيص الصوت داخل لقطة التعليق */
+  const errAudio = libAuto2.__test.exportError("stall", { pct: "0%", stage: "", exporting: false, count: 2, prepared: false, cache: 0, overlay: false, silent: false, prepErr: "timeout" }, 90000);
+  chk("سبب التعليق يذكر التحضير والكاش والنافذة",
+    /prepared=false/.test(errAudio.message) && /cache=0/.test(errAudio.message) && /overlay=false/.test(errAudio.message) && /silent=false/.test(errAudio.message),
+    errAudio.message.slice(0, 140));
+  chk("compactReport يحفظ حكم صوت التلاوة",
+    (() => { const r = libAuto2.__test.compactReport({ ok: false, audio_direct: { ok: false, status: 0, ms: 7, error: "ENOTFOUND" }, audio_proxy: { ok: true, status: 200, ms: 9, bytes: 2048 } });
+      return r.audio_direct && r.audio_direct.ok === false && r.audio_proxy && r.audio_proxy.ok === true; })());
+
+  /* الصفحة: نافذة التصدير تظهر قبل التحضير + جلب صوت بمهلة */
+  const g42CreatorSrc = fs.readFileSync(path.join(ROOT, "public", "js", "creator.js"), "utf8");
+  const g42ReelSrc = fs.readFileSync(path.join(ROOT, "public", "js", "reel.js"), "utf8");
+  chk("startExport يُظهر النافذة قبل تحضير التلاوة",
+    g42CreatorSrc.indexOf('ov.hidden = false;') > 0 &&
+    g42CreatorSrc.indexOf('ov.hidden = false;') < g42CreatorSrc.indexOf('if (!this.prepared && !AyahPlayer.playing)'),
+    "ترتيب النافذة/التحضير");
+  chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
+    /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
+  chk("نسخ الأصول مرفوعة (reel v4 / creator v6 / sw qr-v22)",
+    /reel\.js\?v=4/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v22/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
