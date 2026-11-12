@@ -214,7 +214,7 @@ window.PublishApp = {
     }
     if (!arr.length) return "";
     const names = arr.map((p) => this.esc(PLATFORMS[p] || p)).join("، ");
-    return `<div class="auto-warning" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة القنوات، ثم «🔁 انشر الفيديو الجاهز» فلن يُولَّد فيديو جديد.
+    return `<div class="auto-warning" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة القنوات. لو المشكلة انتهاء تصريح يوتيوب، النظام هيحاول ينشر الفيديو الجاهز بعد الربط لو قدر يتحقق إنه آمن.
       <div class="row gap-lg" style="margin-top:10px"><button class="btn btn-gold" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button></div></div>`;
   },
 
@@ -235,7 +235,7 @@ window.PublishApp = {
 
     let state = "idle", title = "الأتمتة موقوفة", hint = "اضغط الزر لتفعيل النشر اليومي التلقائي";
     if (!conns.length) { state = "idle"; title = "اربط قناة للبدء"; hint = "ما فيش قناة مرتبطة — الأتمتة لا تعمل قبل الربط"; }
-    else if (reauth.length) { state = "warn"; title = "يحتاج إعادة ربط: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "أعد الربط من بطاقة القنوات ثم انشر الفيديو الجاهز"; }
+    else if (reauth.length) { state = "warn"; title = "يحتاج إعادة ربط: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "أعد الربط من بطاقة القنوات، وراجع حالة المحاولة الآلية"; }
     else if (enabled) { state = "on"; title = "الأتمتة مفعّلة — محاولة نشر يومية"; hint = nextTxt; }
 
     if (dot) { dot.className = "acct-dot " + state; }
@@ -548,7 +548,10 @@ window.PublishApp = {
       };
       const notice = document.getElementById("acctNotice");
       const msg = ok
-        ? (/auto_error=1/.test(raw) ? `⚠️ تم ربط ${label} لكن تعذّر تفعيل الأتمتة؛ احفظ الإعدادات يدويًا.` : `✅ تم ربط ${label}. راجع حالة الأتمتة من أعلى الصفحة.`)
+        ? (/auto_error=1/.test(raw) ? `⚠️ تم ربط ${label} لكن تعذّر تفعيل الأتمتة؛ احفظ الإعدادات يدويًا.`
+          : /auto_resume=published/.test(raw) ? `✅ تم ربط ${label} ونشر الفيديو الجاهز تلقائيًا.`
+          : /auto_resume=failed/.test(raw) ? `⚠️ تم ربط ${label}، لكن محاولة نشر الفيديو الجاهز لم تكتمل. راجع السجل.`
+          : `✅ تم ربط ${label}. راجع حالة الأتمتة من أعلى الصفحة.`)
         : `⚠️ لم يكتمل ربط ${label}${whyKey ? " (" + whyKey + ")" : ""}: ${WHY[whyKey] || "أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة."}`;
       if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
       if (typeof toast === "function") toast(msg);

@@ -272,6 +272,16 @@ window.fetch = async (url, opts = {}) => {
   if (!audioLine || !/التلاوة غير متاحة من الخادم/.test(audioLine.textContent)) fail("فشل الصوت لا يُسمّى في سطر آخر فحص");
   else ok("فشل تحميل التلاوة يُسمّى صريحًا في اللوحة");
 
+  // العودة من OAuth تميّز نجاح الرفع عن فشل المحاولة، ولا تطلب ضغط زر.
+  window.history.replaceState(null, "", "/#/account?linked=youtube&auto_resume=published");
+  window.PublishApp.reportLinkedFlag();
+  if (!/نشر الفيديو الجاهز تلقائيًا/.test(d.getElementById("acctNotice").textContent)) fail("لا تظهر نتيجة المحاولة التلقائية الناجحة");
+  else ok("نتيجة المحاولة التلقائية الناجحة تظهر في اللوحة");
+  window.history.replaceState(null, "", "/#/account?linked=youtube&auto_resume=failed");
+  window.PublishApp.reportLinkedFlag();
+  if (!/لم تكتمل/.test(d.getElementById("acctNotice").textContent)) fail("لا يظهر فشل المحاولة التلقائية");
+  else ok("فشل المحاولة التلقائية يظهر في اللوحة");
+
   // صفّ قديم يحمل invalid_grant بلا حقل reauth ⇒ يُترجم ويظهر الزر
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: undefined, last_daily: { run_date: "2026-11-12", status: "failed", error: "فشل في 1 منصات: youtube: تجديد التوكن فشل (youtube): invalid_grant", external_url: null } });
   const legacy = d.getElementById("acctReauth");
@@ -290,7 +300,7 @@ window.fetch = async (url, opts = {}) => {
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
   const re = d.getElementById("acctReauth");
   if (!re) fail("لا تنبيه عند انتهاء ربط القناة (invalid_grant)");
-  else if (!/إعادة الربط/.test(re.textContent) || !/فيديو جديد/.test(re.textContent)) fail("تنبيه انتهاء الربط لا يشرح الخطوة التالية");
+  else if (!/إعادة الربط/.test(re.textContent) || !/هيحاول ينشر الفيديو الجاهز بعد الربط/.test(re.textContent)) fail("تنبيه انتهاء الربط لا يشرح الخطوة التالية");
   else ok("تنبيه انتهاء الربط يشرح إعادة الربط والنشر التلقائي");
   // زر «انشر الفيديو الجاهز» يرسل الإجراء الصحيح
   const retryBtn = d.getElementById("btnRetryPublish");
