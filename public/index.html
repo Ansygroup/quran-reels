@@ -31,8 +31,8 @@
   <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.json?v=2">
 <link rel="preconnect" href="/">
-<link rel="preload" as="style" href="css/style.css?v=8">
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="preload" as="style" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=9">
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 <script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>
@@ -44,7 +44,7 @@
 <body>
 
 <!-- شريط علوي -->
-<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100% · <b>معاينة حية وإنشاء فوري — بدون انتظار وبدون حد يومي</b></div>
+<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني</div>
 
 <!-- الهيدر -->
 <header class="site-header">
@@ -79,21 +79,18 @@
   <!-- Hero -->
   <section class="hero">
     <div class="container center">
-      <div class="hero-badge">✦ مجاني 100% — بدون تسجيل وبدون تطبيق ✦</div>
+      <div class="hero-badge">✦ صمّم من متصفحك مجانًا ✦</div>
       <div class="hero-ayah">﴿ اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ ﴾</div>
-      <h1>صانع فيديو قرآن <span class="hl">فوري</span> — اصنع ريلز قرآنية في ثوانٍ</h1>
-      <p class="hero-sub">حوّل الآيات إلى فيديو قرآن عمودي MP4 جاهز للتيك توك وإنستغرام ويوتيوب شورتس — مع <b>معاينة حية أثناء التصميم</b>، وإنشاء لحظي داخل متصفحك بدون قوائم انتظار وبدون حدود يومية.</p>
+      <h1>اصنع فيديو قرآني <span class="hl">بطريقتك</span></h1>
+      <p class="hero-sub">اختار الآيات والقارئ والخلفية، وشوف المعاينة قبل ما تنشئ الفيديو وتحمله.</p>
       <div class="hero-cta">
         <a class="btn btn-gold btn-lg" href="#/" id="heroCreate">ابدأ إنشاء الفيديو ←</a>
         <a class="btn btn-ghost btn-lg" href="#/tools">تصفح الأدوات الإسلامية</a>
       </div>
-      <div class="hero-note">⚡ أسرع بـ١٠ من مواقع المونتاج التقليدية · 🔒 خلفيتك لا تُرفع لأي خادم</div>
-
       <div class="stats">
         <div class="stat"><b id="statReciters">47</b><span>قارئًا مشهورًا</span></div>
         <div class="stat"><b>114</b><span>سورة كاملة</span></div>
         <div class="stat"><b>32</b><span>أداة إسلامية</span></div>
-        <div class="stat"><b>∞</b><span>فيديوهات بدون حد</span></div>
       </div>
     </div>
   </section>
@@ -104,7 +101,7 @@
       <div class="section-head">
         <div class="eyebrow">الأداة الرئيسية</div>
         <h2>أنشئ ريلز قرآنيًا الآن</h2>
-        <p>اختر القارئ والسورة والآيات والخلفية ← شاهد المعاينة الحية ← حمّل الفيديو فورًا</p>
+        <p>خصّص الفيديو وشوف التغييرات في المعاينة.</p>
       </div>
 
       <div class="creator-wrap">
@@ -112,6 +109,7 @@
 
           <!-- المعاينة -->
           <div class="preview-col">
+            <div class="preview-label">معاينة الفيديو <span>● مباشرة</span></div>
             <div class="phone">
               <div class="phone-screen" id="phoneScreen">
                 <canvas id="reelCanvas" width="405" height="720"></canvas>
@@ -119,9 +117,9 @@
             </div>
             <div class="preview-controls">
               <div class="pctrl">
-                <button class="icon-btn" id="btnPrevAyah" title="الآية السابقة">⏭</button>
-                <button class="icon-btn big" id="btnPlay" title="تشغيل المعاينة">▶</button>
-                <button class="icon-btn" id="btnNextAyah" title="الآية التالية">⏮</button>
+                <button class="icon-btn" id="btnPrevAyah" title="الآية السابقة" aria-label="الآية السابقة">⏭</button>
+                <button class="icon-btn big" id="btnPlay" title="تشغيل المعاينة" aria-label="تشغيل أو إيقاف المعاينة">▶</button>
+                <button class="icon-btn" id="btnNextAyah" title="الآية التالية" aria-label="الآية التالية">⏮</button>
               </div>
               <div class="ayah-dots" id="ayahDots"></div>
               <div class="timebar"><i id="timeFill"></i></div>
@@ -161,12 +159,6 @@
                   <div class="label"><b>اختر القارئ</b><span class="muted">47 قارئًا — جودة عالية</span></div>
                   <select class="select" id="selReciter"></select>
                   <div class="hint">يُستخدم صوت القارئ المختار في المعاينة وفي الفيديو النهائي.</div>
-                </div>
-                <div class="card" style="padding:12px 14px">
-                  <div class="row between" style="font-size:.86rem">
-                    <span class="muted">💡 نصيحة:</span>
-                    <span>القارئ الواضحي يرفع تفاعل الريلز كثيرًا</span>
-                  </div>
                 </div>
               </div>
 

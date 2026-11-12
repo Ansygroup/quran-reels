@@ -87,6 +87,19 @@ setTimeout(async () => {
   const reciter = d.getElementById("selReciter");
   chk("قائمة القرّاء مملوءة", reciter && reciter.options.length > 10, reciter ? `${reciter.options.length}` : "لا يوجد #selReciter");
 
+  // كل التبويبات ما زالت تعمل بعد ترتيب الصانع، مع الاحتفاظ باختيار السورة.
+  const tabs = [...d.querySelectorAll("#stepTabs .step-tab")];
+  const beforeSurah = surah.value;
+  const tabResults = tabs.map((tab) => {
+    tab.click();
+    const pane = d.getElementById("pane-" + tab.dataset.pane);
+    return Boolean(pane && pane.classList.contains("active") && tab.classList.contains("active") && d.querySelectorAll(".step-pane.active").length === 1);
+  });
+  chk("تبويبات الصانع السبعة تعمل دون تغيير السورة", tabs.length === 7 && tabResults.every(Boolean) && surah.value === beforeSurah);
+  tabs[0]?.click();
+  chk("المعاينة وأزرارها وزر الإنشاء متاحة", ["reelCanvas", "btnPlay", "btnPrevAyah", "btnNextAyah", "btnCreate"].every((id) => Boolean(d.getElementById(id))));
+  chk("الصفحة لا تعرض مقارنة سرعة غير مثبتة", !d.querySelector("#view-home .hero").textContent.includes("أسرع بـ١٠"));
+
   chk("السنة في الفوتر تُملأ (#year)", /^\d{4}$/.test((d.getElementById("year")?.textContent || "").trim()), d.getElementById("year")?.textContent);
   chk("شريط الكوكيز موجود", Boolean(d.getElementById("cookieBar") && d.getElementById("cookieOk")));
   chk("زر الدخول ونافذته موجودان", Boolean(d.getElementById("authBtn") && d.getElementById("loginOverlay")));
