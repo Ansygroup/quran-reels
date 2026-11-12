@@ -56,13 +56,19 @@ const Creator = {
     sel.innerHTML = "";
     TRANSLATIONS.forEach(t => sel.appendChild(el("option", { value: t.id }, t.n)));
   },
+  // العنوان والمرجع من نفس بيانات القرآن، وليس من نص حر قابل للخطأ.
+  _famousLabel(s, a, b) {
+    const words = Quran.ayah(s, a).trim().split(/\s+/);
+    const excerpt = words.slice(0, 8).join(" ") + (words.length > 8 ? "…" : "");
+    return `${ayahRef(s, a, b)} — ${excerpt}`;
+  },
   _populateFamous() {
     const sel = $("#selFamous");
-    sel.innerHTML = `<option value="">— اختر من الآيات المشهورة —</option>`;
+    sel.innerHTML = `<option value="">— اختر من المقاطع المختارة —</option>`;
     for (const grp of FAMOUS) {
       const og = el("optgroup", { label: grp.g });
-      grp.i.forEach(([t, s, a, b], ix) => {
-        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, t));
+      grp.i.forEach(([s, a, b]) => {
+        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, this._famousLabel(s, a, b)));
       });
       sel.appendChild(og);
     }
@@ -285,23 +291,23 @@ const Creator = {
   _quickPick(id) {
     if (id === "all") {
       $("#selFamous").focus();
-      toast("اختر من قائمة الآيات المشهورة في تبويب النص");
+      toast("اختر من قائمة المقاطع المختارة في تبويب النص");
       return;
     }
-    let pool = FAMOUS;
     if (id === "me") {
-      const all = FAMOUS.flatMap(g => g.i);
-      const pick = all[Math.floor(Math.random() * all.length)];
-      this.setSelection(pick[1], pick[2], pick[3], true);
-      toast("رسالة لك: " + pick[0]);
+      const all = FAMOUS.filter(g => g.tag !== "other").flatMap(g => g.i);
+      if (!all.length) { toast("لا توجد رسائل مختارة", "err"); return; }
+      const [s, a, b] = all[Math.floor(Math.random() * all.length)];
+      this.setSelection(s, a, b, true);
+      toast("رسالة لك: " + this._famousLabel(s, a, b));
       return;
     }
     const grp = FAMOUS.find(g => g.tag === id);
     if (!grp || !grp.i.length) { toast("لا توجد رسائل في هذا التصنيف", "err"); return; }
-    const pick = grp.i[Math.floor(Math.random() * grp.i.length)];
-    this.setSelection(pick[1], pick[2], pick[3], true);
-    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(pick[1], pick[2], pick[3])[0])}</div>
-      <div class="hint center">${esc(ayahRef(pick[1], pick[2], pick[3]))} — ${esc(pick[0])}</div>`;
+    const [s, a, b] = grp.i[Math.floor(Math.random() * grp.i.length)];
+    this.setSelection(s, a, b, true);
+    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(s, a, b)[0])}</div>
+      <div class="hint center">${esc(ayahRef(s, a, b))}</div>`;
   },
 
   /** اختيار مقطع من الخارج (آية اليوم مثلاً) */
