@@ -452,6 +452,7 @@ window.PublishApp = {
     };
     const changed = e => {
       this._autoDirty = true;
+      this._autoEditRevision = (this._autoEditRevision || 0) + 1;
       if (/^acct(?:Style|Translation|Ratio|Quality|Accent|Font|Ded|ShowTrans|Watermark|Motion)$/.test(e.target.id)) get("acctDesignEnabled").checked = true;
       if (e.target.id === "acctTranslation") get("acctShowTrans").checked = e.target.value !== "none";
       update();
@@ -902,6 +903,7 @@ window.PublishApp = {
 
     const old = btn ? btn.textContent : "";
     const toggle = q2("acctEnabled");
+    const editRevision = this._autoEditRevision || 0;
     this._settingsPending = true;
     if (toggle) toggle.disabled = true;
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
@@ -914,7 +916,8 @@ window.PublishApp = {
     if (btn) { btn.disabled = false; btn.textContent = old; }
 
     if (out.ok) {
-      this._autoDirty = false;
+      // لا نعتبر تعديلًا حدث أثناء طلب الحفظ جزءًا من الاستجابة السابقة.
+      this._autoDirty = (this._autoEditRevision || 0) !== editRevision;
       this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template, all_channels: body.all_channels } };
       this.renderStatus(this.data);
       this.renderSteps(this.data);
