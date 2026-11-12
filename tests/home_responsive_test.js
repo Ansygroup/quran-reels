@@ -81,9 +81,41 @@ const server = http.createServer((req, res) => {
         const allToolCount = await page.evaluate(() => TOOLS.length);
         assert.ok(allToolCount >= 32);
         assert.equal(await page.locator('#toolsGridAll .tool-card').count(), allToolCount);
+        const toolsMeasure = await page.evaluate(() => {
+          const bad = [...document.querySelectorAll('#view-tools *')].filter(e => {
+            const r = e.getBoundingClientRect();
+            return r.width && r.height && (r.left < -1 || r.right > innerWidth + 1);
+          }).map(e => e.id || e.className || e.tagName);
+          return { documentWidth: document.documentElement.scrollWidth, bad };
+        });
+        assert.equal(toolsMeasure.documentWidth, width);
+        assert.deepEqual(toolsMeasure.bad, []);
+        if (process.env.TOOLS_UI_SCREENSHOTS) await page.screenshot({ path: path.join(process.env.TOOLS_UI_SCREENSHOTS, `${name}-tools.png`), fullPage: true });
+        const search = page.locator('#toolsSearch');
+        assert.equal(await search.getAttribute('aria-describedby'), 'toolsResults');
+        await search.fill('أذكار');
+        await page.waitForFunction(() => document.querySelectorAll('#toolsGridAll .tool-card').length > 0 && document.querySelectorAll('#toolsGridAll .tool-card').length < TOOLS.length);
+        assert.equal(await page.locator('#toolsClear').isVisible(), true);
+        assert.match(await page.locator('#toolsResults').innerText(), /من/);
+        await search.fill('baby-names');
+        await page.waitForFunction(() => document.querySelectorAll('#toolsGridAll .tool-card').length === 1 && document.querySelector('#toolsGridAll a[href="#/tool/baby-names"]'));
+        await search.fill('لا يوجد اسم بهذا الشكل مطلقا');
+        await page.waitForFunction(() => !document.querySelector('#toolsEmpty').hidden);
+        assert.equal(await page.locator('#toolsGridAll .tool-card').count(), 0);
+        await page.locator('#toolsClear').click();
+        await page.waitForFunction(() => document.querySelectorAll('#toolsGridAll .tool-card').length === TOOLS.length && document.querySelector('#toolsEmpty').hidden);
+        assert.equal(await search.inputValue(), '');
+        assert.equal(await search.evaluate(e => document.activeElement === e), true);
+        await page.locator('#toolsGridAll a[href="#/tool/tasbeeh"]').click();
+        await page.waitForSelector('#toolMount [data-tap]');
+        await page.locator('#toolMount [data-tap]').click();
+        assert.match(await page.locator('#toolMount [data-count]').innerText(), /١|1/);
+        await page.locator('.tool-back').click();
+        await page.waitForFunction(() => !document.querySelector('#view-tools').hidden);
+        assert.equal(await page.locator('#toolsGridAll .tool-card').count(), allToolCount);
         assert.equal(writes, 0);
         assert.deepEqual(errors, []);
-        console.log(`OK ${name}: ${JSON.stringify(measurements)}, 7 tabs, 6 featured tools, full tool list, FAQ, no writes or page errors`);
+        console.log(`OK ${name}: ${JSON.stringify(measurements)}, 7 tabs, 6 featured tools, search/clear, tool interaction, FAQ, no writes or page errors`);
       } finally { await browser.close(); }
     }
   } finally { server.close(); }
