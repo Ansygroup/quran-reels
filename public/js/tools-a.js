@@ -592,7 +592,7 @@ registerTool("dua", {
       picked.forEach(c => {
         const card = el("div", { class: "mini-card" });
         card.innerHTML = `<div class="m-title">${esc(c.category)}</div>` +
-          c.array.slice(0, 4).map(a => `<div class="quran-text" style="font-size:1.02rem;margin-top:8px">${esc(a.text)}
+          c.array.map(a => `<div class="quran-text" style="font-size:1.02rem;margin-top:8px">${esc(a.text)}
             <div class="row" style="margin-top:4px">${a.count > 1 ? `<span class="count-badge">×${toAr(a.count)}</span>` : ""}
             <button class="btn btn-ghost btn-sm" data-copy="${esc(a.text)}">📋</button></div></div>`).join("");
         grid.appendChild(card);

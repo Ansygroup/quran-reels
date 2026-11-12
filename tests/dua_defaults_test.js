@@ -34,15 +34,30 @@ vm.runInContext(source, context, {filename: 'public/js/tools-a.js'});
   fav.forEach((name, i) => {
     const card = grid.children[i].innerHTML;
     assert(card.includes(`<div class="m-title">${name}</div>`));
-    for (const item of byName.get(name).array.slice(0, 4)) assert(card.includes(item.text), `${name}: content unchanged`);
+    const items = byName.get(name).array;
+    assert.strictEqual((card.match(/data-copy=/g) || []).length, items.length, `${name}: every item can be copied`);
+    for (const item of items) assert(card.includes(item.text), `${name}: content unchanged`);
   });
+  // Search by both category and an item after the old four-item cutoff.
+  const prayer = byName.get('الأذكار بعد السلام من الصلاة');
+  assert(prayer.array.length > 4);
+  search(prayer.array[prayer.array.length - 1].text);
+  const prayerCard = grid.children.find(c => c.innerHTML.includes(`<div class="m-title">${prayer.category}</div>`));
+  assert(prayerCard && prayerCard.innerHTML.includes(prayer.array[prayer.array.length - 1].text));
+  for (const category of categories.filter(c => c.array.length > 4)) {
+    search(category.category);
+    const card = grid.children.find(c => c.innerHTML.includes(`<div class="m-title">${category.category}</div>`));
+    assert(card, `search category: ${category.category}`);
+    assert.strictEqual((card.innerHTML.match(/data-copy=/g) || []).length, category.array.length);
+    for (const item of category.array) assert(card.innerHTML.includes(item.text), `${category.category}: missing item`);
+  }
   search('الدعاء قبل الطعام');
   assert(grid.children.some(c => c.innerHTML.includes('<div class="m-title">الدعاء قبل الطعام</div>')));
   search('');
   assert.strictEqual(grid.children.length, fav.length, 'clearing search restores defaults');
-  assert(fs.readFileSync('public/js/app.js', 'utf8').includes('js/tools-a.js?v=4'));
-  assert(fs.readFileSync('public/index.html', 'utf8').includes('js/app.js?v=7'));
+  assert(fs.readFileSync('public/js/app.js', 'utf8').includes('js/tools-a.js?v=5'));
+  assert(fs.readFileSync('public/index.html', 'utf8').includes('js/app.js?v=8'));
   const sw = fs.readFileSync('public/sw.js', 'utf8');
-  assert(sw.includes('/js/tools-a.js?v=4') && sw.includes('/js/app.js?v=7'));
+  assert(sw.includes('/js/tools-a.js?v=5') && sw.includes('/js/app.js?v=8'));
   console.log(`Dua defaults PASS: ${fav.length} real categories, unchanged texts, search and cache versions`);
 })().catch(e => { console.error(e); process.exitCode = 1; });
