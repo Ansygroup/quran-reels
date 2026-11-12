@@ -32,15 +32,38 @@ const DEFAULTS = {
   template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" }
 };
 
+// Vercel Node helpers consume the request stream before the handler and expose
+// the parsed payload through req.body. Bare Node test servers expose only the
+// stream. Supporting both avoids silently reading an already-ended stream.
 async function readBody(req) {
-  let text = "";
-  for await (const part of req) {
-    text += part;
-    if (text.length > 720000) throw new Error("الطلب أكبر من المسموح");
+  const MAX_REQUEST = 720000, MAX_NORMAL = 20000;
+  const fail = (status, message) => { const e = new Error(message); e.bodyStatus = status; throw e; };
+  const declared = Number(req.headers?.['content-length']);
+  if (Number.isFinite(declared) && declared > MAX_REQUEST) fail(413, "الطلب أكبر من المسموح");
+  let body;
+  try { body = req.body; } catch { fail(400, "بيانات غير صالحة"); }
+  let text;
+  if (body !== undefined && body !== null) {
+    if (Buffer.isBuffer(body)) text = body.toString('utf8');
+    else if (typeof body === 'string') text = body;
+    else {
+      try { text = JSON.stringify(body); } catch { fail(400, "بيانات غير صالحة"); }
+    }
+  } else {
+    const chunks = []; let size = 0;
+    for await (const part of req) {
+      const chunk = Buffer.isBuffer(part) ? part : Buffer.from(part);
+      size += chunk.length;
+      if (size > MAX_REQUEST) fail(413, "الطلب أكبر من المسموح");
+      chunks.push(chunk);
+    }
+    text = Buffer.concat(chunks).toString('utf8');
   }
+  if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > MAX_REQUEST) fail(413, "الطلب أكبر من المسموح");
   let parsed;
-  try { parsed = JSON.parse(text || "{}"); } catch { throw new Error("بيانات غير صالحة"); }
-  if (text.length > 20000 && !(parsed?.action === "save" && typeof parsed.custom_image === "string")) throw new Error("الطلب أكبر من المسموح");
+  try { parsed = JSON.parse(text || "{}"); } catch { fail(400, "بيانات غير صالحة"); }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) fail(400, "بيانات غير صالحة");
+  if (Buffer.byteLength(text, 'utf8') > MAX_NORMAL && !(parsed.action === "save" && typeof parsed.custom_image === "string")) fail(413, "الطلب أكبر من المسموح");
   return parsed;
 }
 
@@ -411,10 +434,10 @@ const handler = async (req, res) => {
 
     return json(res, 400, { error: "إجراء غير معروف" });
   } catch (error) {
-    return json(res, 500, { error: String(error?.message || error).slice(0, 300) });
+    return json(res, [400, 413].includes(error?.bodyStatus) ? error.bodyStatus : 500, { error: String(error?.message || error).slice(0, 300) });
   }
 };
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, latestProgress, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
+module.exports.__test = { readBody, accountData, latestProgress, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
