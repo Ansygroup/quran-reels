@@ -114,6 +114,7 @@ window.PublishApp = {
     const reciters = Array.isArray(data.reciters) ? data.reciters : [];
     const articleCount = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : null;
     const articleLabel = articleCount ? `توليد من مقال (${articleCount.toLocaleString("ar-EG")} مقال)` : "توليد من مقال";
+    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     /* آخر فحص محفوظ في القاعدة: «هل التوليد يعمل؟» يُجاب في اللوحة نفسها
      * بدل لقطة شاشة تُنسى. النصوص من الخادم تُقصّ وتُهرَّب. */
     const lastCheckLine = (c) => {
@@ -123,16 +124,23 @@ window.PublishApp = {
       const kind = c.kind === "render_selftest_deep" ? "توليد تجريبي"
         : c.kind === "render_failure" ? "محاولة توليد آلية"
         : c.kind === "autopilot_daily" ? "تشغيل آلي" : "فحص المحرّك";
-      const why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
+      let why = !c.ok && c.detail && c.detail.error ? " — " + String(c.detail.error).slice(0, 120) : "";
+      /* فحص فاشل بلا سبب مكتوب لكن التلاوة نفسها لم تصل: نسمّيها بدل «غير معروف» */
+      const d = c.detail || {};
+      if (!c.ok && !why && d.audio_direct && d.audio_direct.ok === false) {
+        why = " — التلاوة غير متاحة من الخادم" + (d.audio_proxy && d.audio_proxy.ok ? " (المسار المباشر فقط)" : "");
+      }
+      if (!c.ok && d.export && d.export.stage && !/stage/.test(why)) {
+        why += (why ? " · " : " — ") + "توقّف عند «" + String(d.export.stage).slice(0, 60) + "»";
+      }
       const cls = c.ok ? "hint ok" : "hint warn";
-      return `<p class="${cls}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${why} · ${stamp}</p>`;
+      return `<p class="${cls}" id="acctLastCheck">آخر ${kind} محفوظ: ${c.ok ? "✅ ناجح" : "⚠️ فاشل"}${esc(why)} · ${stamp}</p>`;
     };
     this.lastCheckLine = lastCheckLine(data.last_check);
 
     /* «هل الشغل بيمشي لوحده؟» — سطر واحد يقول حالة آخر تشغيل آلي: يومه،
      * حالته، سببه، ورابط المنشور. بدونه كان الفشل صامتًا حتى يفتح أحدهم
      * قاعدة البيانات. النصوص تأتي من الخادم فتُهرَّب. */
-    const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     const lastDailyLine = (d) => {
       if (!d || !d.run_date) return "";
       const day = String(d.run_date).slice(0, 10);

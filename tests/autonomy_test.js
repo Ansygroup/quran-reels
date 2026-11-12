@@ -93,7 +93,7 @@ const mkRoute = (url) => {
   const routes = [];
   const fakePage = { route: async (matcher, handler) => { routes.push({ matcher, handler }); } };
   const installed = await T.installAudioRoute(fakePage);
-  chk("يُثبّت مسارًا واحدًا على الصفحة", installed === true && routes.length === 1);
+  chk("يُثبّت مسارًا واحدًا ويعيد عدّادات الصوت", Boolean(installed && installed.ok === 0 && installed.miss === 0) && routes.length === 1);
   const m = routes[0].matcher;
   chk("يطابق /proxy?u=", m("https://quran-reels-tau.vercel.app/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
   chk("يطابق /api/proxy?u=", m("https://quran-reels-tau.vercel.app/api/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
@@ -111,7 +111,7 @@ const mkRoute = (url) => {
   global.fetch = realFetch;
 
   chk("renderRecipe يثبّت المسار قبل التوجيه للصفحة",
-    /await installAudioRoute\(page\);\s*\n\s*await page\.goto/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
+    /await installAudioRoute\(page\);\s*\n[\s\S]{0,1400}?await page\.goto/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
 
   /* 3) إعادة المحاولة التلقائية */
   let n = 0;

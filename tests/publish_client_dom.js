@@ -232,6 +232,12 @@ window.fetch = async (url, opts = {}) => {
     else if (diag.querySelector("b, i, script")) fail("تفاصيل التشخيص لم تُهرَّب (وسم من الخادم)");
     else ok("تفاصيل آخر فشل توليد تُعرض كاملة ومُهرَّبة");
   }
+  // فحص فاشل بلا سبب مكتوب لكن التلاوة لم تصل ⇒ نسمّي السبب بدل «غير معروف»
+  window.PublishApp.renderAccount({ ...ACCOUNT, last_check: { kind: "render_selftest_deep", ok: false, created_at: "2026-11-11T06:00:00Z", detail: { error: "", audio_direct: { ok: false, status: 0, error: "ENOTFOUND" }, audio_proxy: { ok: false } } } });
+  const audioLine = d.getElementById("acctLastCheck");
+  if (!audioLine || !/التلاوة غير متاحة من الخادم/.test(audioLine.textContent)) fail("فشل الصوت لا يُسمّى في سطر آخر فحص");
+  else ok("فشل تحميل التلاوة يُسمّى صريحًا في اللوحة");
+
   // بلا فشل توليد: لا صندوق تفاصيل فارغ
   window.PublishApp.renderAccount({ ...ACCOUNT, last_check: { kind: "render_selftest_deep", ok: true, created_at: "2026-11-11T05:00:00Z", detail: {} } });
   if (d.getElementById("acctDiag")) fail("صندوق تفاصيل يظهر مع فحص ناجح");
