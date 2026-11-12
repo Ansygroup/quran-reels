@@ -946,3 +946,11 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   #view-tools .tool-card{padding:15px}
   #view-tools .tool-card h3{font-size:.94rem}
 }
+
+/* معاينة إعدادات الأتمتة مستقلة عن صانع الصفحة الرئيسية. */
+.acct-reel-editor{display:grid;grid-template-columns:minmax(170px,260px) minmax(0,1fr);gap:24px;align-items:start;margin:20px 0}
+.acct-preview{max-width:260px;width:100%;margin-inline:auto}.acct-preview .phone-screen{border:1px solid var(--line);border-radius:20px}.acct-preview .hint{line-height:1.6}
+.acct-reel-controls{min-width:0}.acct-reel-controls .acct-grid2,.acct-reel-controls .acct-grid3{margin:12px 0}.acct-reel-controls input:not([type=checkbox]):not([type=range]){width:100%}
+@media(max-width:760px){.acct-reel-editor{grid-template-columns:1fr}.acct-preview{max-width:200px}}
+.acct-reel-controls [hidden]{display:none}
+.acct-preview [hidden]{display:none}.acct-preview audio{display:block;width:100%;margin-top:8px}

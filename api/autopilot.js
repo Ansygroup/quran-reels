@@ -1,4 +1,5 @@
 /* Account dashboard API: safe settings, private run history, and manual generation. */
+const { validateTemplate } = require("../lib/reel_settings");
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json, configured } = require("../lib/oauth");
@@ -298,6 +299,8 @@ const handler = async (req, res) => {
       const templateInput = body.template && typeof body.template === "object" ? body.template : {};
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
       const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
+      const templateError = validateTemplate(templateInput);
+      if (templateError) return json(res, 400, { error: templateError });
       const enabled = body.enabled === true;
       
       // حفظ اختيار فارغ أثناء الإيقاف لا يختار يوتيوب بالنيابة عن المستخدم.
@@ -316,12 +319,16 @@ const handler = async (req, res) => {
       /* اختيار القارئ: كان مثبتًا على rotate فلا يمكن تخصيص الصوت إطلاقًا */
       const reciterId = String(templateInput.reciter || "");
       const wantFixed = templateInput.reciter_mode === "fixed" && RECITERS.some((r) => r.id === reciterId);
+      if (templateInput.reciter_mode === "fixed" && !wantFixed) return json(res, 400, { error: "اختار قارئًا صالحًا" });
+      if (templateInput.background && !BACKGROUND_IDS.has(templateInput.background)) return json(res, 400, { error: "اختار خلفية صالحة للأتمتة" });
       const template = {
         content_mode,
         reciter_mode: wantFixed ? "fixed" : "rotate",
         reciter: wantFixed ? reciterId : "",
         background,
         privacy: "public",
+        ...(content_mode === "fixed" ? { surah: templateInput.surah, from: templateInput.from, to: templateInput.to } : {}),
+        ...(templateInput.design !== undefined ? { design: templateInput.design } : {}),
       };
       /* all_channels: انشر على كل القنوات المرتبطة (افتراضي: القناة الافتراضية فقط) */
       const all_channels = body.all_channels === true;

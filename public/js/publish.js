@@ -311,7 +311,9 @@ window.PublishApp = {
     for (const c of Array.isArray(this.connections) ? this.connections : []) chanCount.set(c.platform, (chanCount.get(c.platform) || 0) + 1);
     const multi = [...chanCount.values()].some((n) => n > 1);
 
-    const MODES = { mix: "متنوّع (آيات وسور)", famous: "سور مشهورة", sequential: "بالترتيب (مصحف)", article: "من مقال" };
+    const MODES = { mix: "متنوّع (آيات وسور)", famous: "سور مشهورة", sequential: "بالترتيب (مصحف)", article: "من مقال", fixed: "اختيار سورة وآيات بنفسي" };
+    const d = template.design || { translation: "none", showTrans: false, style: "card", ratio: "9:16", quality: 1080, accent: "gold", fontSize: 100, showWatermark: true, motion: true, dedText: "" };
+    const opt = (values, selected) => values.map(([v, label]) => `<option value="${this.esc(v)}" ${String(v) === String(selected) ? "selected" : ""}>${this.esc(label)}</option>`).join("");
     const BGS = {
       rotate: "تتغيّر تلقائيًا", "grad-emerald": "تدرّج زمردي", "grad-gold": "تدرّج ذهبي", "grad-dawn": "تدرّج الفجر", "grad-night": "تدرّج ليلي",
       "bg-mosque-night": "مسجد ليلًا", "bg-starry-desert": "صحراء بنجوم", "bg-ocean-sunset": "غروب البحر", "bg-forest-rays": "غابة وأشعة",
@@ -322,6 +324,7 @@ window.PublishApp = {
     const reciters = Array.isArray(options.reciters) ? options.reciters : (Array.isArray(data.reciters) ? data.reciters : []);
     const bgs = Array.isArray(options.backgrounds) && options.backgrounds.length ? options.backgrounds : Object.keys(BGS);
 
+    this._autoDirty = false;
     wrap.innerHTML = `
       <div class="acct-sec-head">
         <h2>🎛️ التخصيص</h2>
@@ -331,14 +334,37 @@ window.PublishApp = {
         <div class="f-group"><label for="selContentMode">محتوى الفيديو</label>
           <select id="selContentMode">${modes.map((m) => `<option value="${this.esc(m)}" ${template.content_mode === m ? "selected" : ""}>${this.esc(MODES[m] || m)}</option>`).join("")}</select>
         </div>
-        <div class="f-group"><label for="selReciter">القارئ</label>
-          <select id="selReciter">
+        <div class="f-group"><label for="acctReciter">القارئ</label>
+          <select id="acctReciter">
             <option value="" ${template.reciter_mode !== "fixed" ? "selected" : ""}>تلقائي (يتنوّع كل يوم)</option>
             ${reciters.map((r) => `<option value="${this.esc(r.id)}" ${template.reciter_mode === "fixed" && template.reciter === r.id ? "selected" : ""}>${this.esc(r.name || r.id)}</option>`).join("")}
           </select>
         </div>
         <div class="f-group"><label for="selBackground">الخلفية</label>
           <select id="selBackground">${bgs.map((b) => `<option value="${this.esc(b)}" ${template.background === b ? "selected" : ""}>${this.esc(BGS[b] || b)}</option>`).join("")}</select>
+        </div>
+      </div>
+      <div class="acct-reel-editor">
+        <div class="acct-preview"><div class="preview-label">معاينة الشكل <span>● مباشرة</span></div><div class="phone-screen" id="acctPreviewScreen"><canvas id="acctPreviewCanvas" width="405" height="720" aria-label="معاينة شكل الريل"></canvas></div><p class="hint" id="acctPreviewNote">المعاينة صورة تقريبية؛ الاختيارات التلقائية تتحدد وقت التشغيل.</p><div id="acctAudioPreview" hidden><label for="acctAudio">استمع لأول آية بالقارئ المختار</label><audio id="acctAudio" controls preload="none"></audio></div></div>
+        <div class="acct-reel-controls">
+          <div class="acct-grid3" id="acctFixedRange" ${template.content_mode === "fixed" ? "" : "hidden"}>
+            <div class="f-group"><label for="acctSurah">السورة</label><select id="acctSurah" data-value="${this.esc(template.surah || 112)}"></select></div>
+            <div class="f-group"><label for="acctFrom">من آية</label><input type="number" id="acctFrom" min="1" value="${this.esc(template.from || 1)}"></div>
+            <div class="f-group"><label for="acctTo">لآية</label><input type="number" id="acctTo" min="1" value="${this.esc(template.to || 4)}"></div>
+          </div>
+          <p class="hint">لو اخترت آيات بنفسك، نفس المقطع هيتكرر في التشغيل التلقائي. للمقاطع الطويلة ممكن يتوقف التشغيل بدل ما يقصّ آياتك.</p>
+          <label class="chk"><input type="checkbox" id="acctDesignEnabled" ${template.design ? "checked" : ""}> استخدم تخصيص الشكل بدل الشكل التلقائي</label>
+          <div class="acct-grid2">
+            <div class="f-group"><label for="acctStyle">أسلوب النص</label><select id="acctStyle">${opt([["card","بطاقة كلاسيكية"],["minimal","أنيق بسيط"],["banner","بانر سينمائي"],["word","كلمة بكلمة"]],d.style)}</select></div>
+            <div class="f-group"><label for="acctTranslation">الترجمة</label><select id="acctTranslation">${opt([["none","بدون ترجمة"],["ar","العربية"],["en.sahih","الإنجليزية"],["fr.hamidullah","الفرنسية"],["tr.diyanet","التركية"],["id.indonesian","الإندونيسية"],["ur.jalandhry","الأردية"],["es.cortes","الإسبانية"],["it.piccardo","الإيطالية"]],d.translation)}</select></div>
+            <div class="f-group"><label for="acctRatio">المقاس</label><select id="acctRatio">${opt([["9:16","ريلز 9:16"],["1:1","مربع 1:1"],["16:9","عريض 16:9"]],d.ratio)}</select></div>
+            <div class="f-group"><label for="acctQuality">الجودة</label><select id="acctQuality">${opt([[1080,"عالية 1080p"],[720,"سريعة 720p"]],d.quality)}</select></div>
+            <div class="f-group"><label for="acctAccent">لون التمييز</label><select id="acctAccent">${opt([["gold","ذهبي"],["emerald","زمردي"],["silver","فضي"],["rose","وردي"]],d.accent)}</select></div>
+            <div class="f-group"><label for="acctFont">حجم الخط</label><input id="acctFont" type="range" min="70" max="140" step="5" value="${this.esc(d.fontSize)}"></div>
+          </div>
+          <div class="f-group"><label for="acctDed">الإهداء (اختياري)</label><input id="acctDed" maxlength="180" value="${this.esc(d.dedText)}" placeholder="اكتب الإهداء"></div>
+          <div class="plat-checks"><label class="chk"><input id="acctShowTrans" type="checkbox" ${d.showTrans ? "checked" : ""}> إظهار الترجمة</label><label class="chk"><input id="acctWatermark" type="checkbox" ${d.showWatermark ? "checked" : ""}> العلامة المائية</label><label class="chk"><input id="acctMotion" type="checkbox" ${d.motion ? "checked" : ""}> حركة الخلفية</label></div>
+          <p class="hint">الخلفيات المتاحة هنا من مكتبة الموقع؛ صورة جهازك خاصة بالصانع اليدوي ومش متاحة للأتمتة.</p>
         </div>
       </div>
       <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
@@ -360,6 +386,80 @@ window.PublishApp = {
       <p class="hint">«تشغيل الآن» يُنتج فيديو وينشره فورًا (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>`;
 
     this.renderPlatformChecks(data);
+    this.initReelEditor(wrap);
+  },
+
+  /* نرسم بمحرك الصانع نفسه، من غير إنشاء أو نشر أو تغيير إعداداته المحلية. */
+  initReelEditor(wrap) {
+    if (typeof Quran === "undefined" || typeof ReelRenderer === "undefined" || typeof BACKGROUNDS === "undefined") return;
+    const get = id => wrap.querySelector("#" + id);
+    let revision = 0;
+    const generation = (wrap._reelGeneration || 0) + 1;
+    wrap._reelGeneration = generation;
+    const current = token => wrap.isConnected && wrap._reelGeneration === generation && token === revision;
+    const update = async () => {
+      const token = ++revision;
+      const fixed = get("selContentMode").value === "fixed";
+      get("acctFixedRange").hidden = !fixed;
+      try {
+        await Quran.load();
+        if (!current(token)) return;
+        const surah = get("acctSurah");
+        if (!surah.options.length) {
+          const selected = surah.dataset.value;
+          surah.innerHTML = Quran.surahs.map(s => `<option value="${s.n}">${this.esc(s.name)}</option>`).join("");
+          surah.value = selected;
+        }
+        const s = fixed ? Number(surah.value) : 112;
+        const from = fixed ? Number(get("acctFrom").value) : 1;
+        const to = fixed ? Number(get("acctTo").value) : 4;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from || to > Quran.ayahCount(s) || to - from >= 40) {
+          const audio = get("acctAudio"); audio.pause(); audio.removeAttribute("src"); audio.load();
+          get("acctAudioPreview").hidden = true;
+          const cv = get("acctPreviewCanvas"); cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height);
+          get("acctPreviewNote").textContent = "اختار آيات صحيحة من السورة (حد أقصى ٤٠ آية)."; return;
+        }
+        const audioWrap = get("acctAudioPreview"), audio = get("acctAudio");
+        const reader = get("acctReciter").value;
+        audioWrap.hidden = !fixed || !reader;
+        if (fixed && reader) {
+          const url = "/proxy?u=" + encodeURIComponent(`https://everyayah.com/data/${reader}/${String(s).padStart(3, "0")}${String(from).padStart(3, "0")}.mp3`);
+          if (audio.getAttribute("src") !== url) audio.setAttribute("src", url);
+        } else if (audio.hasAttribute("src")) { audio.pause(); audio.removeAttribute("src"); audio.load(); }
+        const enabled = get("acctDesignEnabled").checked;
+        const tr = enabled ? get("acctTranslation").value : "none";
+        if (enabled && get("acctShowTrans").checked && tr !== "none" && tr !== "ar") await Quran.loadTranslation(tr);
+        const cv = get("acctPreviewCanvas"), screen = get("acctPreviewScreen");
+        const ratio = enabled ? get("acctRatio").value : "9:16";
+        const sizes = { "9:16": [405,720,""], "1:1": [560,560,"ratio-1-1"], "16:9": [640,360,"ratio-16-9"] };
+        const [w,h,cls] = sizes[ratio]; cv.width = w; cv.height = h; screen.className = "phone-screen " + cls;
+        const renderer = new ReelRenderer(cv);
+        const bg = get("selBackground").value;
+        const selectedBg = BACKGROUNDS.find(b => b.id === bg) || BACKGROUNDS[0];
+        await renderer.setBackground(selectedBg);
+        if (selectedBg.file && !renderer.bgImg) throw new Error("background unavailable");
+        if (!current(token)) return;
+        renderer.setConfig({ verses:[{s,a:from,text:Quran.ayah(s,from)}], index:0, ayahElapsed:99, surahName:"سورة " + Quran.shortName(s),
+          reciterName: get("acctReciter").selectedOptions[0]?.textContent || "تلقائي", style: enabled ? get("acctStyle").value : "card",
+          accent: enabled ? get("acctAccent").value : "gold", fontSize: enabled ? Number(get("acctFont").value) : 100,
+          showTrans: enabled && get("acctShowTrans").checked && tr !== "none", translationId:tr,
+          customTrans: tr === "ar" ? Quran.ayah(s,from) : Quran.trText(tr,s,from),
+          showWatermark: enabled ? get("acctWatermark").checked : true, motion: enabled ? get("acctMotion").checked : true,
+          dedMode: enabled && get("acctDed").value ? "custom" : "none", dedText: enabled ? get("acctDed").value : "" });
+        renderer.draw();
+        get("acctPreviewNote").textContent = fixed && bg !== "rotate" && enabled && get("acctReciter").value ? "معاينة تقريبية لأول آية؛ التلاوة والحركة تظهر في الفيديو." : "دي عيّنة للشكل؛ السورة أو القارئ أو الخلفية أو الأسلوب التلقائي بيتحدد وقت التشغيل.";
+      } catch { if (current(token)) get("acctPreviewNote").textContent = "تعذّر تحميل المعاينة أو الترجمة؛ جرّب تاني قبل الحفظ."; }
+    };
+    const changed = e => {
+      this._autoDirty = true;
+      this._autoEditRevision = (this._autoEditRevision || 0) + 1;
+      if (/^acct(?:Style|Translation|Ratio|Quality|Accent|Font|Ded|ShowTrans|Watermark|Motion)$/.test(e.target.id)) get("acctDesignEnabled").checked = true;
+      if (e.target.id === "acctTranslation") get("acctShowTrans").checked = e.target.value !== "none";
+      update();
+    };
+    // إعادة رسم البطاقة لا تكدّس مستمعات قديمة أو تعيد المعاينة أكثر من مرة.
+    wrap.oninput = changed; wrap.onchange = changed;
+    update();
   },
 
   /* نعرض فقط المراحل التي سجّلها الخادم وحالة كل صف نشر فعلي. */
@@ -568,7 +668,8 @@ window.PublishApp = {
     /* الحالة والخطوات تعتمد على القنوات، فنُعيد رسمهما بعد التحميل */
     this.renderStatus(this.data || {});
     this.renderSteps(this.data || {});
-    this.renderAutoPanel(this.data || {});
+    // تحديث القنوات لا يمس التعديلات التي لم يضغط المستخدم حفظها بعد.
+    if (!this._autoDirty) this.renderAutoPanel(this.data || {});
     return conns;
   },
 
@@ -776,7 +877,7 @@ window.PublishApp = {
     if (this._settingsPending || this._settingsUncertain) return { ok: false, error: "راجع حالة الأتمتة قبل الحفظ" };
     const q2 = (id) => document.getElementById(id);
     const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map((i) => i.dataset.platform);
-    const reciter = q2("selReciter") ? q2("selReciter").value : "";
+    const reciter = q2("acctReciter") ? q2("acctReciter").value : "";
     const template = {
       content_mode: q2("selContentMode") ? q2("selContentMode").value : "mix",
       background: q2("selBackground") ? q2("selBackground").value : "rotate",
@@ -784,11 +885,25 @@ window.PublishApp = {
       reciter: reciter || "",
       privacy: "public",
     };
+    if (template.content_mode === "fixed") {
+      template.surah = Number(q2("acctSurah")?.value); template.from = Number(q2("acctFrom")?.value); template.to = Number(q2("acctTo")?.value);
+      const count = typeof Quran !== "undefined" ? Quran.ayahCount(template.surah) : 0;
+      if (!count || !Number.isInteger(template.from) || !Number.isInteger(template.to) || template.from < 1 || template.to < template.from || template.to > count || template.to - template.from >= 40) {
+        if (typeof toast === "function") toast("اختار آيات صحيحة من السورة (حد أقصى ٤٠ آية)", "err");
+        return { ok: false, error: "آيات غير صالحة" };
+      }
+    }
+    if (q2("acctDesignEnabled")?.checked) template.design = {
+      translation: q2("acctTranslation").value, showTrans: q2("acctShowTrans").checked, style: q2("acctStyle").value,
+      ratio: q2("acctRatio").value, quality: Number(q2("acctQuality").value), accent: q2("acctAccent").value,
+      fontSize: Number(q2("acctFont").value), showWatermark: q2("acctWatermark").checked, motion: q2("acctMotion").checked, dedText: q2("acctDed").value,
+    };
     const enabledNow = enabled !== undefined ? Boolean(enabled) : Boolean(q2("acctEnabled") && q2("acctEnabled").checked);
     const body = { enabled: enabledNow, platforms, template, all_channels: q2("chkAllChannels") ? Boolean(q2("chkAllChannels").checked) : Boolean(this.data?.config?.all_channels) };
 
     const old = btn ? btn.textContent : "";
     const toggle = q2("acctEnabled");
+    const editRevision = this._autoEditRevision || 0;
     this._settingsPending = true;
     if (toggle) toggle.disabled = true;
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
@@ -801,6 +916,8 @@ window.PublishApp = {
     if (btn) { btn.disabled = false; btn.textContent = old; }
 
     if (out.ok) {
+      // لا نعتبر تعديلًا حدث أثناء طلب الحفظ جزءًا من الاستجابة السابقة.
+      this._autoDirty = (this._autoEditRevision || 0) !== editRevision;
       this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template, all_channels: body.all_channels } };
       this.renderStatus(this.data);
       this.renderSteps(this.data);

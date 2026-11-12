@@ -150,12 +150,12 @@ window.fetch = async (url, opts = {}) => {
   if (kpis.length !== 4) fail(`أرقام الأتمتة: ${kpis.length} بدل 4`);
   else ok("أرقام الأتمتة (منشور/طابور/فشل/آخر نشر) مرسومة");
 
-  const ids = ["selContentMode", "selReciter", "selBackground"];
+  const ids = ["selContentMode", "acctReciter", "selBackground"];
   const missing = ids.filter((id) => !d.getElementById(id));
   if (missing.length) fail("عناصر التخصيص المفقودة: " + missing.join(", "));
   else ok("اختيار المحتوى والقارئ والخلفية موجودة (قابلة للتعديل)");
 
-  const recOpts = [...d.querySelectorAll("#selReciter option")].map((o) => o.value);
+  const recOpts = [...d.querySelectorAll("#acctReciter option")].map((o) => o.value);
   if (recOpts[0] !== "" || recOpts.length < 2) fail("قائمة القُرّاء لا تبدأ بـ«تلقائي» أو فارغة: " + JSON.stringify(recOpts.slice(0, 3)));
   else ok("قائمة القُرّاء تتيح «تلقائي» وقارئًا محدّدًا");
 
