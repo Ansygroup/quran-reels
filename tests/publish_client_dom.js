@@ -172,7 +172,7 @@ window.fetch = async (url, opts = {}) => {
   else ok("سطر «آخر تشغيل آلي» يعرض اليوم والحالة والسبب مهروبًا");
 
   // ---- لا تكرار ولا فقدان لمعرّفات DOM بعد الرسم (رسم الحاوية داخل نفسها) ----
-  const idList = ["acctQueue", "schedPlatforms", "schedTitle", "schedTime", "schedSave", "acctAuto", "queueList", "acctQuickActions", "acctPlatforms", "acctLastDaily"];
+  const idList = ["acctQueue", "acctAuto", "queueList", "acctQuickActions", "acctPlatforms", "acctLastDaily"];
   const badIds = idList.filter((id) => d.querySelectorAll("#" + id).length !== 1);
   if (badIds.length) fail("معرّفات مفقودة/مكررة بعد الرسم: " + badIds.join(", "));
   else ok("معرّفات DOM فريدة بعد الرسم");
@@ -234,20 +234,24 @@ window.fetch = async (url, opts = {}) => {
     if (bad.length) fail(`#${id}: تنبيه خطأ: ${bad[0].slice(0, 80)}`);
   }
 
-  // زر الجدولة: شرح واضح محليًا بلا طلب شبكة (الجدولة تحتاج فيديو من صانع الريلز)
-  const sched = d.getElementById("schedSave");
-  if (sched) {
-    calls.length = 0; alerts.length = 0;
-    const t = d.getElementById("schedTitle"); if (t) t.value = "ريلز";
-    const tm = d.getElementById("schedTime"); if (tm) tm.value = "06:00"; // type=time يقبل HH:MM
-    const cb = d.querySelector('#schedPlatforms input[data-platform="youtube"]');
-    if (cb) cb.checked = true;
-    sched.dispatchEvent(new window.Event("click", { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 30));
-    if (calls.length) fail("#schedSave: أرسل طلبًا غير مدعوم على الخادم");
-    else if (!alerts.some((a) => /جدولة/.test(a))) fail("#schedSave: لا رسالة توضيحية للمستخدم");
-    else ok("#schedSave: رسالة توضيحية محليًا بلا طلب فاشل");
+  // النموذج السابق لم يكن يجدول فيديو؛ السجل محفوظ، والتحذيرات لا تُخفى داخل التشخيص.
+  if (d.getElementById("schedSave") || d.getElementById("schedTitle")) fail("حقول الجدولة غير الفعالة ما زالت ظاهرة");
+  else ok("لا تظهر حقول جدولة لا تنشئ طلبًا");
+  if (d.getElementById("acctTools").tagName !== "DETAILS" || d.getElementById("acctTools").open) fail("التشخيص ليس مطويًا افتراضيًا");
+  else ok("التشخيص مطوي ويمكن فتحه");
+  const more = d.querySelector("#acctAuto .acct-more");
+  calls.length = 0;
+  if (!more || more.open || !more.querySelector("#autoRunAll") || !more.querySelector("#autoGenArticle")) fail("الخيارات الإضافية غير متاحة داخل قسم مطوي");
+  else {
+    more.querySelector("summary").click();
+    await new Promise((r) => setTimeout(r, 0));
+    if (!more.open || calls.length) fail("فتح الخيارات لم ينجح أو أرسل طلب شبكة");
+    else ok("فتح الخيارات الإضافية لا يبدأ نشرًا");
   }
+  window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
+  if (!d.querySelector("#acctAlerts #acctReauth") || d.querySelector("#acctTools #acctReauth")) fail("تحذير إعادة الربط ليس ظاهرًا خارج التشخيص");
+  else ok("تحذير إعادة الربط ظاهر خارج التشخيص المطوي");
+  window.PublishApp.renderAccount({ ...ACCOUNT });
 
   if (consoleErrors.length) fail("أخطاء console غير متوقعة: " + consoleErrors.slice(0, 3).join(" | "));
   else ok("لا أخطاء console");
@@ -338,6 +342,20 @@ window.fetch = async (url, opts = {}) => {
   if (!dailyOk || !/منشور/.test(dailyOk.textContent)) fail("حالة «منشور» لا تظهر في سطر التشغيل الآلي");
   else if (!dailyOk.querySelector('a[href="https://youtu.be/ok"]')) fail("رابط المنشور غير معروض");
   else ok("سطر التشغيل الآلي يعرض «منشور» + رابط المنشور");
+
+  // عند قناتين يصف التلميح الاختيار المحفوظ، ولا يبدّله فتح اللوحة.
+  window.fetch = async () => ({ ok: true, json: async () => ({ connections: [
+    { id: "a", platform: "youtube", account_name: "قناة أ", is_default: true, has_refresh: true },
+    { id: "b", platform: "youtube", account_name: "قناة ب", is_default: false, has_refresh: true },
+  ] }) });
+  window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, all_channels: true } });
+  await window.PublishApp.renderConnections("test-token");
+  if (d.querySelectorAll('#acctAccountsList [data-channel]').length !== 2 || !/النشر على كل القنوات المرتبطة/.test(d.getElementById("acctAccountsList").textContent) || !d.getElementById("chkAllChannels").checked) fail("وضع القناتين لا يعكس اختيار كل القنوات");
+  else ok("القناتان وتلميح كل القنوات والمفتاح تظهر حسب الإعداد المحفوظ");
+  window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, all_channels: false } });
+  await window.PublishApp.renderConnections("test-token");
+  if (!/النشر على القناة الافتراضية/.test(d.getElementById("acctAccountsList").textContent) || d.getElementById("chkAllChannels").checked) fail("وضع القناة الافتراضية لا يعكس الإعداد المحفوظ");
+  else ok("تلميح القناة الافتراضية يعكس الإعداد عند إيقاف كل القنوات");
 
   done();
 })();

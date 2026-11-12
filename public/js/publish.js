@@ -341,9 +341,14 @@ window.PublishApp = {
       <div class="row gap-lg acct-actions">
         <button class="btn btn-gold" id="autoSave" data-act="save">💾 حفظ التعديلات</button>
         <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
-        <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ على كل القنوات</button>
-        <button class="btn btn-ghost" id="autoGenArticle" data-act="article_random">${articleLabel}</button>
       </div>
+      <details class="acct-more">
+        <summary>خيارات إضافية</summary>
+        <div class="row gap-lg acct-actions">
+          <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ على كل القنوات</button>
+          <button class="btn btn-ghost" id="autoGenArticle" data-act="article_random">${articleLabel}</button>
+        </div>
+      </details>
       <p class="hint">«تشغيل الآن» يُنتج فيديو وينشره فورًا (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>`;
 
     this.renderPlatformChecks(data);
@@ -439,11 +444,10 @@ window.PublishApp = {
         <button class="btn btn-ghost" id="quickRenderTest" data-act="selftest_deep">🎬 اختبار توليد فيديو</button>
         <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل الكل الآن</button>
         ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button>'}
-      </div>
-      ${this.lastDailyLine || ""}
-      ${this.lastReauthLine || ""}
-      ${this.lastCheckLine || ""}
-      ${this.lastDiagBox || ""}`;
+      </div>`;
+    // نتائج التشغيل والفحص والتنبيهات لا تختفي داخل التشخيص المغلق.
+    const alerts = document.getElementById("acctAlerts");
+    if (alerts) alerts.innerHTML = `${this.lastDailyLine || ""}${this.lastReauthLine || ""}${this.lastCheckLine || ""}${this.lastDiagBox || ""}`;
   },
 
   renderAccount(data = {}) {
@@ -464,27 +468,6 @@ window.PublishApp = {
     this.renderAutoPanel(data);
     this.renderHistory(runs);
     this.renderTools(data);
-
-    /* منصات الجدولة اليدوية */
-    const schedWrap = document.getElementById("schedPlatforms");
-    if (schedWrap) {
-      schedWrap.innerHTML = this.available.map((p) =>
-        `<label class="chk"><input type="checkbox" data-platform="${this.esc(p.key)}" ${p.publish ? "" : "disabled"}> ${this.esc(p.name)}</label>`
-      ).join("");
-    }
-
-    /* مكتبة المقالات */
-    const articles = document.getElementById("acctArticles");
-    if (articles) {
-      const n = data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : 0;
-      if (n) {
-        articles.style.display = "";
-        articles.innerHTML = `<div class="acct-sec-head"><h2>📚 مكتبة المقالات</h2><span class="hint">${n.toLocaleString("ar-EG")} مقال جاهز للتوليد</span></div>
-          <div class="row gap-lg" id="articleCards"><p class="hint">استخدم زر «توليد من مقال» لاختيار مقال عشوائي وتحويله إلى فيديو.</p></div>`;
-      } else {
-        articles.style.display = "none";
-      }
-    }
   },
 
   /* قائمة الحسابات المرتبطة + أزرار ربط/فك ربط لكل منصة */
@@ -540,7 +523,7 @@ window.PublishApp = {
           <div class="chan-list">${mine.map(one).join("")}</div>
           <div class="chan-foot">
             ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}">➕ إضافة قناة</button>` : ""}
-            <small class="hint">يُنشر على القناة الافتراضية (⭐). أضف قناة ثانية بتسجيل الدخول بحساب جوجل الذي يملكها.</small>
+            <small class="hint">${this.data?.config?.all_channels ? "اختيارك الحالي: النشر على كل القنوات المرتبطة." : "اختيارك الحالي: النشر على القناة الافتراضية (⭐)."} أضف قناة ثانية بحساب صاحبها.</small>
           </div>
         </div>`;
       }
@@ -701,7 +684,7 @@ window.PublishApp = {
       autoSave: "save", autoRun: "run", autoRunAll: "run_all",
       autoGenArticle: "article_random", quickGenArticle: "article_random",
       quickRunAll: "run_all", quickSelfTest: "selftest", quickRenderTest: "selftest_deep",
-      schedSave: "schedule", btnRetryPublish: "retry_publish",
+      btnRetryPublish: "retry_publish",
     };
 
     root.addEventListener("click", async (e) => {
@@ -717,7 +700,6 @@ window.PublishApp = {
       if (act === "article_random") return this.randomArticle(el);
       if (act === "selftest") return this.runSelfTest(el, false);
       if (act === "selftest_deep") return this.runSelfTest(el, true);
-      if (act === "schedule") return this.scheduleHint();
       if (act === "retry_publish") return this.retryPublish(el);
     });
 
@@ -831,20 +813,6 @@ window.PublishApp = {
       if (typeof toast === "function") toast("تعذّر الاتصال بالخادم", "err");
     }
     if (btn) { btn.disabled = false; btn.textContent = "🔁 انشر الفيديو الجاهز"; }
-  },
-
-  scheduleHint() {
-    const title = document.getElementById("schedTitle")?.value;
-    const time = document.getElementById("schedTime")?.value;
-    const platforms = [...document.querySelectorAll("#schedPlatforms input[data-platform]:checked:not(:disabled)")].map((i) => i.dataset.platform);
-    if (!title || !time || platforms.length === 0) {
-      if (typeof toast === "function") toast("اكتب العنوان والوقت واختر منصة أولًا", "err");
-      else alert("يرجى ملء العنوان والوقت واختيار المنصات");
-      return;
-    }
-    /* الجدولة على الخادم تحتاج ملف الفيديو — نوجّه الطريق الصحيح بدل طلب فاشل */
-    const msg = "الجدولة من هنا تحتاج فيديو مُصدَّرًا.\nأنشئ الفيديو من صانع الريلز ثم اضغط «جدولة للنشر»، أو استخدم «تشغيل الآن» للنشر الفوري.";
-    if (typeof toast === "function") toast(msg); else alert(msg);
   },
 
   /* فحص محرّك التوليد: سريع (يقلع المتصفح) وعميق (يُنتج فيديو قصيرًا فعلًا) */

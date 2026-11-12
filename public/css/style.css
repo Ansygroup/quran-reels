@@ -825,3 +825,36 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .acct-progress .progress-steps,.acct-progress .progress-channels{margin:12px 0;padding-inline-start:1.5rem;display:grid;gap:.5rem}
 .acct-progress .progress-steps{list-style:none;padding-inline-start:0}
 .acct-progress .progress-channels a{color:var(--gold,#c99838);text-decoration:underline}
+
+/* ترتيب لوحة الحساب: الأولوية للحالة والمتابعة، والتفاصيل الأقل استخدامًا قابلة للفتح. */
+.acct-wrap{max-width:1040px;padding-top:38px;padding-bottom:72px}
+.acct-hero{background:linear-gradient(130deg,rgba(25,67,52,.94),rgba(8,25,20,.96));border-color:rgba(212,175,55,.25);border-radius:22px;padding:30px;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+.acct-hero-l h1{font-size:2.15rem;letter-spacing:-.02em}
+.acct-hero-l .lead{max-width:490px;line-height:1.8}
+.acct-status{background:rgba(3,15,11,.48);padding:18px;border-radius:16px}
+.acct-steps{gap:10px;margin-top:14px}
+.acct-step{background:rgba(14,35,27,.8)}
+.acct-sec{border-radius:20px;padding:24px;margin-top:16px}
+.acct-sec-head{margin-bottom:16px}
+.acct-sec-head h2{font-size:1.18rem}
+.acct-sec-head .hint{margin-top:5px}
+.acct-progress{border-color:rgba(212,175,55,.23)}
+.acct-kpis{margin-top:16px}
+#acctAlerts:not(:empty){margin-top:14px;padding:4px 18px;border:1px solid var(--line-2);border-radius:16px;background:rgba(14,35,27,.8)}
+#acctAlerts .auto-warning{margin:10px 0}
+.acct-actions{gap:10px}
+.acct-more{margin-top:16px}
+.acct-more summary,.acct-disclosure summary{cursor:pointer;color:var(--gold-3);font-weight:700}
+.acct-more summary:focus-visible,.acct-disclosure summary:focus-visible{outline:2px solid var(--gold);outline-offset:5px;border-radius:4px}
+.acct-disclosure summary small{font-weight:400;color:var(--muted);margin-inline-start:10px}
+.acct-disclosure[open] summary{margin-bottom:14px}
+.acct-disclosure .hint{line-height:1.8}
+#queueList:empty{display:none}
+@media(max-width:760px){
+  .acct-wrap{padding-top:22px;padding-bottom:48px}
+  .acct-hero{padding:22px;gap:18px}
+  .acct-hero-l h1{font-size:1.8rem}
+  .acct-sec{padding:19px}
+  .acct-actions .btn{flex:1 1 auto;white-space:normal;text-align:center}
+  .acct-disclosure summary small{display:block;margin:4px 22px 0 0}
+}
