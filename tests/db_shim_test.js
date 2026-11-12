@@ -63,6 +63,15 @@ const reset = () => { calls.length = 0; };
     body.kind === "reauth_needed" && body.ok === false && body.detail && body.detail.platform === "youtube",
     last().body);
 
+  reset();
+  await q(`insert into system_checks (kind, ok, detail) values ('reauth_needed', false, $1::jsonb)`,
+    [JSON.stringify({ platform: "youtube", connection_id: "c1" })]);
+  chk("نص ::jsonb يتحول لكائن لا نص مزدوج", JSON.parse(last().body).detail.connection_id === "c1", last().body);
+  let badJson = false;
+  try { await q(`insert into system_checks (kind, ok, detail) values ('reauth_needed', false, $1::jsonb)`, ["not-json"]); }
+  catch { badJson = true; }
+  chk("نص jsonb غير الصالح يُرفض", badJson);
+
   /* 4) <> و now() - interval */
   reset();
   await q(`update autopilot_runs set status='published', external_url=$3, error=null, completed_at=now()
@@ -119,6 +128,7 @@ const reset = () => { calls.length = 0; };
       const sql = m[1].replace(/\s+/g, " ").trim();
       if (/\$\{/.test(sql)) { skipped.push({ rel, sql }); continue; }
       const dummy = Array.from({ length: 12 }, (_, i) => (i === 0 ? "11111111-1111-1111-1111-111111111111" : "x"));
+      for (const m of sql.matchAll(/\$(\d+)::jsonb/gi)) dummy[Number(m[1]) - 1] = '{}';
       reset();
       try {
         await q(sql, dummy);

@@ -422,7 +422,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=25/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=26/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -491,10 +491,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v25 / sw qr-v27)",
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v6 / publish v26 / sw qr-v28)",
     /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=6/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v27/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v28/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
@@ -547,13 +547,28 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   setDb({
     q1: async () => null,
     rest: async (p2) => {
-      if (/system_checks/.test(p2)) return [{ detail: { platform: "youtube", reason: "invalid_grant" }, created_at: "2026-11-12T04:32:00Z" }];
+      if (/social_connections/.test(p2)) return [{ id: "c1", platform: "youtube", account_name: "قناتي", updated_at: "2026-11-12T04:00:00Z" }];
+      if (/system_checks/.test(p2)) return [{ detail: { connection_id: "c1", platform: "youtube", reason: "invalid_grant" }, created_at: "2026-11-12T04:32:00Z" }];
       return [];
     },
   });
   const acctRe = await T.accountData("u9");
   chk("accountData يبلّغ عن منصة من system_checks(reauth_needed)",
     Array.isArray(acctRe.reauth) && acctRe.reauth.includes("youtube"), JSON.stringify(acctRe.reauth));
+
+  setDb({ q1: async () => null, rest: async (p2) => {
+    if (/social_connections/.test(p2)) return [{ id: "mine", platform: "youtube", updated_at: "2026-11-12T05:00:00Z" }];
+    if (/system_checks/.test(p2)) return [{ detail: { connection_id: "other", platform: "youtube" }, created_at: "2026-11-12T06:00:00Z" }];
+    return [];
+  }});
+  chk("علامة حساب آخر لا تظهر في لوحتي", !(await T.accountData("u9")).reauth.includes("youtube"));
+  setDb({ rest: async (p2) => {
+    if (/social_connections/.test(p2)) return [{ id: "mine", platform: "youtube", updated_at: "2026-11-12T05:00:00Z" }];
+    if (/system_checks/.test(p2)) return [{ detail: { connection_id: "mine", platform: "youtube" }, created_at: "2026-11-12T04:00:00Z" }];
+    if (/publish_queue/.test(p2)) return [{ platform: "youtube", error: "invalid_grant", updated_at: "2026-11-12T04:00:00Z" }];
+    return [];
+  }});
+  chk("التحذير القديم يختفي بعد إعادة ربط ناجحة", !(await T.accountData("u9")).reauth.includes("youtube"));
 
   setDb({
     q1: async () => null,

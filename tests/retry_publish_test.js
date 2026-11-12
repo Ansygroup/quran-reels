@@ -90,6 +90,15 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimR
   const out3 = await T.retryPublishFailed("u1", "2026-11-12");
   chk("منصتان مختلفتان ⇒ نشر مرتين", pub.calls.length === 2 && out3.published.length === 2, JSON.stringify(out3));
 
+  reset();
+  qRows = [
+    { id: "c1", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "c2", platform: "youtube", connection_id: "channel2", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "c3", platform: "youtube", connection_id: "channel1", video_path: "u/autopilot/2026-11-12-a.mp4" },
+  ];
+  const channels = await T.retryPublishFailed("u1", "2026-11-12");
+  chk("إعادة النشر تحفظ القناتين وتحذف المكرر لنفس القناة فقط", pub.calls.join(",") === "c1,c2" && channels.duplicates === 1, JSON.stringify(channels));
+
   /* 4) فشل النشر لا يرمي ويُحصى */
   reset();
   qRows = [{ id: "f1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }];
@@ -132,6 +141,25 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimR
   };
   const created = await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/y.mp4", videoName: "v.mp4", meta: { title: "t", caption: "c", hashtags: "#a" } });
   chk("بلا صفّ قائم يُدرج صفًّا واحدًا", created && created.id === "new1" && posts2.length === 1, JSON.stringify({ created, posts2: posts2.length }));
+
+  const seenPaths = [];
+  impl.rest = async (p, opts = {}) => {
+    if (!opts.method) { seenPaths.push(p); return []; }
+    if (opts.method === "POST") return [{ id: "new" }];
+    return [];
+  };
+  await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: "c1", storagePath: "u/autopilot/x.mp4", videoName: "x", meta: {} });
+  await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: "c2", storagePath: "u/autopilot/x.mp4", videoName: "x", meta: {} });
+  chk("فحص التكرار مقيّد بمعرّف القناة", /connection_id=eq\.c1/.test(seenPaths[0]) && /connection_id=eq\.c2/.test(seenPaths[1]));
+  let writes = 0;
+  impl.rest = async (p, opts = {}) => { if (opts.method === "POST") writes++; throw new Error("db unavailable"); };
+  let rejected = false;
+  try { await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: "c1", storagePath: "x", meta: {} }); } catch { rejected = true; }
+  chk("فشل فحص التكرار لا يُدرج صفًا جديدًا", rejected && writes === 0);
+
+  impl.rest = async () => [{ id: "fb", platform: "facebook" }, { id: "ig", platform: "instagram" }];
+  const igConns = await T.connectionsFor("u1", "instagram");
+  chk("قنوات إنستغرام لا تشمل صفوف فيسبوك", igConns.length === 1 && igConns[0].id === "ig");
 
   /* 4d) صفّ عالق في publishing لا يضيع اليوم بصمت */
   chk("reclaimStalePublishing مُصدَّرة", typeof A.reclaimStalePublishing === "function" && typeof T.reclaimStalePublishing === "function");

@@ -148,7 +148,7 @@ async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
   const { rows: runs } = await loadRuns(uid);
   // دعم تعدد القنوات
-  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name`);
+  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name,updated_at`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
@@ -175,7 +175,7 @@ async function accountData(uid) {
     // آخر تشغيل آلي: يومه وحالته وسببه ورابطه (null إن لم يجرِ بعد)
     last_daily: await lastDaily(uid),
     // منصات ربطها انتهى (invalid_grant) — اللوحة تعرض تنبيهًا صريحًا
-    reauth: await reauthPlatforms(uid),
+    reauth: await reauthPlatforms(uid, connections),
     // حصيلة الأتمتة (منشور/فاشل/مجدول + آخر رابط) لبطاقة الحالة
     stats: await accountStats(uid),
     // تفضيلات قابلة للتحرير: الأنماط والخلفيات والقُرّاء المتاحون
@@ -192,19 +192,26 @@ async function accountData(uid) {
  * — الثاني يغطي ما وقع قبل وجود العلامة. (social_connections.meta مشفّر،
  * فلا يصلح لعلامة تُقرأ — درس 2026-11-12.) */
 const REAUTH_RE = /invalid_grant|invalid_client|unauthorized_client|expired or revoked/i;
-async function reauthPlatforms(uid) {
+async function reauthPlatforms(uid, connections = []) {
   const out = new Set();
+  // لا نقرأ علامة حساب آخر: الربط الوحيد بين الفحص وصاحبه هو connection_id.
+  // تحديث القناة بعد فشل قديم يعني أن المستخدم أعاد الربط أو نجح التجديد.
+  for (const conn of Array.isArray(connections) ? connections : []) {
+    if (!conn?.id || !conn.platform) continue;
+    try {
+      const checks = await rest(`/rest/v1/system_checks?kind=eq.reauth_needed&detail->>connection_id=eq.${encodeURIComponent(conn.id)}&select=detail,created_at&order=created_at.desc&limit=1`);
+      const c = Array.isArray(checks) ? checks[0] : null;
+      if (c && c.detail?.connection_id === conn.id && c.detail?.platform === conn.platform &&
+          (!conn.updated_at || Date.parse(c.created_at) >= Date.parse(conn.updated_at))) out.add(conn.platform);
+    } catch { /* تظهر أخطاء النشر الخاصة بالمستخدم أدناه */ }
+  }
   try {
-    const checks = await rest(`/rest/v1/system_checks?kind=eq.reauth_needed&select=detail,created_at&order=created_at.desc&limit=5`);
-    for (const c of Array.isArray(checks) ? checks : []) {
-      const d = c && c.detail && typeof c.detail === "object" ? c.detail : {};
-      if (d.platform) out.add(String(d.platform));
-    }
-  } catch { /* لا نُسقط اللوحة */ }
-  try {
-    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,error&order=created_at.desc&limit=20`);
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=platform,connection_id,error,updated_at&order=updated_at.desc&limit=20`);
     for (const r of Array.isArray(rows) ? rows : []) {
-      if (r && r.platform && REAUTH_RE.test(String(r.error || ""))) out.add(r.platform);
+      if (!r?.platform || !REAUTH_RE.test(String(r.error || ""))) continue;
+      const linked = (Array.isArray(connections) ? connections : []).filter(c => c.platform === r.platform && (!r.connection_id || c.id === r.connection_id));
+      // أخطاء الصفوف القديمة لا تتغلب على إعادة الربط الناجحة.
+      if (linked.some(c => !c.updated_at || !r.updated_at || Date.parse(r.updated_at) >= Date.parse(c.updated_at))) out.add(r.platform);
     }
   } catch { /* لا نُسقط اللوحة */ }
   return [...out];

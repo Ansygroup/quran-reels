@@ -206,7 +206,7 @@ window.PublishApp = {
   /* ---------- تنبيه إعادة الربط + زر نشر الفيديو الجاهز ---------- */
   reauthLineHTML(list) {
     const arr = (Array.isArray(list) ? list : []).filter((p) => typeof p === "string" && p);
-    if (!arr.length) {
+    if (!Array.isArray(list)) {
       const raw = `${(this.data && this.data.last_daily && this.data.last_daily.error) || ""} ${(this.data && this.data.last_check && this.data.last_check.detail && this.data.last_check.detail.error) || ""}`;
       if (/invalid_grant|expired or revoked|unauthorized_client/i.test(raw)) {
         arr.push(/tiktok/i.test(raw) ? "tiktok" : /youtube/i.test(raw) ? "youtube" : "youtube");
@@ -385,6 +385,7 @@ window.PublishApp = {
         <button class="btn btn-ghost" id="quickSelfTest" data-act="selftest">🔍 فحص محرّك التوليد</button>
         <button class="btn btn-ghost" id="quickRenderTest" data-act="selftest_deep">🎬 اختبار توليد فيديو</button>
         <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل الكل الآن</button>
+        ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button>'}
       </div>
       ${this.lastDailyLine || ""}
       ${this.lastReauthLine || ""}

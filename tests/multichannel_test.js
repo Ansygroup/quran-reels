@@ -69,7 +69,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("القناة الافتراضية تتقدّم على الأحدث", PICK([older, { ...newer, is_default: true }])?.id === "b");
   chk("الافتراضية الأقدم تفوز أيضًا", PICK([{ ...older, is_default: true }, newer])?.id === "a");
   chk("قناة مطلوبة صراحةً تفوز على الافتراضية", PICK([{ ...older, is_default: true }, newer], "b")?.id === "b");
-  chk("قناة مطلوبة غير مملوكة ⇒ تراجع للافتراضية", PICK([{ ...older, is_default: true }, newer], "zzz")?.id === "a");
+  chk("قناة مطلوبة غير مملوكة ⇒ لا نشر على الافتراضية", PICK([{ ...older, is_default: true }, newer], "zzz") === null);
   chk("قائمة فارغة ⇒ null", PICK([]) === null && PICK(null) === null);
   chk("قيمة is_default بصيغة Postgres ('t') تُفهم", PICK([older, conn("c", { is_default: "t" })])?.id === "c");
 
@@ -148,9 +148,9 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
   chk("تلميح أن النشر على القناة الافتراضية", /يُنشر على القناة الافتراضية/.test(ui));
-  chk("الكاش مكسور (v=25 / qr-v27) في الماركب والخدمة",
-    /publish\.js\?v=25/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v27/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("الكاش مكسور (v=26 / qr-v28) في الماركب والخدمة",
+    /publish\.js\?v=26/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v28/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
