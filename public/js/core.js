@@ -387,7 +387,9 @@ function accordionify(root) {
     if (!q || !a) return;
     q.addEventListener("click", () => {
       const open = item.classList.toggle("open");
-      a.style.maxHeight = open ? a.scrollHeight + "px" : "0";
+      // إخفاء الإجابة فعليًا يطابق حالتها لقارئ الشاشة ويمنع قصّها عند تغيير العرض.
+      q.setAttribute("aria-expanded", String(open));
+      a.hidden = !open;
     });
   });
 }
