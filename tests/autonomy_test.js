@@ -176,7 +176,12 @@ const mkRoute = (url) => {
   impl.q = async (sql, params) => { dbCalls.push({ sql, params }); return []; };
   const closed = await T.closeStaleRuns(45);
   chk("ينظّف autopilot_runs العالقة", closed === true && dbCalls.some((c) => /status='rendering'/.test(c.sql) && /completed_at=now\(\)/.test(c.sql)));
-  chk("لا يمسّ التشغيلات الحديثة (نافذة زمنية)", dbCalls.some((c) => /\(\$2 \|\| ' minutes'\)::interval/.test(c.sql)));
+  const staleCall = dbCalls.find((c) => /status='rendering'/.test(c.sql)) || { params: [] };
+  const windowMin = (staleCall.params[1] ? Date.now() - Date.parse(staleCall.params[1]) : 0) / 60000;
+  /* طبقة db تُترجم إلى PostgREST ولا تفهم `now() - ($2 || ' minutes')::interval`،
+   * فكان الشرط الزمني يسقط ⇒ كل تشغيل 'rendering' يُغلق مهما كان عمره. */
+  chk("لا يمسّ التشغيلات الحديثة (نافذة زمنية فعلية)", /created_at < \$2/.test(staleCall.sql || "") && Math.abs(windowMin - 45) < 1,
+    JSON.stringify({ window: windowMin, sql: String(staleCall.sql || "").slice(0, 90) }));
 
   /* 8) الترتيب في التشغيل اليومي: تنظيف ← فحص ← توليد */
   const src2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
@@ -419,7 +424,8 @@ const mkRoute = (url) => {
   await T.catchUpDaily();
   const stale = sqlSeen.find((c) => /update autopilot_runs set status='failed'/.test(c.sql));
   chk("الإنقاذ يغلق التشغيلات العالقة قبل الحكم عليها",
-    Boolean(stale) && JSON.stringify(stale.params) === JSON.stringify(["أُغلقت تلقائيًا: تجاوزت المهلة بلا نتيجة (تنظيف تلقائي)", "20"]),
+    Boolean(stale) && /تنظيف تلقائي/.test(String(stale.params[0])) &&
+    Math.abs((Date.now() - Date.parse(stale.params[1])) / 60000 - 20) < 1,
     stale ? JSON.stringify(stale.params) : "لم يُستدعَ closeStaleRuns");
   /* والصفّ العالق فعليًا لا يُقرأ «جارٍ» بعد التنظيف: نتحقق من الترتيب في المصدر */
   const cuSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
@@ -431,7 +437,9 @@ const mkRoute = (url) => {
   impl.q = async (sql) => {
     const s2 = String(sql);
     if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
-    if (/from publish_queue/i.test(s2) && /status='published'/i.test(s2)) return [{ id: "qp" }];
+    /* الفلترة على يوم التشغيل صارت في جافاسكربت (لا like في SQL) — فالبديل
+     * يجب أن يحمل مسارًا يحمل علامة اليوم الفعلي. */
+    if (/from publish_queue/i.test(s2) && /status='published'/i.test(s2)) return [{ id: "qp", video_path: `u1/autopilot/${A.cairoDate()}-run1.mp4` }];
     if (/from publish_queue/i.test(s2)) return [];
     return [];
   };
@@ -448,7 +456,20 @@ const mkRoute = (url) => {
     { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" },
   ] : []);
   const bfPub = await T.backfillDaily();
-  chk("التعويض يتخطى يومًا فيه نشر فعلي", bfPub.length === 1 && bfPub[0].skipped === "already-published" && bfPub[0].day === "2026-11-11", JSON.stringify(bfPub));
+  /* كان الاختبار يتوقّع «already-published» لليوم 11 لأن dayHasPublish كانت
+   * تُسقط شرط المسار فترى صفوف اليوم 12 وتقول «نُشر» لكل يوم. الصواب: اليوم 12
+   * منشور (يُتخطى)، واليوم 11 فاشل فيُعالَج. */
+  chk("التعويض يعالج اليوم الفاشل (11) ولا يعيد المنشور (12)",
+    bfPub.length === 1 && bfPub[0].day === "2026-11-11" && bfPub[0].backfill === true, JSON.stringify(bfPub));
+
+  /* الفحص السلوكي للدالة نفسها: يوم بيوم لا «أي صفّ منشور» */
+  impl.q = async (sql) => {
+    if (/status='published'/i.test(sql)) return [{ id: "p1", video_path: "u1/autopilot/2026-11-12-run1.mp4" }];
+    return [];
+  };
+  const has12 = await T.dayHasPublish("u1", "2026-11-12");
+  const has11 = await T.dayHasPublish("u1", "2026-11-11");
+  chk("dayHasPublish تخصّ اليوم المطلوب (لا «أي صفّ منشور»)", has12 === true && has11 === false, JSON.stringify({ has12, has11 }));
 
   chk("dayHasPublish متاحة ومحصورة بصفوف published",
     typeof T.dayHasPublish === "function" && /status='published'/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));

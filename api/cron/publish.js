@@ -2,7 +2,7 @@
 const { q } = require("../../lib/db");
 const { publishRow } = require("../../lib/publish");
 const { json } = require("../../lib/oauth");
-const { runDailyAutopilots } = require("../../lib/autopilot");
+const { runDailyAutopilots, reclaimStalePublishing } = require("../../lib/autopilot");
 
 module.exports = async (req, res) => {
   const auth = req.headers.authorization || "";
@@ -21,6 +21,10 @@ module.exports = async (req, res) => {
         [JSON.stringify({ error: reason, source: "cron_publish", at: new Date().toISOString() })]);
     } catch { /* لا نُسقط الكرون بسبب التسجيل */ }
   }
+  /* صفّ بقي 'publishing' بعد إنهاء الدالة في تشغيل سابق لا يلتقطه أي مسار:
+   * نُعيده 'failed' أولًا حتى يُعاد نشره بدل أن يضيع اليوم بصمت. */
+  let reclaimed = 0;
+  try { reclaimed = await reclaimStalePublishing({ minutes: 20 }); } catch { reclaimed = 0; }
   const rows = await q(
     `select * from publish_queue where status='scheduled' and publish_at <= now() order by publish_at asc limit 12`
   );
@@ -34,5 +38,5 @@ module.exports = async (req, res) => {
   const autoFail = autopilot.filter(x => x && x.ok === false).length;
   const autoErrors = autopilot.filter(x => x && x.ok === false)
     .map(x => String(x.error || "").slice(0, 160)).filter(Boolean);
-  json(res, 200, { ran: rows.length, ok, fail, errors, autopilot: { ran: autopilot.length, ok: autoOk, fail: autoFail, errors: autoErrors }, at: new Date().toISOString() });
+  json(res, 200, { ran: rows.length, ok, fail, errors, reclaimed, autopilot: { ran: autopilot.length, ok: autoOk, fail: autoFail, errors: autoErrors }, at: new Date().toISOString() });
 };
