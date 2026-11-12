@@ -148,10 +148,10 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("بطاقة القنوات تعرض شارة ⭐ افتراضية", /⭐ افتراضية/.test(ui));
   chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
-  chk("تلميح أن النشر على القناة الافتراضية", /يُنشر على القناة الافتراضية/.test(ui));
-  chk("الكاش مكسور (v=29 / qr-v31) في الماركب والخدمة",
-    /publish\.js\?v=29/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v31/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("تلميح أن النشر على القناة الافتراضية", /اختيارك الحالي: النشر على القناة الافتراضية/.test(ui) && /اختيارك الحالي: النشر على كل القنوات المرتبطة/.test(ui));
+  chk("الكاش مكسور (v=30 / qr-v32) في الماركب والخدمة",
+    /publish\.js\?v=30/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v32/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
