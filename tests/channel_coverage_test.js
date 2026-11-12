@@ -57,5 +57,14 @@ global.fetch = async (url, opts = {}) => {
   mode = "normal"; requests = []; patches = [];
   const missing = await A.generateAndPublish("u1", { runType: "daily", config: { platforms: ["youtube", "tiktok"], all_channels: true } });
   assert.equal(missing.ok, false); assert.match(missing.error, /tiktok/); assert(patches.some(p => p.status === "failed")); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
+  // الإعداد التالف يتوقف قبل قراءة القنوات أو رفع/إدراج فيديو، ولا يُسقط هدفًا بصمت.
+  for (const platforms of [[], ['youtube', 'telegram'], ['youtube', 'youtube'], null, 'youtube']) {
+    requests = []; patches = [];
+    const bad = await A.generateAndPublish('u1', { runType: 'manual', config: { platforms, all_channels: true } });
+    assert.equal(bad.ok, false); assert.match(bad.error, /منصة|المنصات/);
+    assert(patches.some(p => p.status === 'failed'));
+    assert(!requests.some(r => r.u.pathname.includes('social_connections') || r.u.pathname.includes('publish_queue')));
+    assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
+  }
   console.log("ALL OK: 205 قنوات عبر الصفحات، فشل مغلق، واستقلال محاولة كل قناة محاكيًا");
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -384,6 +384,16 @@ window.fetch = async (url, opts = {}) => {
   await window.PublishApp.renderConnections("test-token");
   if (!groups.querySelector('[data-connect="youtube"]') || groups.querySelector('[data-connect="youtube"]').closest('#acctMorePlatforms')) fail("المستخدم الجديد لا يرى زر ربط يوتيوب مباشرة");
   else ok("المستخدم بلا قنوات يرى خيارات الربط المتاحة مباشرة");
+  // إلغاء كل المنصات أثناء الإيقاف يُرسل قائمة فارغة لا اختيار يوتيوب بديلًا.
+  window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, enabled: false, platforms: [], all_channels: true } });
+  let savedEmpty = null;
+  window.fetch = async (url, opts = {}) => {
+    savedEmpty = JSON.parse(opts.body);
+    return { ok: true, status: 200, json: async () => ({ ok: true, config: savedEmpty }) };
+  };
+  const emptyResult = await window.PublishApp.saveSettings({ enabled: false });
+  if (!emptyResult.ok || savedEmpty.enabled !== false || savedEmpty.platforms.length !== 0 || savedEmpty.all_channels !== true || window.PublishApp.data.config.platforms.length !== 0) fail("حفظ الإيقاف غيّر اختيار المنصات الفارغ");
+  else ok("حفظ الإيقاف يحافظ على القائمة الفارغة وخيار كل القنوات");
   window.fetch = async () => { throw Error("offline"); };
   await window.PublishApp.renderConnections("test-token");
   if (!/تعذّر تحميل الحسابات/.test(groups.textContent)) fail("فشل قراءة القنوات لا يظهر");

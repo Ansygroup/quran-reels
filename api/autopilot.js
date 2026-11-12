@@ -5,7 +5,7 @@ const { json, configured } = require("../lib/oauth");
 const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest, publishReadyToday } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
-const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST } = require("../lib/platforms");
+const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST, validatePlatforms } = require("../lib/platforms");
 
 /* أي مزوّد OAuth يخدم كل منصة (facebook/instagram يتشاركان تطبيق Meta) */
 const CONNECT_PROVIDER = { youtube: "youtube", facebook: "meta", instagram: "meta", tiktok: "tiktok", x: "x" };
@@ -273,9 +273,11 @@ const handler = async (req, res) => {
       const background = BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate";
       const enabled = body.enabled === true;
       
-      // دعم تعدد القنوات
-      const platforms = Array.isArray(body.platforms) && body.platforms.length > 0 ? body.platforms : ["youtube"];
-      
+      // حفظ اختيار فارغ أثناء الإيقاف لا يختار يوتيوب بالنيابة عن المستخدم.
+      const platforms = body.platforms;
+      const platformError = validatePlatforms(platforms, { allowEmpty: !enabled });
+      if (platformError) return json(res, 400, { error: platformError });
+
       if (enabled) {
         /* نفس عطل الاقتباس المفرد في in.(…) — كان يرفض التفعيل بـ409 رغم
          * أن القناة مربوطة. نقارن في JavaScript. */
