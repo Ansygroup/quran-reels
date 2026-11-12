@@ -392,7 +392,7 @@ const mkRoute = (url) => {
   const cPartial = await T.catchUpDaily();
   chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "partial-publish" && cPartial[0].ok === false, JSON.stringify(cPartial).slice(0, 240));
 
-  /* فشل النشر كله ⇒ لا شيء منشور، فيجوز إعادة التوليد الكاملة */
+  /* فشل النشر كله ⇒ الفيديو الجاهز يبقى ولا نعيد توليده */
   impl.q = async (sql) => (/from publish_queue/i.test(sql)
     ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube")])
     : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []));
@@ -400,7 +400,7 @@ const mkRoute = (url) => {
   pub.impl = async () => ({ ok: false, error: "token" });
   global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button>' });
   const cFull = await T.catchUpDaily();
-  chk("فشل النشر كله ⇒ يكمل لإعادة التوليد", cFull.length === 1 && cFull[0].catchup === true && pub.calls.length === 1, JSON.stringify(cFull).slice(0, 240));
+  chk("فشل النشر كله ⇒ لا إعادة توليد", cFull.length === 1 && cFull[0].skipped === "publish-failed" && pub.calls.length === 1, JSON.stringify(cFull).slice(0, 240));
 
   /* لا صفوف فاشلة ⇒ لا استدعاء للنشر */
   impl.q = async (sql) => (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
