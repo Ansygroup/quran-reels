@@ -83,7 +83,7 @@ let _toolImplsP = null;
 function ensureToolImpls() {
   if (!_toolImplsP) {
     _toolImplsP = Promise.all(
-      ["js/tools-a.js?v=4", "js/tools-b.js?v=3", "js/tools-c.js?v=3"].map(src =>
+      ["js/tools-a.js?v=5", "js/tools-b.js?v=3", "js/tools-c.js?v=3"].map(src =>
         new Promise((res, rej) => {
           const sc = document.createElement("script");
           sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error(src));

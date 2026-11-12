@@ -149,9 +149,9 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
   chk("تلميح أن النشر على القناة الافتراضية", /اختيارك الحالي: النشر على القناة الافتراضية/.test(ui) && /اختيارك الحالي: النشر على كل القنوات المرتبطة/.test(ui));
-  chk("الكاش مكسور (v=35 / qr-v44) في الماركب والخدمة",
+  chk("الكاش مكسور (v=35 / qr-v45) في الماركب والخدمة",
     /publish\.js\?v=35/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v44/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v45/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");
