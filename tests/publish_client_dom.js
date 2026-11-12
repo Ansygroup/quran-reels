@@ -214,7 +214,7 @@ window.fetch = async (url, opts = {}) => {
     calls.length = 0; alerts.length = 0;
     el.dispatchEvent(new window.Event("click", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 30));
-    return calls[0] || null;
+    return calls.find((c) => c.method === "POST") || calls[0] || null;
   };
 
   const cases = [

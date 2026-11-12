@@ -109,6 +109,35 @@ async function loadRuns(uid) {
   }
 }
 
+/* قراءة آخر تشغيل فقط وبنطاق صاحب الجلسة؛ لا نعيد مسار الملف أو التوكنات. */
+const PROGRESS_STAGES = new Set(["checking", "preparing", "audio", "export", "validating", "storage", "queue", "publishing"]);
+async function latestProgress(uid) {
+  const runs = await rest(`/rest/v1/autopilot_runs?user_id=eq.${encodeURIComponent(uid)}&select=id,user_id,status,title,error,video_path,created_at,updated_at,started_at,completed_at&order=created_at.desc,id.desc&limit=1`);
+  if (!Array.isArray(runs)) throw new Error("تعذّر قراءة حالة التشغيل");
+  const run = runs[0];
+  if (!run) return { run: null };
+  if (String(run.user_id) !== String(uid) || !run.id) throw new Error("تعذّر التحقق من صاحب التشغيل");
+  let events = [], targets = [], eventsAvailable = true, targetsAvailable = true, targetsTruncated = false;
+  try {
+    const rows = await rest(`/rest/v1/system_checks?kind=eq.autopilot_progress&detail->>user_id=eq.${encodeURIComponent(uid)}&detail->>run_id=eq.${encodeURIComponent(run.id)}&select=detail,created_at${run.started_at ? `&created_at=gte.${encodeURIComponent(run.started_at)}` : ""}&order=created_at.asc&limit=30`);
+    if (!Array.isArray(rows)) throw new Error("invalid events");
+    events = rows.filter(r => r.detail?.user_id === uid && r.detail?.run_id === run.id && PROGRESS_STAGES.has(r.detail?.stage) && (!run.started_at || (Date.parse(r.created_at) >= Date.parse(run.started_at)))).map(r => ({ stage: r.detail.stage, at: r.created_at }));
+  } catch { eventsAvailable = false; }
+  if (run.video_path) {
+    try {
+      const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&video_path=eq.${encodeURIComponent(run.video_path)}&select=user_id,platform,connection_id,status,external_url,error&limit=100`);
+      const conns = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,user_id,platform,account_name&limit=100`);
+      if (!Array.isArray(rows) || !Array.isArray(conns)) throw new Error("invalid targets");
+      targetsTruncated = rows.length >= 100 || conns.length >= 100;
+      targets = rows.filter(r => r.user_id === uid).map(r => {
+        const c = conns.find(x => x.user_id === uid && x.id === r.connection_id && x.platform === r.platform);
+        return { platform: r.platform, channel: c?.account_name || (r.connection_id ? "قناة غير متاحة" : "قناة غير محددة في السجل"), status: r.status, url: r.external_url || null, error: r.error || null };
+      });
+    } catch { targetsAvailable = false; }
+  }
+  return { run: { id: run.id, status: run.status, title: run.title || "", error: run.error || null, created_at: run.created_at, updated_at: run.updated_at, completed_at: run.completed_at }, events, events_available: eventsAvailable, targets, targets_available: targetsAvailable, targets_truncated: targetsTruncated };
+}
+
 /* آخر نتيجة فحص محفوظة (system_checks) — اللوحة تعرضها بلا أن يضغط المستخدم شيئًا */
 async function lastSelfTest(uid) {
   if (!uid) return null;
@@ -227,7 +256,14 @@ const handler = async (req, res) => {
   } catch { /* أي خطأ في التحقق من الجلسة = غير مسجّل، لا 500 خام من Vercel */ }
   if (!uid) return json(res, 401, { error: "سجّل الدخول أولًا" });
   try {
-    if (req.method === "GET") return json(res, 200, await accountData(uid));
+    if (req.method === "GET") {
+      const url = new URL(req.url || "/api/autopilot", "http://local");
+      if (url.searchParams.get("progress") === "1") {
+        res.setHeader("Cache-Control", "no-store");
+        return json(res, 200, await latestProgress(uid));
+      }
+      return json(res, 200, await accountData(uid));
+    }
     if (req.method !== "POST") return json(res, 405, { error: "method" });
     const body = await readBody(req);
 
@@ -342,4 +378,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { accountData, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
+module.exports.__test = { accountData, latestProgress, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
