@@ -285,7 +285,7 @@
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
     },
     "api/oauth/callback.js": {
-      "maxDuration": 30
+      "maxDuration": 300
     },
     "api/autopilot.js": {
       "maxDuration": 300,
