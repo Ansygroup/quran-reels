@@ -31,8 +31,8 @@
   <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="manifest" href="/manifest.json?v=2">
 <link rel="preconnect" href="/">
-<link rel="preload" as="style" href="css/style.css?v=4">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="preload" as="style" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=12">
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
 <script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>
@@ -44,7 +44,7 @@
 <body>
 
 <!-- شريط علوي -->
-<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100% · <b>معاينة حية وإنشاء فوري — بدون انتظار وبدون حد يومي</b></div>
+<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني</div>
 
 <!-- الهيدر -->
 <header class="site-header">
@@ -79,21 +79,18 @@
   <!-- Hero -->
   <section class="hero">
     <div class="container center">
-      <div class="hero-badge">✦ مجاني 100% — بدون تسجيل وبدون تطبيق ✦</div>
+      <div class="hero-badge">✦ صمّم من متصفحك مجانًا ✦</div>
       <div class="hero-ayah">﴿ اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ ﴾</div>
-      <h1>صانع فيديو قرآن <span class="hl">فوري</span> — اصنع ريلز قرآنية في ثوانٍ</h1>
-      <p class="hero-sub">حوّل الآيات إلى فيديو قرآن عمودي MP4 جاهز للتيك توك وإنستغرام ويوتيوب شورتس — مع <b>معاينة حية أثناء التصميم</b>، وإنشاء لحظي داخل متصفحك بدون قوائم انتظار وبدون حدود يومية.</p>
+      <h1>اصنع فيديو قرآني <span class="hl">بطريقتك</span></h1>
+      <p class="hero-sub">اختار الآيات والقارئ والخلفية، وشوف المعاينة قبل ما تنشئ الفيديو وتحمله.</p>
       <div class="hero-cta">
         <a class="btn btn-gold btn-lg" href="#/" id="heroCreate">ابدأ إنشاء الفيديو ←</a>
         <a class="btn btn-ghost btn-lg" href="#/tools">تصفح الأدوات الإسلامية</a>
       </div>
-      <div class="hero-note">⚡ أسرع بـ١٠ من مواقع المونتاج التقليدية · 🔒 خلفيتك لا تُرفع لأي خادم</div>
-
       <div class="stats">
         <div class="stat"><b id="statReciters">47</b><span>قارئًا مشهورًا</span></div>
         <div class="stat"><b>114</b><span>سورة كاملة</span></div>
         <div class="stat"><b>32</b><span>أداة إسلامية</span></div>
-        <div class="stat"><b>∞</b><span>فيديوهات بدون حد</span></div>
       </div>
     </div>
   </section>
@@ -104,7 +101,7 @@
       <div class="section-head">
         <div class="eyebrow">الأداة الرئيسية</div>
         <h2>أنشئ ريلز قرآنيًا الآن</h2>
-        <p>اختر القارئ والسورة والآيات والخلفية ← شاهد المعاينة الحية ← حمّل الفيديو فورًا</p>
+        <p>خصّص الفيديو وشوف التغييرات في المعاينة.</p>
       </div>
 
       <div class="creator-wrap">
@@ -112,6 +109,7 @@
 
           <!-- المعاينة -->
           <div class="preview-col">
+            <div class="preview-label">معاينة الفيديو <span>● مباشرة</span></div>
             <div class="phone">
               <div class="phone-screen" id="phoneScreen">
                 <canvas id="reelCanvas" width="405" height="720"></canvas>
@@ -119,9 +117,9 @@
             </div>
             <div class="preview-controls">
               <div class="pctrl">
-                <button class="icon-btn" id="btnPrevAyah" title="الآية السابقة">⏭</button>
-                <button class="icon-btn big" id="btnPlay" title="تشغيل المعاينة">▶</button>
-                <button class="icon-btn" id="btnNextAyah" title="الآية التالية">⏮</button>
+                <button class="icon-btn" id="btnPrevAyah" title="الآية السابقة" aria-label="الآية السابقة">⏭</button>
+                <button class="icon-btn big" id="btnPlay" title="تشغيل المعاينة" aria-label="تشغيل أو إيقاف المعاينة">▶</button>
+                <button class="icon-btn" id="btnNextAyah" title="الآية التالية" aria-label="الآية التالية">⏮</button>
               </div>
               <div class="ayah-dots" id="ayahDots"></div>
               <div class="timebar"><i id="timeFill"></i></div>
@@ -161,12 +159,6 @@
                   <div class="label"><b>اختر القارئ</b><span class="muted">47 قارئًا — جودة عالية</span></div>
                   <select class="select" id="selReciter"></select>
                   <div class="hint">يُستخدم صوت القارئ المختار في المعاينة وفي الفيديو النهائي.</div>
-                </div>
-                <div class="card" style="padding:12px 14px">
-                  <div class="row between" style="font-size:.86rem">
-                    <span class="muted">💡 نصيحة:</span>
-                    <span>القارئ الواضحي يرفع تفاعل الريلز كثيرًا</span>
-                  </div>
                 </div>
               </div>
 
@@ -375,24 +367,19 @@
     </div>
   </section>
 
-  <!-- لماذا أفضل -->
-  <section class="section" style="padding-top:20px">
+  <!-- مميزات الصانع الأساسية دون تكرار بقية أقسام الصفحة. -->
+  <section class="section home-features" style="padding-top:20px">
     <div class="container">
       <div class="section-head">
-        <div class="eyebrow">لماذا هذا الموقع أفضل</div>
-        <h2>كل ما يحتاجه صانع المحتوى القرآني — في مكان واحد</h2>
-        <p>بنينا النسخة الكاملة من الصفر إلى الياء: أداة الإنشاء +32 أداة إسلامية، وكلها تعمل من المتصفح مباشرة</p>
+        <div class="eyebrow">ببساطة</div>
+        <h2>فيديو قرآني على ذوقك</h2>
+        <p>اختيارات تساعدك تصمّم المقطع بالطريقة اللي تناسبك.</p>
       </div>
       <div class="features">
-        <div class="feature hot"><div class="f-ic">👁️</div><h3>معاينة حية فورية</h3><p>شاهد الفيديو وهو يتغيّر مع كل اختيار — لا انتظار حتى تعرف كيف سيبدو الناتج.</p></div>
-        <div class="feature hot"><div class="f-ic">⚡</div><h3>إنشاء فوري بدون طوابير</h3><p>لا قوائم انتظار ولا «جاري الإنشاء ٣ دقائق» — يُسجَّل الفيديو لحظيًا في متصفحك.</p></div>
-        <div class="feature hot"><div class="f-ic">♾️</div><h3>بدون حدود يومية</h3><p>لا حد لعدد الفيديوهات ولا فترات تبريد — أنشئ ما شئت ومتى شئت.</p></div>
-        <div class="feature"><div class="f-ic">🎙️</div><h3>47 قارئًا مشهورًا</h3><p>من عبدالباسط والعفاسي والسديس والمنشاوي والحصري… بأعلى جودة متاحة.</p></div>
-        <div class="feature"><div class="f-ic">🌍</div><h3>ترجمة بـ8 لغات</h3><p>إنجليزية وفرنسية وتركية وإندونيسية وأردية وإسبانية وإيطالية داخل الفيديو.</p></div>
-        <div class="feature"><div class="f-ic">🔒</div><h3>خصوصية كاملة</h3><p>صورك وملفاتك لا تغادر جهازك — لا حسابات ولا رفع للخوادم.</p></div>
-        <div class="feature"><div class="f-ic">📱</div><h3>جاهز لكل المنصات</h3><p>1080×1920 عمودي لتيك توك وريلز وشورتس، مع دعم 1:1 و16:9.</p></div>
-        <div class="feature"><div class="f-ic">🎨</div><h3>تحكم كامل بالتصميم</h3><p>3 أساليب نص، 4 ألوان تمييز، حجم خط، حركة خلفية، إهداء، وعلامة مائية.</p></div>
-        <div class="feature"><div class="f-ic">🛡️</div><h3>32 أداة إسلامية</h3><p>مواقيت الصلاة، القبلة، الأذكار، الزكاة، المواريث، الأحاديث… مجانًا.</p></div>
+        <div class="feature"><div class="f-ic">👁️</div><h3>معاينة أثناء التصميم</h3><p>شوف التغييرات قبل ما تنشئ الفيديو.</p></div>
+        <div class="feature"><div class="f-ic">🎙️</div><h3>القارئ والآيات</h3><p>اختار التلاوة والمقطع اللي تحب تسمعه.</p></div>
+        <div class="feature"><div class="f-ic">🎨</div><h3>تصميم مناسب ليك</h3><p>غيّر الخلفية والأسلوب، وأضف ترجمة أو إهداء.</p></div>
+        <div class="feature"><div class="f-ic">📱</div><h3>مقاسات مختلفة</h3><p>اختار فيديو عمودي أو مربّع أو عريض.</p></div>
       </div>
     </div>
   </section>
@@ -410,25 +397,17 @@
     </div>
   </section>
 
-  <!-- المكتبة -->
-  <section class="section" id="library" style="padding-top:20px">
+  <!-- رابط واحد واضح للمكتبة بدل روابط تصنيفات لا تفتح أقسامًا فعلية. -->
+  <section class="section home-library" id="library" style="padding-top:20px">
     <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">تعلّم وانشر</div>
-        <h2>مكتبة المقالات: 7,993 دليل عملي</h2>
-        <p>أدلة مجانية عن صناعة المقاطع القرآنية والصلاة والحفظ والأذكار والمواسم والأسرة والنشر — اختر محورك أو ابحث مباشرة</p>
+      <div class="card home-library-card">
+        <div>
+          <div class="eyebrow">تعلّم وانشر</div>
+          <h2>مكتبة المقالات</h2>
+          <p>اقرأ أدلة عن صناعة المقاطع القرآنية والحفظ والأذكار والنشر.</p>
+        </div>
+        <a class="btn btn-em" href="/articles/">📚 تصفّح المقالات ←</a>
       </div>
-      <div class="lib-grid">
-        <a class="lib-card" href="/articles/#c-video"><b>صناعة المقاطع القرآنية</b><span>أفكار الريلز وخطوات الإنتاج والتصدير</span></a>
-        <a class="lib-card" href="/articles/#c-reciters"><b>أصوات التلاوة والقرّاء</b><span>اختيار القارئ والتلاوة المناسبة لمقطعك</span></a>
-        <a class="lib-card" href="/articles/#c-prayer"><b>الصلاة والمواقيت</b><span>المواقيت والقبلة وأحكام الصلاة المبسّطة</span></a>
-        <a class="lib-card" href="/articles/#c-hifz"><b>الحفظ والمراجعة والتجويد</b><span>خطط حفظ ومراجعة وأحكام تلاوة</span></a>
-        <a class="lib-card" href="/articles/#c-azkar"><b>الأذكار وحصن المسلم</b><span>أذكار الصباح والمساء وأدعية مأثورة</span></a>
-        <a class="lib-card" href="/articles/#c-seasons"><b>المواسم والمناسبات</b><span>رمضان والعيد والحج وعشر ذي الحجة</span></a>
-        <a class="lib-card" href="/articles/#c-family"><b>الأسرة والأطفال</b><span>تربية وحفظ للأطفال وبرامج عائلية</span></a>
-        <a class="lib-card" href="/articles/#c-publishing"><b>النشر والوصول والأخلاق</b><span>نشر المحتوى بمسؤولية والوصول للجمهور</span></a>
-      </div>
-      <div class="tools-more"><a class="btn btn-em" href="/articles/">📚 ادخل المكتبة وابحث بين كل المقالات ←</a></div>
     </div>
   </section>
 
@@ -444,11 +423,6 @@
         <div class="step-card"><div class="num">٢</div><span class="s-ic">🎙️</span><h3>اختر القارئ</h3><p>47 قارئًا مشهورًا بأعلى جودة</p></div>
         <div class="step-card"><div class="num">٣</div><span class="s-ic">🎨</span><h3>الخلفية والترجمة</h3><p>خلفيات جاهزة أو صورتك + ترجمة بلغات متعددة</p></div>
         <div class="step-card"><div class="num">٤</div><span class="s-ic">⬇️</span><h3>أنشئ وحمّل</h3><p>معاينة حية ثم تحميل الفيديو فورًا</p></div>
-      </div>
-      <div class="row gap-lg" style="justify-content:center;margin-top:34px">
-        <div class="card" style="text-align:center"><div style="font-size:1.6rem">📱</div><b>جاهز لتيك توك وإنستغرام</b><div class="muted" style="font-size:.84rem">تنسيق عمودي 1080×1920</div></div>
-        <div class="card" style="text-align:center"><div style="font-size:1.6rem">⚡</div><b>أسرع من المونتاج اليدوي</b><div class="muted" style="font-size:.84rem">من الفكرة للنشر في دقائق</div></div>
-        <div class="card" style="text-align:center"><div style="font-size:1.6rem">🌍</div><b>ترجمة متعددة اللغات</b><div class="muted" style="font-size:.84rem">8 لغات داخل الفيديو</div></div>
       </div>
     </div>
   </section>
@@ -482,17 +456,21 @@
 
 <!-- ================= صفحة الأدوات ================= -->
 <div class="view" id="view-tools" hidden>
-  <section class="section" style="padding-top:40px">
+  <section class="section tools-page">
     <div class="container">
-      <div class="section-head">
-        <div class="eyebrow">مجاني للجميع</div>
-        <h2>الأدوات الإسلامية —32 أداة</h2>
-        <p>كل ما تحتاجه في مكان واحد، يعمل من المتصفح مباشرة</p>
+      <div class="tools-intro">
+        <div class="eyebrow">أدوات تساعدك كل يوم</div>
+        <h1>الأدوات الإسلامية</h1>
+        <p>اختار الأداة اللي محتاجها، أو دور عليها بالاسم.</p>
+        <div class="tools-search">
+          <label class="sr-only" for="toolsSearch">ابحث في الأدوات الإسلامية</label>
+          <input class="input" type="search" id="toolsSearch" placeholder="ابحث عن أداة… مثل الصلاة أو الأذكار" aria-describedby="toolsResults" autocomplete="off">
+          <button type="button" class="tools-clear" id="toolsClear" aria-label="مسح البحث" hidden>مسح</button>
+        </div>
       </div>
-      <div class="tools-search"><input class="input" id="toolsSearch" placeholder="ابحث عن أداة… (صلاة، زكاة، أذكار…)"></div>
+      <div class="tools-list-head"><h2>تصفّح الأدوات</h2><p id="toolsResults" role="status" aria-live="polite"></p></div>
       <div class="tools-grid" id="toolsGridAll"></div>
-      <div class="tools-more"><a class="btn btn-em" href="/articles/">📚 مكتبة المقالات — 7,993 دليل عملي ←</a></div>
-      <div class="center muted" id="toolsEmpty" hidden style="margin-top:20px">لا توجد أداة بهذا الاسم — جرّب كلمة أخرى</div>
+      <div class="tools-empty" id="toolsEmpty" hidden>مفيش أداة بالاسم ده. جرّب كلمة تانية.</div>
     </div>
   </section>
 </div>
@@ -523,72 +501,74 @@
 </div>
 <!-- ================= حسابي والنشر التلقائي ================= -->
 <div class="view" id="view-account" hidden>
-  <section class="section container" style="max-width:900px">
-    <div class="section-head">
-      <div class="eyebrow">حسابي والنشر التلقائي</div>
-      <h1>إدارة الحساب والجدولة</h1>
-      <p class="hint">اربط القنوات، جدولة النشر، والأتمتة اليومية (06:15 القاهرة)</p>
-    </div>
+  <section class="section container acct-wrap">
 
-    <!-- بطاقة الإجراءات السريعة (تعدد القنوات والتوازي والمقالات) -->
-    <div id="acctQuickActions" class="card" style="margin-top:16px" hidden>
-      <h2>⚡ إجراءات سريعة</h2>
-      <div class="row gap-lg">
-        <button class="btn btn-gold" id="quickGenArticle">توليد من مقال</button>
-        <button class="btn btn-em" id="quickRunAll">تشغيل الأتمتة (توازي)</button>
+    <!-- رأس الصفحة + حالة الأتمتة (زر تشغيل/إيقاف فوري) -->
+    <div class="card acct-hero" id="acctHero">
+      <div class="acct-hero-l">
+        <div class="eyebrow">أتمتة يومية قابلة للتعديل</div>
+        <h1>حسابي</h1>
+        <p class="lead">تابع النشر اليومي، قنواتك وإعدادات الفيديو من مكان واحد. تقدر توقف أو تعدّل في أي وقت.</p>
       </div>
-    </div>
-
-    <!-- بطاقة الربط (تعدد القنوات) -->
-    <div class="card" style="margin-top:18px">
-      <h2>🔗 ربط المنصات</h2>
-      <div class="row gap-md" id="acctPlatforms">
-        <!-- سيتم ملؤها بواسطة JavaScript (PLATFORMS: يوتيوب، فيسبوك، إنستغرام، تيك توك، X، لينكد إن، تيليجرام، واتساب) -->
-      </div>
-    </div>
-
-    <!-- بطاقة الحسابات المرتبطة فعليًا (OAuth) — كانت غير موجودة: لا زر «اربط» في أي صفحة -->
-    <div class="card" id="acctAccounts" style="margin-top:18px" hidden>
-      <h2>🔐 الحسابات المرتبطة</h2>
-      <p class="hint">ربط رسمي عبر OAuth — لا نرى كلمة مرورك، والتوكنات مشفّرة على الخادم، ويمكنك فك الربط في أي وقت.</p>
-      <div id="acctAccountsList" class="col" style="display:flex;flex-direction:column;gap:10px"></div>
-    </div>
-
-    <!-- جدول النشر -->
-    <div id="acctQueue" class="card" style="margin-top:18px">
-      <h2>📅 جدول النشر</h2>
-      <div class="row gap-lg">
-        <div class="f-group" style="flex:1"><label>العنوان</label><input id="schedTitle" maxlength="120" style="width:100%" placeholder="عنوان الفيديو أو المقال"></div>
-        <div class="f-group" style="flex:1"><label>الوقت</label><input type="time" id="schedTime" style="width:100%"></div>
-        <div class="f-group" style="flex:1"><label>المنصات</label>
-          <div class="row gap-sm wrap" id="schedPlatforms">
-            <!-- سيتم ملؤها بواسطة JavaScript -->
+      <div class="acct-hero-r">
+        <div class="acct-status">
+          <span class="acct-dot" id="acctDot"></span>
+          <div class="acct-status-txt">
+            <b id="acctStateLabel">جارٍ التحقق…</b>
+            <small class="hint" id="acctNextRun">—</small>
           </div>
+          <label class="switch" title="تشغيل/إيقاف الأتمتة">
+            <input type="checkbox" id="acctEnabled" data-act="toggle-enabled" aria-label="تشغيل الأتمتة اليومية">
+            <i></i>
+          </label>
         </div>
       </div>
-      <button class="btn btn-gold" style="margin-top:12px" id="schedSave">جدولة النشر</button>
-      <div id="queueList" class="auto-runs" style="margin-top:20px"></div>
     </div>
 
-    <!-- لوحة الأتمتة (تعدد القنوات والتوازي والمقالات) -->
-    <div id="acctAuto" class="card" style="margin-top:18px">
-      <!-- سيتم ملؤها بواسطة JavaScript -->
-    </div>
+    <!-- التنبيهات قبل المحتوى حتى لا تختفي نتيجة إعادة الربط. -->
+    <div id="acctAuth" class="card acct-sec" hidden></div>
+    <div id="acctNotice" class="acct-notice" role="status" hidden></div>
 
-    <!-- بطاقة المقال (العدد الحقيقي يأتي من الخادم) -->
-    <div id="acctArticles" class="card" style="margin-top:18px;display:none">
-      <h2>📚 مكتبة المقالات</h2>
-      <div class="row gap-lg" id="articleCards">
-        <!-- سيتم ملؤها بواسطة JavaScript (نمط .article-card) -->
+    <!-- خطوات التشغيل: ماذا بقي بالضبط؟ -->
+    <div class="acct-steps" id="acctSteps"></div>
+
+    <!-- حالة فعلية للتشغيل الأخير، تُحدَّث من الخادم لا من مؤقّت تقديري -->
+    <section class="card acct-sec acct-progress" id="acctProgress" aria-live="polite">
+      <div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div>
+      <p class="hint">جارٍ قراءة حالة التشغيل…</p>
+    </section>
+
+    <!-- تحذيرات النشر والربط تبقى ظاهرة حتى عند غلق أدوات التشخيص. -->
+    <div id="acctAlerts" aria-live="polite"></div>
+
+    <!-- القنوات المرتبطة -->
+    <div class="card acct-sec" id="acctAccounts" hidden>
+      <div class="acct-sec-head">
+        <h2>🔗 قنواتك</h2>
+        <span class="hint">ربط رسمي عبر OAuth — لا نرى كلمة مرورك، والتوكنات مشفّرة على الخادم، وفك الربط متاح دائمًا.</span>
       </div>
+      <div id="acctAccountsList" class="acct-channels"></div>
     </div>
 
-    <!-- بطاقة المصادقة -->
-    <div id="acctAuth" class="card" style="margin-top:18px"></div>
+    <!-- التخصيص (كل ما هنا قابل للتعديل) — المحتوى يُرسم من publish.js -->
+    <div class="card acct-sec" id="acctAuto">
+      <div class="acct-sec-head"><h2>🎛️ التخصيص</h2></div>
+      <div class="plat-checks" id="acctPlatforms"></div>
+    </div>
 
-    <!-- إشعارات الإعداد -->
-    <div id="acctNotice" class="center" style="margin-top:20px;display:none"></div>
-  </div>
+    <!-- السجل منفصل عن الجدولة: حقول الجدولة القديمة لم تكن تنشئ طلبًا. -->
+    <div class="acct-kpis" id="acctKpis"></div>
+    <section class="card acct-sec" id="acctQueue">
+      <div class="acct-sec-head"><div><h2>سجل الفيديوهات</h2><p class="hint">راجع نتائج المحاولات وروابط النشر.</p></div></div>
+      <div id="queueList" class="auto-runs"></div>
+    </section>
+
+    <!-- الأدوات الأقل استخدامًا تظل متاحة بدون ازدحام الصفحة. -->
+    <details class="card acct-sec acct-disclosure" id="acctTools">
+      <summary><span>أدوات التشخيص</span><small>فحص المحرّك والتوليد</small></summary>
+      <p class="hint">اختبر التوليد على الخادم من غير رفع أو نشر.</p>
+      <div id="acctQuickActions"></div>
+    </details>
   </section>
 </div>
 
@@ -669,14 +649,14 @@
 
 <!-- السكربتات -->
 <script src="js/data.js?v=3" defer></script>
-<script src="js/core.js?v=3" defer></script>
+<script src="js/core.js?v=4" defer></script>
 <script src="js/quran.js?v=4" defer></script>
-<script src="js/reel.js?v=3" defer></script>
-<script src="js/creator.js?v=5" defer></script>
+<script src="js/reel.js?v=5" defer></script>
+<script src="js/creator.js?v=6" defer></script>
 <script src="js/tools.js?v=3" defer></script>
   <script src="js/auth.js?v=3" defer></script>
-  <script src="js/publish.js?v=19" defer></script>
-  <script src="js/app.js?v=3" defer></script>
+  <script src="js/publish.js?v=33" defer></script>
+  <script src="js/app.js?v=6" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "قرآن ريلز", "alternateName": "Quran Reels", "url": "https://quran-reels-tau.vercel.app/", "applicationCategory": "MultimediaApplication", "operatingSystem": "Any (web browser)", "browserRequirements": "Requires JavaScript", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EGP"}, "description": "صانع فيديو قرآن مجاني فوري: اختر الآيات والقارئ والخلفية والترجمة، شاهد معاينة حية، وصدّر MP4 عمودي 1080×1920 مباشرة داخل المتصفح — بدون طابور انتظار وبدون حدود. مع 32 أداة إسلامية.", "inLanguage": "ar", "featureList": "47 قارئًا، 114 سورة، ترجمة بـ8 لغات، 14 خلفية، معاينة حية، تصدير MP4/WebM فوري، 32 أداة إسلامية، حساب اختياري مع نشر تلقائي وجدولة للمنصات", "screenshot": "https://quran-reels-tau.vercel.app/img/og-cover.jpg?v=2"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "هل الموقع مجاني تمامًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الإنشاء والتحميل مجاني 100% — لا اشتراك ولا بطاقة ائتمان ولا حدود يومية. كل شيء يعمل من متصفحك مباشرة."}}, {"@type": "Question", "name": "هل أحتاج تسجيل حساب أو تثبيت برنامج؟", "acceptedAnswer": {"@type": "Answer", "text": "لا — كل الأدوات والإنشاء تعمل فورًا دون تسجيل. التسجيل اختياري فقط لو أردت ميزة النشر التلقائي: تحفظ فيديوهاتك وترتبط بقنواتك وتجدول النشر من صفحة حسابي."}}, {"@type": "Question", "name": "ما صيغة وأبعاد الفيديو الناتج؟", "acceptedAnswer": {"@type": "Answer", "text": "فيديو عمودي 1080×1920 (أو 720×1280 اقتصادي) بصيغة WebM/MP4 حسب متصفحك — مناسب لتيك توك وإنستغرام ريلز ويوتيوب شورتس وحالات واتساب."}}, {"@type": "Question", "name": "هل توجد فترة انتظار أو حد يومي؟", "acceptedAnswer": {"@type": "Answer", "text": "لا. على عكس المواقع الأخرى لا توجد قوائم انتظار ولا حد لعدد الفيديوهات — أنشئ ما شئت في اللحظة نفسها."}}, {"@type": "Question", "name": "كيف يعمل إنشاء الفيديو بدون خادم؟", "acceptedAnswer": {"@type": "Answer", "text": "يُسجَّل الفيديو لحظيًا داخل متصفحك عبر Canvas + MediaRecorder مع صوت التلاوة، لذلك الخصوصية مضمونة ولا تُرفع ملفاتك إلى أي خادم."}}, {"@type": "Question", "name": "هل يمكنني استخدام صورة خلفية من جهازي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، ارفع أي صورة من جهازك وستبقى محلية 100% لا تُرسل لأي مكان."}}, {"@type": "Question", "name": "هل الترجمة متاحة بعدة لغات؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — الإنجليزية والفرنسية والتركية والإندونيسية والأردية والإسبانية والإيطالية بالإضافة للعربية."}}, {"@type": "Question", "name": "على أي منصات أنشر الفيديو؟", "acceptedAnswer": {"@type": "Answer", "text": "تيك توك، إنستغرام ريلز، يوتيوب شورتس، فيسبوك، حالات واتساب، تيليجرام — وكل منصات التواصل."}}, {"@type": "Question", "name": "هل النص القرآني مضبوط بالرسم الإملائي؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، يُعرض النص بالرسم العثماني المضبوط مع علامات الوقف والأرقام بالشكل الصحيح."}}, {"@type": "Question", "name": "ما المدة المثالية للريلز؟", "acceptedAnswer": {"@type": "Answer", "text": "من 15 إلى 60 ثانية هو الأنسب للتفاعل، ويُسمح بالفيديو حتى 5 دقائق لمن أراد."}}, {"@type": "Question", "name": "هل تعمل الخدمة من خارج مصر والخليج؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم، الموقع يعمل من أي مكان في العالم والمواقيت والأدوات تدعم الدول حسب موقعك."}}, {"@type": "Question", "name": "هل بياناتي محفوظة عندكم؟", "acceptedAnswer": {"@type": "Answer", "text": "الإنشاء والأدوات بلا حساب — ملفاتك تبقى في متصفحك. أما إن سجّلت للنشر التلقائي فيُحفظ بريدك وفيديوهاتك المجدولة في قاعدة بيانات محمية بصلاحيات، وتوكنات المنصات مشفّرة وتُحذف بضغطة «فك الربط»."}}, {"@type": "Question", "name": "هل يمكن للموقع أن ينشر فيديوهاتي تلقائيًا؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم. سجّل دخولك، اربط قناتك من صفحة «حسابي» بضغطة موافقة واحدة، ثم جدولة أي فيديو أو فعّل «الأتمتة» — والنشر يتم يوميًا 06:15 بتوقيت القاهرة مع كتابة البوست والعناوين والوسوم تلقائيًا."}}, {"@type": "Question", "name": "كيف أربط قناتي بيوتيوب أو المنصات؟", "acceptedAnswer": {"@type": "Answer", "text": "من صفحة «حسابي والنشر التلقائي» اضغط «اربط» أمام المنصة، توافق مرة واحدة على الصلاحيات، ويظهر الحساب مرتبطًا بعدها. يمكنك فك الربط في أي لحظة بضغطة."}}, {"@type": "Question", "name": "هل ربط حساباتي آمن؟", "acceptedAnswer": {"@type": "Answer", "text": "نعم — ربط رسمي عبر OAuth من المنصات نفسها (لا نرى كلمة مرورك أبدًا)، والتوكنات تُخزَّن مشفّرة AES-256 على الخادم فقط، ولا تظهر في أي استجابة، وتُحذف فورًا عند فك الربط."}}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "HowTo", "name": "كيف تصنع ريلز قرآن في 4 خطوات", "step": [{"@type": "HowToStep", "name": "١ — اختر الآيات", "text": "اختر السورة ونطاق الآيات أو استخدم رسائل سريعة وآية اليوم."}, {"@type": "HowToStep", "name": "٢ — اختر القارئ والخلفية", "text": "47 قارئًا و14 خلفية وترجمة بثمانية لغات مع تخصيص الألوان والخط."}, {"@type": "HowToStep", "name": "٣ — شاهد المعاينة", "text": "معاينة حية فورية أثناء التصميم بدون انتظار."}, {"@type": "HowToStep", "name": "٤ — أنشئ الفيديو", "text": "تصدير MP4 1080×1920 خلال ثوانٍ داخل المتصفح ثم حمّله أو شاركه."}]}</script>
