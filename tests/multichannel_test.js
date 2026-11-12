@@ -159,12 +159,24 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
 
   /* 8) أول قناة تصبح افتراضية تلقائيًا، ولا نلمس افتراضية موجودة */
   const defCalls = [];
-  setDb({ q: async (sql, params) => { defCalls.push({ sql, params }); return []; } });
+  setDb({ q: async (sql, params) => {
+    defCalls.push({ sql, params });
+    if (/^select/i.test(sql)) return [{ id: "ch-newest", is_default: false }];
+    return [];
+  } });
   const ensured = await require(path.join(ROOT, "lib", "soc_default.js")).ensureDefault("user-7", "youtube");
   chk("ensureDefault ينجح", ensured === true);
   const dsql = (defCalls[0] || {}).sql || "";
-  chk("ensureDefault لا يغيّر منصة لها افتراضية", /not exists \(select 1 from social_connections d/.test(dsql));
-  chk("ensureDefault يستهدف أحدث قناة فقط", /order by updated_at desc limit 1/.test(dsql) && (defCalls[0].params || [])[0] === "user-7");
+  /* لم يبقَ subquery: طبقة db تُترجم إلى PostgREST وsubqueries تسقط بصمت
+   * فيصير التحديث PATCH بلا فلتر (كل القنوات تصبح افتراضية). */
+  chk("ensureDefault بلا subquery (قراءة ثم تحديث بمعرّف)",
+    /^select/i.test(dsql) && !/not exists/i.test(dsql) && defCalls.length >= 2 && /where id=\$1/.test(defCalls[1].sql || ""),
+    JSON.stringify(defCalls.map((c) => c.sql.slice(0, 60))));
+  chk("ensureDefault يستهدف أحدث قناة فقط", (defCalls[1].params || [])[0] === "ch-newest");
+  const withDef = [];
+  setDb({ q: async (sql) => { withDef.push(sql); if (/^select/i.test(sql)) return [{ id: "a", is_default: true }]; return []; } });
+  await require(path.join(ROOT, "lib", "soc_default.js")).ensureDefault("user-8", "youtube");
+  chk("منصة لها افتراضية ⇒ لا تحديث أصلًا", withDef.filter((x) => /^update/i.test(x)).length === 0, String(withDef.length));
   setDb({ q: async () => { throw new Error("db down"); } });
   chk("فشل ensureDefault لا يُفشل الربط", (await require(path.join(ROOT, "lib", "soc_default.js")).ensureDefault("user-7", "youtube")) === false);
 

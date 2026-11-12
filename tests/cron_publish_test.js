@@ -22,7 +22,7 @@ const stub = {
   autopilot: async () => [{ ok: true, url: "https://youtu.be/x" }],
   queue: [],
   publish: async (row) => ({ ok: true, url: "https://youtu.be/" + row.id }),
-  calls: { autopilot: 0, publish: [] },
+  calls: { autopilot: 0, publish: [], reclaim: 0 },
   sql: [],
 };
 
@@ -43,6 +43,7 @@ cacheModule("lib/publish.js", {
 });
 cacheModule("lib/autopilot.js", {
   runDailyAutopilots: async () => { stub.calls.autopilot++; return stub.autopilot(); },
+  reclaimStalePublishing: async () => { stub.calls.reclaim++; return 0; },
 });
 cacheModule("lib/oauth.js", { json: (res, code, obj) => { res.statusCode = code; res.body = obj; } });
 
@@ -58,7 +59,7 @@ async function call(auth) {
 }
 
 function reset() {
-  stub.calls = { autopilot: 0, publish: [] };
+  stub.calls = { autopilot: 0, publish: [], reclaim: 0 };
   stub.sql = [];
   stub.queue = [];
   stub.autopilot = async () => [{ ok: true, url: "https://youtu.be/x" }];
@@ -107,6 +108,12 @@ function reset() {
   chk("الاستثناء يُسجَّل في system_checks (لا فشل صامت)",
     stub.sql.some((c) => /insert into system_checks/i.test(c.sql) && /autopilot_daily/.test(c.sql)), JSON.stringify(stub.sql.map((c) => c.sql)).slice(0, 200));
   chk("المهام المستحقة تُنشر رغم فشل الأتمتة", r3.body.ok === 1 && r3.body.ran === 1);
+
+  /* 4b) صفّ عالق في publishing من تشغيل سابق يُنظَّف ويُبلَّغ عنه */
+  reset();
+  const r4b = await call();
+  chk("الكرون ينظّف الصفوف العالقة قبل النشر ويُبلغ بالعدد",
+    stub.calls.reclaim === 1 && r4b.body.reclaimed === 0, JSON.stringify({ reclaim: stub.calls.reclaim, body: r4b.body.reclaimed }));
 
   /* 5) فشل كل الأتمتة يُبلّغ fail=1 */
   reset();

@@ -33,9 +33,11 @@ Module._load = function (request) {
 /* بديل قاعدة البيانات */
 const sql = [];
 let qRows = [];
+let reclaimRows = [];
 const impl = { q: async () => [], rest: async () => [] };
 impl.q = async (text, params) => {
   sql.push({ text, params });
+  if (/status='publishing'/.test(text)) return reclaimRows;
   return /from publish_queue/.test(text) ? qRows : [];
 };
 const dbStub = { q: (...a) => impl.q(...a), q1: async () => null, rest: (...a) => impl.rest(...a) };
@@ -54,7 +56,7 @@ require.cache[pubPath] = {
 const A = require(path.join(ROOT, "lib", "autopilot.js"));
 const T = A.__test;
 
-const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id }); };
+const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; reclaimRows = []; pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id }); };
 
 (async () => {
   chk("retryPublishFailed مُصدَّرة للاختبار", typeof T.retryPublishFailed === "function");
@@ -82,15 +84,15 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; pub.impl
   /* 3) منصتان مختلفتان ⇒ نشر كلتيهما */
   reset();
   qRows = [
-    { id: "a1", platform: "youtube" },
-    { id: "a2", platform: "instagram" },
+    { id: "a1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" },
+    { id: "a2", platform: "instagram", video_path: "u/autopilot/2026-11-12-a.mp4" },
   ];
   const out3 = await T.retryPublishFailed("u1", "2026-11-12");
   chk("منصتان مختلفتان ⇒ نشر مرتين", pub.calls.length === 2 && out3.published.length === 2, JSON.stringify(out3));
 
   /* 4) فشل النشر لا يرمي ويُحصى */
   reset();
-  qRows = [{ id: "f1", platform: "youtube" }];
+  qRows = [{ id: "f1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }];
   pub.impl = async () => ({ ok: false, error: "invalid_grant" });
   const out4 = await T.retryPublishFailed("u1", "2026-11-12");
   chk("فشل النشر يُحصى بلا استثناء", out4 && out4.failed === 1 && out4.published.length === 0, JSON.stringify(out4));
@@ -130,6 +132,38 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; pub.impl
   };
   const created = await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/y.mp4", videoName: "v.mp4", meta: { title: "t", caption: "c", hashtags: "#a" } });
   chk("بلا صفّ قائم يُدرج صفًّا واحدًا", created && created.id === "new1" && posts2.length === 1, JSON.stringify({ created, posts2: posts2.length }));
+
+  /* 4d) صفّ عالق في publishing لا يضيع اليوم بصمت */
+  chk("reclaimStalePublishing مُصدَّرة", typeof A.reclaimStalePublishing === "function" && typeof T.reclaimStalePublishing === "function");
+  reset();
+  reclaimRows = [{ id: "p1", platform: "youtube" }, { id: "p2", platform: "youtube" }];
+  const n1 = await A.reclaimStalePublishing({ minutes: 20 });
+  const upd = sql.find((s) => /status='publishing'/.test(s.text)) || {};
+  const ageMin = (iso) => (Date.now() - Date.parse(iso)) / 60000;
+  chk("الصفّ العالق يُعاد إلى failed بعد المهلة",
+    n1 === 2 && /set status='failed'/.test(upd.text || "") && /updated_at < \$1/.test(upd.text || "") &&
+    Math.abs(ageMin(upd.params[0]) - 20) < 1,
+    JSON.stringify({ n1, age: upd.params && ageMin(upd.params[0]) }));
+  chk("المهلة كافية لرفع حيّ (لا صفر يلمس رفعًا جاريًا)", upd.params && ageMin(upd.params[0]) >= 19, JSON.stringify(upd.params));
+
+  reset();
+  await A.reclaimStalePublishing({ minutes: 0, userId: "u1" });
+  const upd2 = sql.find((s) => /status='publishing'/.test(s.text)) || {};
+  chk("القيمة غير الصالحة تصير 20، والمستخدم مُقيَّد",
+    upd2.params && Math.abs(ageMin(upd2.params[0]) - 20) < 1 && /and user_id=\$3/.test(upd2.text || "") && upd2.params[2] === "u1",
+    JSON.stringify({ params: upd2.params, text: (upd2.text || "").slice(-40) }));
+
+  reset();
+  qRows = [{ id: "z1", platform: "youtube", video_path: "u/autopilot/2026-11-12-a.mp4" }];
+  await T.retryPublishFailed("u1", "2026-11-12");
+  const iPublish = sql.findIndex((s) => /status='publishing'/.test(s.text));
+  const iSelect = sql.findIndex((s) => /from publish_queue/.test(s.text));
+  chk("إعادة النشر تُنظّف العالق قبل قراءة الفاشلة",
+    iPublish >= 0 && iSelect > iPublish, JSON.stringify({ iPublish, iSelect }));
+
+  const cronSrc = require("fs").readFileSync(path.join(ROOT, "api", "cron", "publish.js"), "utf8");
+  chk("كرون النشر ينظّف الصفوف العالقة ويُبلغ عنها",
+    /reclaimStalePublishing\(\{ minutes: 20 \}\)/.test(cronSrc) && /reclaimed,/.test(cronSrc), "cron");
 
   /* 5) publishReadyToday تستخدم نفس المسار وتُعلن السبب */
   reset();
