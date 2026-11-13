@@ -717,9 +717,9 @@ const ReelRecorder = {
       mimeType: mime || undefined,
       videoBitsPerSecond: canvas.height >= 1900 ? 9_000_000 : 5_000_000,
     });
-    this._chunks = [];
-    rec.ondataavailable = e => { if (e.data && e.data.size) this._chunks.push(e.data); };
-    const stopped = new Promise(res => { rec.onstop = res; });
+    const chunks = [];
+    this._chunks = chunks;
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
 
     onStage && onStage("recording");
     const total = player.totalDuration();
@@ -732,15 +732,37 @@ const ReelRecorder = {
       raf = requestAnimationFrame(drawLoop);
     };
 
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      let settled = false, finishing = false, endTimer = 0, stopTimer = 0;
       const cleanup = () => {
+        clearTimeout(endTimer); clearTimeout(stopTimer);
         cancelAnimationFrame(raf);
+        signal && signal.removeEventListener("abort", onAbort);
+        player.onEnd = null; player.onTick = null; player.onAyah = null;
         player.stop();
         try { rec.state !== "inactive" && rec.stop(); } catch {}
         stream.getVideoTracks().forEach(t => t.stop());
       };
-      const onAbort = () => { this._abort = true; cleanup(); reject(new Error("aborted")); };
+      const fail = error => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const onAbort = () => { this._abort = true; fail(new Error("aborted")); };
+      rec.onerror = e => fail(new Error("تعذّر تسجيل الفيديو: " + ((e.error && e.error.message) || "خطأ في التسجيل")));
+      rec.onstop = () => {
+        if (settled) return;
+        if (!finishing) { fail(new Error("توقف تسجيل الفيديو قبل اكتماله")); return; }
+        const blob = new Blob(chunks, { type: mime || "video/webm" });
+        if (!blob.size) { fail(new Error("ملف الفيديو الناتج فارغ")); return; }
+        settled = true;
+        cleanup();
+        onProgress && onProgress(1, total, total);
+        resolve({ blob, mime: mime || "video/webm" });
+      };
       signal && signal.addEventListener("abort", onAbort, { once: true });
+      if (signal && signal.aborted) { onAbort(); return; }
 
       player.onTick = (elapsed, tot) => {
         renderer.state.elapsed = elapsed;
@@ -750,20 +772,25 @@ const ReelRecorder = {
       };
       player.onAyah = i => { renderer.state.index = i; };
       player.onEnd = () => {
+        if (settled || finishing || endTimer) return;
         renderer.state.elapsed = total;
-        setTimeout(() => {
-          cleanup();
-          onProgress && onProgress(1, total, total);
-          setTimeout(() => {
-            const blob = new Blob(this._chunks, { type: mime || "video/webm" });
-            resolve({ blob, mime: mime || "video/webm" });
-          }, 260);
+        endTimer = setTimeout(() => {
+          endTimer = 0;
+          if (settled) return;
+          finishing = true;
+          cancelAnimationFrame(raf);
+          player.stop();
+          // dataavailable الأخير يسبق stop؛ الانتظار الثابت قد يُرجع ملفًا ناقصًا.
+          stopTimer = setTimeout(() => fail(new Error("تعذّر إنهاء تسجيل الفيديو")), 20000);
+          try { rec.stop(); } catch (error) { fail(error); }
         }, 500);
       };
 
-      drawLoop();
-      rec.start(400);
-      player.play(0, 0);
+      try {
+        drawLoop();
+        rec.start(400);
+        player.play(0, 0);
+      } catch (error) { fail(error); }
     });
   },
 };
