@@ -31,7 +31,7 @@ const html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
 const clientJs = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
 
 const ACCOUNT = {
-  config: { enabled: true, at_utc: "04:15:00", platforms: ["youtube"], template: { content_mode: "mix" } },
+  config: { settings_revision: "11111111-1111-4111-8111-111111111111", all_channels: false, enabled: true, at_utc: "04:15:00", platforms: ["youtube"], template: { content_mode: "mix" } },
   runs: [
     { id: "r1", title: "سورة الكوثر", status: "published", reciter: "السديس", created_at: "2026-11-07T04:15:00Z", external_url: "https://youtu.be/x" },
     { id: "r2", title: "سورة الإخلاص", status: "rendering", reciter: "الحصري", created_at: "2026-11-06T04:15:00Z" },
@@ -87,7 +87,7 @@ window.fetch = async (url, opts = {}) => {
   calls.push({ url: String(url), method, body: opts.body, action });
   const payload =
     method === "GET" ? ACCOUNT :
-    action === "save" ? { ok: true, config: JSON.parse(opts.body) } :
+    action === "save" ? { ok: true, config: { ...JSON.parse(opts.body), settings_revision: "22222222-2222-4222-8222-222222222222" } } :
     action === "run" ? { ok: true, url: "https://youtu.be/x" } :
     action === "run_all" ? { ok: true, run_id: "r3" } :
     action === "article_random" ? { ok: true, article_title: "مقال قرآني", url: "https://quran-reels.test/articles/1" } :
@@ -386,12 +386,13 @@ window.fetch = async (url, opts = {}) => {
   await window.PublishApp.renderConnections("test-token");
   if (!groups.querySelector('[data-connect="youtube"]') || groups.querySelector('[data-connect="youtube"]').closest('#acctMorePlatforms')) fail("المستخدم الجديد لا يرى زر ربط يوتيوب مباشرة");
   else ok("المستخدم بلا قنوات يرى خيارات الربط المتاحة مباشرة");
-  // إلغاء كل المنصات أثناء الإيقاف يُرسل قائمة فارغة لا اختيار يوتيوب بديلًا.
+  // حالة مستقلة بعد انتهاء المسودة السابقة: الإيقاف يحفظ قائمة منصات فارغة.
+  window.PublishApp._autoDirty = false;
   window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, enabled: false, platforms: [], all_channels: true } });
   let savedEmpty = null;
   window.fetch = async (url, opts = {}) => {
     savedEmpty = JSON.parse(opts.body);
-    return { ok: true, status: 200, json: async () => ({ ok: true, config: savedEmpty }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true, config: { ...savedEmpty, settings_revision: "33333333-3333-4333-8333-333333333333" } }) };
   };
   const emptyResult = await window.PublishApp.saveSettings({ enabled: false });
   if (!emptyResult.ok || savedEmpty.enabled !== false || savedEmpty.platforms.length !== 0 || savedEmpty.all_channels !== true || window.PublishApp.data.config.platforms.length !== 0) fail("حفظ الإيقاف غيّر اختيار المنصات الفارغ");

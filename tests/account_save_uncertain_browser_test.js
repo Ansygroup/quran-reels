@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
       document.querySelector('#view-home').hidden = true; document.querySelector('#view-account').hidden = false;
       const app = PublishApp; app._accountOwner = 'user-a';
       window.AuthApp = { getUserId:async()=> 'user-a', getToken:async()=> 'mock' };
-      app.data = {config:{enabled:true,platforms:['youtube'],all_channels:false,template:{content_mode:'mix',reciter_mode:'rotate',reciter:'',background:'rotate',privacy:'public'}},options:{reciters:[],content_modes:['mix'],backgrounds:['rotate']}};
+      app.data = {config:{settings_revision:'11111111-1111-4111-8111-111111111111',enabled:true,platforms:['youtube'],all_channels:false,template:{content_mode:'mix',reciter_mode:'rotate',reciter:'',background:'rotate',privacy:'public'}},options:{reciters:[],content_modes:['mix'],backgrounds:['rotate']}};
       app.available=[{key:'youtube',name:'يوتيوب',publish:true}]; app.connections=[{platform:'youtube'}];
       app.renderStatus(app.data); app.renderAutoPanel(app.data); app.bindEvents(); app.startProgressPolling=()=>{};
       app.prepareAccountImage=async()=> 'data:image/jpeg;base64,mocked';
@@ -33,14 +33,15 @@ const server = http.createServer((req, res) => {
       window.fetch=async(url,opts={})=>{
         if (String(url)==='/api/autopilot' && opts.method==='POST') {
           const body=JSON.parse(opts.body); window.posts.push(body);
+          if (window.fetchMode==='conflict' && body.action==='save') return {ok:false,status:409,json:async()=>({code:'settings_conflict',error:'conflict'})};
           if (window.fetchMode==='validation') return {ok:false,status:400,json:async()=>({error:'invalid'})};
-          if (body.action==='save') { window.savedConfig={...body,template:{...body.template,background_image_id:'e6babd90-5848-4327-a948-b282b87dad08'}}; }
-          if (body.action==='set_enabled') window.savedConfig.enabled=body.enabled;
+          if (body.action==='save') { window.savedConfig={...body,settings_revision:crypto.randomUUID(),template:{...body.template,background_image_id:'e6babd90-5848-4327-a948-b282b87dad08'}}; }
+          if (body.action==='set_enabled') { window.savedConfig.enabled=body.enabled; window.savedConfig.settings_revision=crypto.randomUUID(); }
           if (window.fetchMode==='lost') throw Error('response lost');
           if (window.fetchMode==='server-error') return {ok:false,status:503,json:async()=>({error:'uncertain'})};
           if (window.fetchMode==='bad-success') return {ok:true,status:200,json:async()=>({ok:true})};
           if (window.fetchMode==='mismatch') return {ok:true,status:200,json:async()=>({ok:true,config:{...window.savedConfig,enabled:false}})};
-          return {ok:true,status:200,json:async()=>({ok:true,config:window.savedConfig,enabled:body.enabled})};
+          return {ok:true,status:200,json:async()=>({ok:true,config:window.savedConfig,enabled:body.enabled,stale:false})};
         }
         if (String(url)==='/api/autopilot') {
           if (window.fetchMode==='offline') throw Error('offline');
@@ -110,12 +111,21 @@ const server = http.createServer((req, res) => {
     await page.locator('#acctEnabled + i').click();
     await page.waitForFunction(()=>window.posts.at(-1)?.action==='set_enabled' && window.posts.at(-1)?.enabled===true && !PublishApp._settingsPending);
     assert.equal(await page.locator('#acctEnabled').isChecked(),true);
-    assert.deepEqual(Object.keys(await page.evaluate(()=>posts.at(-1))).sort(),['action','enabled']);
+    assert.deepEqual(Object.keys(await page.evaluate(()=>posts.at(-1))).sort(),['action','enabled','expected_revision']);
     assert.equal(await page.locator('#acctDed').inputValue(),'مسودة بعد الحفظ');
+    // A stale draft is preserved; an explicit pause is still possible before review.
+    await page.evaluate(()=>window.fetchMode='conflict'); await page.locator('#autoSave').click();
+    assert.equal(await page.locator('#acctRecovery').isVisible(),true);
+    await page.evaluate(()=>window.fetchMode='success'); await page.locator('#acctPauseSafe').click();
+    assert.equal(await page.evaluate(()=>savedConfig.enabled),false);
+    assert.equal(await page.locator('#acctDed').inputValue(),'مسودة بعد الحفظ');
+    assert.equal(await page.locator('#autoSave').isDisabled(),true);
+    await page.locator('#acctRecheck').click(); await page.locator('#acctResume').click();
+    assert.equal(await page.locator('#acctEnabled').isChecked(),false);
     // The article button explicitly says publish and cancellation sends nothing.
     assert.match(await page.locator('#autoGenArticle').textContent(),/نشر/);
     page.once('dialog', d => d.dismiss()); await page.evaluate(()=>PublishApp.randomArticle(document.querySelector('#autoGenArticle')));
-    const articleBefore = before + 3; // one successful save and two toggles
+    const articleBefore = await page.evaluate(()=>posts.length);
     assert.equal(await page.evaluate(()=>posts.length),articleBefore);
     page.once('dialog', d => d.accept()); await page.evaluate(()=>PublishApp.randomArticle(document.querySelector('#autoGenArticle')));
     assert.equal(await page.evaluate(()=>posts.at(-1).action),'article_random');

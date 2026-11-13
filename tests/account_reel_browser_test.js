@@ -16,7 +16,7 @@ try{const context=await browser.newContext({viewport:{width:Number(process.env.R
 await page.locator('#cookieOk').click();await page.evaluate(()=>QRAuthUI.open());
 assert.equal(await page.locator('#loginOverlay').isVisible(),true,'نافذة الدخول تظهر بعد إغلاق الشريط');
 await page.evaluate(()=>QRAuthUI.close());
-await page.evaluate(()=>{document.getElementById('view-home').hidden=true;document.getElementById('view-account').hidden=false;const app=window.PublishApp;app.available=[{key:'youtube',name:'يوتيوب',publish:true}];app.connections=[{platform:'youtube'},{platform:'youtube'}];app.data={config:{enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'rotate'}},options:{content_modes:['mix','famous','sequential','article','fixed'],reciters:[{id:'Alafasy_128kbps',name:'مشاري العفاسي'}],backgrounds:['rotate','grad-gold']}};app.renderStatus(app.data);app.renderAutoPanel(app.data);app.api=async(action,body)=>{window.__saved={action,body};return {ok:true,config:body}}});
+await page.evaluate(()=>{document.getElementById('view-home').hidden=true;document.getElementById('view-account').hidden=false;const app=window.PublishApp;app.available=[{key:'youtube',name:'يوتيوب',publish:true}];app.connections=[{platform:'youtube'},{platform:'youtube'}];app.data={config:{settings_revision:'11111111-1111-4111-8111-111111111111',enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'rotate'}},options:{content_modes:['mix','famous','sequential','article','fixed'],reciters:[{id:'Alafasy_128kbps',name:'مشاري العفاسي'}],backgrounds:['rotate','grad-gold']}};app.renderStatus(app.data);app.renderAutoPanel(app.data);app.api=async(action,body)=>{window.__saved={action,body};return {ok:true,config:{...body,settings_revision:crypto.randomUUID()}}}});
 await page.waitForFunction(()=>document.querySelector('#acctSurah')?.options.length===114);const before=await page.evaluate(()=>JSON.stringify({s:Selection.surah,from:Selection.from,to:Selection.to,reciter:Selection.reciter}));
 await page.selectOption('#selContentMode','fixed');await page.selectOption('#acctSurah','2');await page.fill('#acctFrom','255');await page.fill('#acctTo','256');await page.selectOption('#acctReciter','Alafasy_128kbps');await page.selectOption('#selBackground','grad-gold');await page.selectOption('#acctStyle','banner');await page.selectOption('#acctTranslation','en.sahih');await page.selectOption('#acctRatio','1:1');await page.selectOption('#acctQuality','720');await page.selectOption('#acctAccent','rose');await page.locator('#acctFont').fill('120');await page.locator('#acctWatermark').uncheck();await page.locator('#acctMotion').uncheck();await page.fill('#acctDed','صدقة جارية');
 // تحديث الحساب والتنقل لا يمسّان حقولًا أو ملفًا لم يُحفظا؛ لا طلب نشر فعلي.
@@ -46,7 +46,7 @@ await page.evaluate(()=>PublishApp.saveSettings()); const body=await page.evalua
 // تعديل أحدث أثناء الحفظ يجب أن يبقى غير محفوظ، ولا يضيع مع تحديث القنوات.
 await page.evaluate(()=>{PublishApp.api=(action,body)=>new Promise(resolve=>{window.__pendingBody=body;window.__resolveSave=resolve});window.__pendingSave=PublishApp.saveSettings()});
 await page.fill('#acctDed','تعديل بعد بدء الحفظ');
-await page.evaluate(async()=>{window.__resolveSave({ok:true,config:window.__pendingBody});await window.__pendingSave;await PublishApp.renderConnections('mock')});
+await page.evaluate(async()=>{window.__resolveSave({ok:true,config:{...window.__pendingBody,settings_revision:crypto.randomUUID()}});await window.__pendingSave;await PublishApp.renderConnections('mock')});
 assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');assert.equal(await page.evaluate(()=>PublishApp._autoDirty),true);assert.match(await page.locator('#acctEditState').innerText(),/غير محفوظة/);
 await page.evaluate(()=>PublishApp.renderAccount(PublishApp.data));assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');
 // طلب قراءة بدأ قبل الحفظ لا يعيد رسم الإعدادات القديمة عند وصوله متأخرًا.
@@ -55,8 +55,8 @@ await page.evaluate(async()=>{
  window.AuthApp={getUserId:async()=> 'race-user',getToken:async()=> 'mock'};app.startProgressPolling=()=>{};
  window.fetch=url=>String(url)==='/api/autopilot'?new Promise(resolve=>window.__resolveRead=resolve):window.__raceFetch(url);
  window.__raceRead=app.init();await new Promise(r=>setTimeout(r,0));
- app.api=async(action,body)=>({ok:true,config:body});await app.saveSettings();
- window.__resolveRead({ok:true,json:async()=>({config:{enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}},runs:[]})});await window.__raceRead;
+ app.api=async(action,body)=>({ok:true,config:{...body,settings_revision:crypto.randomUUID()}});await app.saveSettings();
+ window.__resolveRead({ok:true,json:async()=>({config:{settings_revision:'33333333-3333-4333-8333-333333333333',enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}},runs:[]})});await window.__raceRead;
  window.fetch=window.__raceFetch;window.AuthApp=window.__raceAuth;app.startProgressPolling=window.__racePoll;
 });
 assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');
@@ -74,7 +74,7 @@ await page.evaluate(async()=>{
 });
 assert.equal(await page.evaluate(()=>window.__requests.length),2);
 assert.equal(await page.locator('#acctDed').count(),0,'تُزال حقول الحساب السابق قبل تحميل الجديد');
-await page.evaluate(async()=>{const cfg={enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}};window.__requests[1]({ok:true,json:async()=>({config:cfg,runs:[]})});await window.__second;window.__requests[0]({ok:true,json:async()=>({config:{...cfg,enabled:true},runs:[]})});await window.__first});
+await page.evaluate(async()=>{const cfg={settings_revision:'33333333-3333-4333-8333-333333333333',enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}};window.__requests[1]({ok:true,json:async()=>({config:cfg,runs:[]})});await window.__second;window.__requests[0]({ok:true,json:async()=>({config:{...cfg,enabled:true},runs:[]})});await window.__first});
 assert.equal(await page.evaluate(()=>PublishApp._accountOwner),'user-b');assert.equal(await page.locator('#acctEnabled').isChecked(),false);
 await page.evaluate(()=>{window.fetch=window.__origFetch2;window.AuthApp=window.__origAuth2;PublishApp.startProgressPolling=window.__origPoll2;PublishApp.renderConnections=window.__origConnections});
 // تطبيق نفس الإعدادات داخل نسخة الصانع التي يستخدمها الرندر.

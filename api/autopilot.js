@@ -13,6 +13,9 @@ const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST, validatePlatforms } = requir
 /* أي مزوّد OAuth يخدم كل منصة (facebook/instagram يتشاركان تطبيق Meta) */
 const CONNECT_PROVIDER = { youtube: "youtube", facebook: "meta", instagram: "meta", tiktok: "tiktok", x: "x" };
 
+const REVISION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const revisionInputValid = v => v === null || (typeof v === "string" && REVISION_UUID.test(v));
+
 /* هل مفاتيح المزوّد موجودة فعلًا في هذه البيئة؟
  * يمنع «زر ربط لا يفعل شيئًا»: META_APP_ID/SECRET غير مضبوطين في Vercel،
  * فكان الضغط على «اربط فيسبوك» يعود إلى ?setup=meta بلا أي تفسير. */
@@ -27,6 +30,7 @@ const PLATFORMS = PLATFORM_NAMES;
 
 const DEFAULTS = {
   enabled: false,
+  settings_revision: null, // null means no persisted settings row
   at_utc: "04:15:00", // 06:15 القاهرة (UTC+2)
   platforms: ["youtube"],
   template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" }
@@ -305,32 +309,29 @@ const handler = async (req, res) => {
 
     if (body.action === "set_enabled") {
       if (typeof body.enabled !== "boolean") return json(res, 400, { error: "حالة الأتمتة غير صالحة" });
-      let guard = "";
+      // Old cached clients may still pause safely, but must reload before enabling.
+      const expected = body.expected_revision === undefined && !body.enabled ? null : body.expected_revision;
+      if (!revisionInputValid(expected)) return json(res, 409, { code: "revision_required", error: "حدّث الصفحة قبل تعديل حالة الأتمتة" });
       if (body.enabled) {
-        // نفحص الإعداد المحفوظ لا التعديلات غير المحفوظة، ونمنع التفعيل إذا تغيّر أثناء الفحص.
         const current = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-        if (!current) return json(res, 409, { error: "احفظ إعدادات النشر الأول قبل تفعيل الأتمتة" });
+        if (!current) return json(res, 409, { code: "settings_conflict", error: "احفظ إعدادات النشر الأول قبل تفعيل الأتمتة" });
+        if (!REVISION_UUID.test(current.settings_revision || "") || current.settings_revision !== expected) return json(res, 409, { code: "settings_conflict", error: "الإعدادات اتغيرت — راجع حالة الخادم قبل التفعيل" });
         const problem = validatePlatforms(current.platforms);
         if (problem) return json(res, 400, { error: problem });
-        if (!current.updated_at) return json(res, 409, { error: "تعذّر تأكيد الإعدادات المحفوظة — حدّث الصفحة" });
         const connected = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=platform`);
         if (!Array.isArray(connected)) throw new Error("تعذّر التحقق من القنوات المرتبطة");
         const missing = current.platforms.filter(p => !connected.some(c => c.platform === p));
         if (missing.length) return json(res, 409, { error: `المنصات المختارة غير مرتبطة (${missing.join(", ")}) — اربطها أولًا` });
-        guard = `&updated_at=eq.${encodeURIComponent(current.updated_at)}`;
       }
-      // الإيقاف لا يعتمد على صلاحية الإعدادات ولا يكتب حقول القنوات أو المحتوى.
-      const changed = await rest(`/rest/v1/autopilot?user_id=eq.${encodeURIComponent(uid)}${guard}&select=enabled`, {
-        method: "PATCH", headers: { Prefer: "return=representation" },
-        body: JSON.stringify({ enabled: body.enabled, updated_at: new Date().toISOString() }),
-      });
-      if (!Array.isArray(changed) || changed.length !== 1 || changed[0].enabled !== body.enabled) {
-        return json(res, 409, { error: "الإعدادات اتغيرت أو مش موجودة — حدّث الصفحة وحاول تاني" });
-      }
-      return json(res, 200, { ok: true, enabled: changed[0].enabled });
+      const changed = await rest("/rest/v1/rpc/set_autopilot_enabled_guarded", { method: "POST", body: JSON.stringify({ p_user_id: uid, p_enabled: body.enabled, p_expected_revision: expected }) });
+      if (changed?.outcome === "missing" || changed?.outcome === "conflict") return json(res, 409, { code: "settings_conflict", error: "الإعدادات اتغيرت أو مش موجودة — راجع حالة الخادم" });
+      const config = changed?.config;
+      if (changed?.outcome !== "updated" || typeof changed.stale !== "boolean" || !config || config.user_id !== uid || config.enabled !== body.enabled || !REVISION_UUID.test(config.settings_revision || "")) throw new Error("تعذّر تأكيد حالة الأتمتة");
+      return json(res, 200, { ok: true, enabled: config.enabled, stale: changed.stale, config: { ...config, template: parseTemplate(config.template) } });
     }
 
     if (body.action === "save") {
+      if (!revisionInputValid(body.expected_revision)) return json(res, 409, { code: "revision_required", error: "حدّث الصفحة قبل حفظ الإعدادات" });
       const templateInput = body.template && typeof body.template === "object" ? body.template : {};
       const content_mode = CONTENT_MODES.has(templateInput.content_mode) ? templateInput.content_mode : "mix";
       const background = templateInput.background === "custom" ? "custom" : (BACKGROUND_IDS.has(templateInput.background) ? templateInput.background : "rotate");
@@ -376,16 +377,15 @@ const handler = async (req, res) => {
       const all_channels = body.all_channels === true;
       const configInput = { user_id: uid, enabled, at_utc: "04:15:00", platforms, template, all_channels, updated_at: new Date().toISOString() };
       let saved;
-      if (background === "custom") {
-        try {
-          saved = await rest("/rest/v1/rpc/save_custom_reel", { method: "POST", body: JSON.stringify({ p_config: configInput, p_image_id: imageId, p_jpeg_base64: imageData }) });
-        } catch (e) {
-          if (/background not found/i.test(String(e?.message))) return json(res, 409, { error: "الصورة اتغيّرت أو اتحذفت — حدّث الصفحة قبل الحفظ" });
-          return json(res, 503, { error: "تعذّر تأكيد حفظ الصورة والإعدادات — حدّث الصفحة قبل المحاولة" });
-        }
-      } else saved = await rest("/rest/v1/autopilot?on_conflict=user_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" }, body: JSON.stringify(configInput) });
+      try {
+        saved = await rest("/rest/v1/rpc/save_autopilot_guarded", { method: "POST", body: JSON.stringify({ p_config: configInput, p_expected_revision: body.expected_revision, p_image_id: background === "custom" ? imageId : null, p_jpeg_base64: imageData }) });
+      } catch (e) {
+        if (/background not found/i.test(String(e?.message))) return json(res, 409, { code: "settings_conflict", error: "الصورة اتغيّرت أو اتحذفت — راجع حالة الخادم قبل الحفظ" });
+        return json(res, 503, { error: "تعذّر تأكيد حفظ الإعدادات — راجع حالة الخادم" });
+      }
+      if (Array.isArray(saved) && saved.length === 0) return json(res, 409, { code: "settings_conflict", error: "الإعدادات اتغيّرت من مكان آخر — راجع حالة الخادم قبل الحفظ" });
       const config = Array.isArray(saved) && saved.length === 1 ? saved[0] : null;
-      if (!config || config.user_id !== uid || (background === "custom" && config.template?.background_image_id !== imageId)) throw new Error("تعذّر تأكيد حفظ الإعدادات — حدّث الصفحة قبل المحاولة");
+      if (!config || config.user_id !== uid || !REVISION_UUID.test(config.settings_revision || "") || (background === "custom" && config.template?.background_image_id !== imageId)) throw new Error("تعذّر تأكيد حفظ الإعدادات — راجع حالة الخادم");
       return json(res, 200, { ok: true, config: { ...config, template: parseTemplate(config?.template) } });
     }
 

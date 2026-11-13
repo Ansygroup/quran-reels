@@ -10,7 +10,8 @@ create table auth.users(id uuid primary key);
 insert into auth.users(id) values
   ('11111111-1111-4111-8111-111111111111'),
   ('22222222-2222-4222-8222-222222222222'),
-  ('33333333-3333-4333-8333-333333333333');
+  ('33333333-3333-4333-8333-333333333333'),
+  ('44444444-4444-4444-8444-444444444444');
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claims', true)::jsonb->>'sub','')::uuid
 $$;
@@ -29,3 +30,8 @@ create policy "ap own" on public.autopilot for all to authenticated
 grant select,insert,update,delete,truncate,references,trigger,maintain on public.autopilot to authenticated,service_role;
 -- Deliberately grant column privileges separately to test that revocation covers them.
 grant update(template),insert(enabled) on public.autopilot to authenticated;
+-- Minimal connected-platform fixture for the real API handler; no tokens.
+create table public.social_connections(user_id uuid not null, platform text not null);
+insert into public.social_connections(user_id,platform)
+values ('44444444-4444-4444-8444-444444444444','youtube');
+grant select on public.social_connections to service_role;

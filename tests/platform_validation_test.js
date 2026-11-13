@@ -7,7 +7,7 @@ let writes = [], reads = [];
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
   q1: async () => null, q: async () => [],
   rest: async (path, opts = {}) => {
-    if (opts.method === 'POST') { const row = JSON.parse(opts.body); writes.push(row); return [row]; }
+    if (opts.method === 'POST') { const row = JSON.parse(opts.body).p_config; writes.push(row); return [{...row, settings_revision:'11111111-1111-4111-8111-111111111111'}]; }
     reads.push(path);
     if (path.includes('/social_connections')) return [{platform:'youtube'}, {platform:'tiktok'}];
     throw Error('unexpected read ' + path);
@@ -17,7 +17,7 @@ require.cache[sessPath] = { id: sessPath, filename: sessPath, loaded: true, expo
 const api = require('../api/autopilot');
 const { validatePlatforms } = require('../lib/platforms');
 async function save(body) {
-  const req = Readable.from([JSON.stringify({action:'save', ...body})]);
+  const req = Readable.from([JSON.stringify({action:'save', expected_revision:null, ...body})]);
   Object.assign(req, { method:'POST', url:'/api/autopilot', headers:{} });
   const res = {setHeader(){}, end(v){this.body=JSON.parse(v)}}; await api(req, res); return res;
 }

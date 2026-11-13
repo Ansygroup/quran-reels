@@ -48,6 +48,12 @@ global.fetch = async (url, opts = {}) => {
   if (u.hostname === "upload.example") { uploads++; return result({ id: "vid1" }); }
   if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) return method === "HEAD" ? { ok: true, headers: { get: () => "4" } } : { ok: true, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer };
   if (u.hostname !== "db.example") throw new Error("unexpected " + url);
+  if (u.pathname.endsWith('/rpc/link_autopilot_platform_guarded')) {
+    const body=JSON.parse(opts.body); let row=tables.autopilot.find(r=>r.user_id===body.p_user_id);
+    if (!row) { tables.autopilot.push({user_id:body.p_user_id,enabled:true,platforms:[body.p_platform]}); return result('created'); }
+    if (!row.platforms.includes(body.p_platform)) { row.platforms.push(body.p_platform); return result('extended'); }
+    return result('unchanged');
+  }
   const name = u.pathname.split("/").at(-1);
   if (!tables[name]) throw new Error("table " + name);
   if (failReads && method === "GET" && name === "publish_queue") throw new Error("DB unavailable");

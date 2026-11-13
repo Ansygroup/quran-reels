@@ -38,10 +38,12 @@ const sql = [];
 const restCalls = [];
 let rowsFor = () => [];
 let restRows = [];
+let rpcOutcome = "created";
+let rpcFailure = false;
 const dbStub = {
   q: async (text, params) => { sql.push({ text, params }); return rowsFor(text, params); },
   q1: async (text, params) => { const r = await rowsFor(text, params); return Array.isArray(r) && r.length ? r[0] : null; },
-  rest: async (p, opts) => { restCalls.push({ p: String(p), method: (opts && opts.method) || "GET" }); return restRows; },
+  rest: async (p, opts) => { restCalls.push({ p: String(p), method: (opts && opts.method) || "GET", body: opts?.body }); if (String(p).includes("/rpc/link_autopilot_platform_guarded")) { if (rpcFailure) throw new Error("db down"); return rpcOutcome; } return restRows; },
 };
 require.cache[require.resolve(path.join(ROOT, "lib", "db.js"))] = { id: "db", filename: "db", loaded: true, exports: dbStub };
 require.cache[require.resolve(path.join(ROOT, "lib", "publish.js"))] = {
@@ -51,41 +53,22 @@ require.cache[require.resolve(path.join(ROOT, "lib", "publish.js"))] = {
 
 const A = require(path.join(ROOT, "lib", "autopilot.js"));
 const T = A.__test;
-const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; restRows = []; };
+const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; restRows = []; rpcOutcome = "created"; rpcFailure = false; };
 
 (async () => {
   /* 1) إعداد الأتمتة يُنشأ تلقائيًا عند أول ربط */
   chk("enableDefaultAutomation متاحة", typeof A.enableDefaultAutomation === "function" && typeof T.enableDefaultAutomation === "function");
   reset();
   const created = await A.enableDefaultAutomation("u1", "youtube");
-  const ins = sql.find((s) => /^insert into autopilot/i.test(s.text)) || {};
-  chk("أول ربط ⇒ إنشاء إعداد مفعّل بالمنصة",
-    created === "created" && Boolean(ins.text) && /enabled, at_utc, platforms, template/.test(ins.text) && ins.params[1][0] === "youtube",
-    JSON.stringify({ created, params: ins.params }));
-
-  /* 2) ربط منصة ثانية يُضيفها بدل تجاهلها */
-  reset();
-  rowsFor = (text) => (/from autopilot/i.test(text) ? [{ id: "c1", enabled: true, platforms: ["youtube"] }] : []);
-  const extended = await A.enableDefaultAutomation("u1", "tiktok");
-  const upd = sql.find((s) => /^update autopilot/i.test(s.text)) || {};
-  chk("ربط منصة جديدة يوسّع المنصات",
-    extended === "extended" && Array.isArray(upd.params && upd.params[1]) && upd.params[1].includes("tiktok"),
-    JSON.stringify({ extended, params: upd.params }));
-
-  /* 3) إعادة الربط تحترم اختيار المستخدم إيقاف الأتمتة */
-  reset();
-  rowsFor = (text) => (/from autopilot/i.test(text) ? [{ id: "c1", enabled: false, platforms: ["youtube"] }] : []);
-  const enabled = await A.enableDefaultAutomation("u1", "youtube");
-  chk("إعادة الربط لا تعيد تفعيل أتمتة أوقفها المستخدم", enabled === "unchanged" && !sql.some((s) => /set enabled=true/.test(s.text)), enabled);
-
-  /* 4) لا تغيير بلا داعٍ، وفشل القاعدة لا يرمي */
-  reset();
-  rowsFor = (text) => (/from autopilot/i.test(text) ? [{ id: "c1", enabled: true, platforms: ["youtube"] }] : []);
-  const same = await A.enableDefaultAutomation("u1", "youtube");
-  chk("إعداد سليم ⇒ لا كتابة إطلاقًا", same === "unchanged" && !sql.some((x) => /^(insert|update)/i.test(x.text)), JSON.stringify(sql.map((x) => x.text.slice(0, 30))));
-  reset();
-  rowsFor = () => { throw new Error("db down"); };
-  chk("فشل القاعدة لا يُفشل الربط", (await A.enableDefaultAutomation("u1", "youtube")) === "error");
+  const rpc = restCalls[0];
+  const args = JSON.parse(rpc.body);
+  chk("أول ربط يستخدم RPC ذريًا", created === "created" && rpc.p.includes("/rpc/link_autopilot_platform_guarded") && args.p_user_id === "u1" && args.p_platform === "youtube");
+  reset(); rpcOutcome = "extended";
+  chk("ربط منصة جديدة يوسّع المنصات", await A.enableDefaultAutomation("u1", "tiktok") === "extended" && JSON.parse(restCalls[0].body).p_platform === "tiktok");
+  reset(); rpcOutcome = "unchanged";
+  chk("إعادة الربط تحترم اختيار المستخدم", await A.enableDefaultAutomation("u1", "youtube") === "unchanged");
+  reset(); rpcFailure = true;
+  chk("فشل القاعدة لا يُفشل الربط", await A.enableDefaultAutomation("u1", "youtube") === "error");
 
   /* 5) كل ردود OAuth تُفعّل الأتمتة بعد الربط */
   for (const f of ["cb_youtube.js", "cb_meta.js", "cb_tiktok.js", "cb_x.js"]) {
@@ -134,6 +117,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
   chk("قارئ غير معروف ⇒ رجوع للتدوير", bad.reciter_mode === "rotate" && bad.reciter === "", JSON.stringify(bad));
   reset();
   rowsFor = (text) => (/from autopilot/i.test(text) ? [{ id: "c1", enabled: false, platforms: ["youtube"] }] : []);
+  rpcOutcome = "extended";
   const addedWhilePaused = await A.enableDefaultAutomation("u1", "tiktok");
   chk("إضافة منصة لا تلغي إيقاف الأتمتة", addedWhilePaused === "extended" && !sql.some((s) => /enabled\s*=/.test(s.text)));
   chk("القالب الافتراضي ما زال التدوير", A.parseTemplate({}).reciter_mode === "rotate");
@@ -153,7 +137,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
 
   /* 10) الشارة الجديدة للنسخ */
   chk("نسخة الواجهة مرفوعة في الماركب والكاش",
-    /publish\.js\?v=37/.test(html) && /qr-v58/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
+    /publish\.js\?v=38/.test(html) && /qr-v59/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

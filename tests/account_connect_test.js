@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=37)", /publish\.js\?v=37/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=38)", /publish\.js\?v=38/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -79,7 +79,7 @@ if (!JSDOM) {
         ] });
       }
       if (String(url).includes("/api/autopilot")) {
-        return json({ config: {enabled:false, platforms:[], template:{}}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
+        return json({ config: {settings_revision:null, enabled:false, platforms:[], template:{}}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
           reciters: [], available: [
             { key: "youtube", name: "يوتيوب", publish: true, connect: "youtube", ready: true },
             { key: "tiktok", name: "تيك توك", publish: true, connect: "tiktok", ready: true },
@@ -135,7 +135,7 @@ if (!JSDOM) {
     w2.scrollTo = () => {};
     w2.fetch = (url) => {
       if (String(url).includes("/api/gw?op=list")) return json({ connections: [] });
-      return json({ config: {enabled:false, platforms:[], template:{}}, runs: [], connected: false, platforms: [], reciters: [], available: [], articles: { count: 7993 } });
+      return json({ config: {settings_revision:null, enabled:false, platforms:[], template:{}}, runs: [], connected: false, platforms: [], reciters: [], available: [], articles: { count: 7993 } });
     };
     w2.AuthApp = { getUserId: async () => "u1", getToken: async () => "T" };
     w2.eval(publish);
