@@ -299,6 +299,7 @@ const Creator = {
       if (!all.length) { toast("لا توجد رسائل مختارة", "err"); return; }
       const [s, a, b] = all[Math.floor(Math.random() * all.length)];
       this.setSelection(s, a, b, true);
+      this._showQuickVerse(s, a, b);
       toast("رسالة لك: " + this._famousLabel(s, a, b));
       return;
     }
@@ -306,6 +307,10 @@ const Creator = {
     if (!grp || !grp.i.length) { toast("لا توجد رسائل في هذا التصنيف", "err"); return; }
     const [s, a, b] = grp.i[Math.floor(Math.random() * grp.i.length)];
     this.setSelection(s, a, b, true);
+    this._showQuickVerse(s, a, b);
+  },
+
+  _showQuickVerse(s, a, b) {
     $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(s, a, b)[0])}</div>
       <div class="hint center">${esc(ayahRef(s, a, b))}</div>`;
   },

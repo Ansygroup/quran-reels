@@ -64,9 +64,12 @@ for (const group of groups.filter(g => g.tag !== 'other')) {
   assert($('#msgVerse').innerHTML.includes(quran.ayah(selected[0], selected[1])));
 }
 for (let i = 0; i < 50; i++) {
+  $('#msgVerse').innerHTML = 'stale preview';
   creator._quickPick('me');
+  const [s, a, b] = selected;
   assert(groups.filter(g => g.tag !== 'other').some(g => g.i.some(x => x.join(':') === selected.slice(0, 3).join(':'))));
-  assert(notifications.at(-1).includes(creator._famousLabel(...selected.slice(0, 3))));
+  assert.strictEqual($('#msgVerse').innerHTML, `<div class="inline-ayah">${quran.ayah(s, a)}</div>\n      <div class="hint center">${ref(s, a, b)}</div>`);
+  assert(notifications.at(-1).includes(creator._famousLabel(s, a, b)));
 }
 creator._quickPick('all');
 assert(select.focused);
