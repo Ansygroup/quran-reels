@@ -132,7 +132,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
 
   /* 8) lib/autopilot يفلتر غير القابل للنشر ولا يكرّر الخريطة */
   const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("lib/autopilot يفلتر المنصات بـ canPublish", /filter\(canPublish\)/.test(autoSrc));
+  chk("lib/autopilot يتحقق من المنصات بدل إسقاط غير المدعوم", /validatePlatforms\(requested\)/.test(autoSrc));
   chk("لا خريطة منصات مكرّرة في lib/autopilot", !/linkedin:\s*"لينكد إن"/.test(autoSrc),
     "ما زالت الخريطة القديمة موجودة");
 
@@ -188,9 +188,9 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("connectedPlatforms يعيد المنصات المرتبطة فقط", set1 instanceof Set && set1.has("youtube") && !set1.has("tiktok"),
     [...(set1 || [])].join(","));
   const autoSrc2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("generateAndPublish يفلتر المنصات بالربط", /requested\.filter\(p => connectedSet\.has\(p\)\)/.test(autoSrc2));
+  chk("generateAndPublish يوقف عند منصة مختارة غير مرتبطة", /requested\.filter\(p => !connectedSet\.has\(p\)\)/.test(autoSrc2) && /if \(missing\.length\)/.test(autoSrc2));
   const apiSrc2 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
-  chk("run_all لا يشمل إلا المنصات المرتبطة", /platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
+  chk("run_all يستخدم مسار التشغيل نفسه دون إسقاط المنصات", /body\.action === "run" \|\| body\.action === "run_all"/.test(apiSrc2) && !/platforms = requested\.filter\(p => connectedPlatforms\.includes\(p\)\)/.test(apiSrc2));
 
   /* 12) فحص محرّك التوليد متاح ويعيد تقريرًا منظّمًا */
   let st = null, stErr = null;
@@ -349,14 +349,14 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("acceptDialogs يلتقط الحوار المتأخر", clicked === true && calls >= 3, `clicked=${clicked} calls=${calls}`);
 
   /* 19) سبب الرفض من الصفحة نفسها + تقييد المدة قبل الإنشاء */
-  const libSrc6 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const libSrcG42 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
   const creatorSrc = fs.readFileSync(path.join(ROOT, "public", "js", "creator.js"), "utf8");
   chk("Wait/تعريف: Creator.lastAbortReason يُسجَّل قبل كل خروج مبكر",
     /lastAbortReason/.test(creatorSrc) && (creatorSrc.match(/lastAbortReason = "/g) || []).length >= 4,
     String((creatorSrc.match(/lastAbortReason = "/g) || []).length) + " موضعًا");
-  chk("assertExportStarted يقرأ lastAbortReason", /st\.abort/.test(libSrc6) && /المولّد لم يبدأ التصدير/.test(libSrc6));
+  chk("assertExportStarted يقرأ lastAbortReason", /st\.abort/.test(libSrcG42) && /المولّد لم يبدأ التصدير/.test(libSrcG42));
   chk("renderRecipe يقيّد المدة قبل الإنشاء (لا حوار «المدة طويلة»)",
-    /totalDuration\(\)/.test(libSrc6) && /<= 240/.test(libSrc6));
+    /totalDuration\(\)/.test(libSrcG42) && /<= 240/.test(libSrcG42));
 
   const pAbort = { evaluate: async () => ({ exporting: false, running: false, toast: "", count: 2, abort: "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)" }) };
   let eAbort = null; try { await libAuto2.__test.assertExportStarted(pAbort); } catch (e) { eAbort = e; }
@@ -379,7 +379,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const rec2 = await libAuto2.__test.recordSelfTest({ ok: false, deep: false });
   chk("فشل التسجيل لا يرمي (best effort)", rec2 === false);
   const apiSrc6 = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
-  chk("الـAPI يعيد recorded مع التقرير", /recorded = await recordSelfTest\(report\)/.test(apiSrc6) && /recorded }/.test(apiSrc6));
+  chk("الـAPI يعيد recorded مع التقرير", /recorded = await recordSelfTest\(report, uid\)/.test(apiSrc6) && /recorded }/.test(apiSrc6));
   chk("ملف ترحيل الجدول موجود ومحميّ", fs.existsSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql")) &&
     /enable row level security/.test(fs.readFileSync(path.join(ROOT, "sql", "migrations", "20261111_system_checks.sql"), "utf8")));
 
@@ -387,7 +387,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   setDb({
     q1: async () => null,
     rest: async (p) => {
-      if (/system_checks/.test(p)) return [{ kind: "render_selftest_deep", ok: true, detail: { ms: 9000 }, created_at: "2026-11-11T15:20:00Z" }];
+      if (/system_checks/.test(p)) return [{ kind: "render_selftest_deep", ok: true, detail: { ms: 9000, user_id: "u9" }, created_at: "2026-11-11T15:20:00Z" }];
       if (/autopilot_runs/.test(p)) return [];
       if (/social_connections/.test(p)) return [];
       return [];
@@ -396,13 +396,216 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const acct = await T.accountData("u9");
   chk("accountData يحمل last_check", Boolean(acct.last_check && acct.last_check.kind === "render_selftest_deep"), JSON.stringify(acct.last_check));
   chk("lastSelfTest يقرأ أحدث صف بترتيب تنازلي",
-    (await T.lastSelfTest()) !== null);
+    (await T.lastSelfTest("u9")) !== null);
   setDb({ rest: async () => { throw new Error("table missing"); } });
-  chk("غياب الجدول لا يُسقط اللوحة (last_check = null)", (await T.lastSelfTest()) === null);
+  chk("غياب الجدول لا يُسقط اللوحة (last_check = null)", (await T.lastSelfTest("u9")) === null);
+  let checkQuery = "";
+  setDb({ rest: async (p) => { checkQuery = p; return [{ kind: "render_failure", detail: { user_id: "other", error: "private" } }]; } });
+  chk("آخر فحص لا يكشف تفاصيل مستخدم آخر", (await T.lastSelfTest("u9")) === null && /detail->>user_id=eq.u9/.test(checkQuery) && /kind=in.\(render_selftest,render_selftest_deep\)/.test(checkQuery));
+  const scoped = [];
+  setDb({ rest: async (p, opts) => { scoped.push({ p, opts }); return []; } });
+  await libAuto2.__test.recordSelfTest({ ok: true }, "u9");
+  chk("فحص المستخدم محفوظ بمعرّفه", JSON.parse(scoped[0].opts.body).detail.user_id === "u9");
   const pubSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("اللوحة تعرض «آخر فحص محفوظ»", /acctLastCheck/.test(pubSrc) && /آخر \$\{kind\} محفوظ/.test(pubSrc));
   chk("نص الفحص يذكر هل حُفظت النتيجة", /data\.recorded \?/.test(pubSrc));
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=19/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  /* 22) آخر تشغيل آلي يصل للوحة (لا فشل صامت) */
+  setDb({
+    q1: async () => null,
+    rest: async (p2) => {
+      if (/autopilot_runs/.test(p2)) return [{ run_date: "2026-11-11", status: "failed", error: "توقّف عند «تحضير التلاوة»", external_url: null, created_at: "2026-11-11T04:30:00Z" }];
+      return [];
+    },
+  });
+  const ld = await T.lastDaily("u9");
+  chk("lastDaily يقرأ آخر تشغيل آلي", ld && ld.status === "failed" && ld.run_date === "2026-11-11", JSON.stringify(ld));
+  chk("lastDaily يستخدم run_type=daily فقط", /run_type=eq\.daily/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
+  setDb({ rest: async (p2) => (/autopilot_runs/.test(p2) ? [{ run_date: "2026-11-11", status: "published", external_url: "https://youtu.be/x", created_at: "2026-11-11T04:30:00Z" }] : []) });
+  const acct2 = await T.accountData("u9");
+  chk("accountData يحمل last_daily للوحة", Boolean(acct2.last_daily && acct2.last_daily.status === "published"), JSON.stringify(acct2.last_daily));
+  setDb({ rest: async () => { throw new Error("db down"); } });
+  chk("تعذّر قراءة التشغيل لا يُسقط اللوحة", (await T.lastDaily("u9")) === null);
+  const pubSrc2 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
+    /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
+
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=35/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+
+  /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
+   * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
+   *  تحضّر الصوت ٨٥ ثانية لكل آية قبل أن تُظهر نافذة التصدير أصلًا). */
+  const libSrcAudio = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderRecipe يفحص التلاوة قبل الرندر ويفشل بسبب مسمّى",
+    /probeAudioForRecipe\(recipe, reciter\)/.test(libSrcAudio) && /التلاوة غير متاحة من الخادم:/.test(libSrcAudio) && /diag\.audio = audioProbe/.test(libSrcAudio));
+  chk("مساعدات الصوت مُصدَّرة للاختبار",
+    typeof libAuto2.__test.probeAudioForRecipe === "function" && typeof libAuto2.__test.describeProbe === "function");
+
+  const g42FetchBackup = global.fetch;
+  global.fetch = async () => ({ ok: false, status: 503, headers: { get: () => "" }, arrayBuffer: async () => new ArrayBuffer(0), text: async () => "down" });
+  const probeDown = await libAuto2.__test.probeAudioForRecipe({ s: 108, from: 1, to: 1 }, { id: "Alafasy_128kbps" });
+  chk("فحص الصوت يفشل بوضوح عند تعذّر المصدر",
+    probeDown.direct.ok === false && probeDown.proxy.ok === false && probeDown.direct.status === 503,
+    JSON.stringify(probeDown.direct));
+  global.fetch = async () => ({ ok: true, status: 206, headers: { get: () => "audio/mpeg" }, arrayBuffer: async () => new ArrayBuffer(2048), text: async () => "" });
+  const probeUp = await libAuto2.__test.probeAudioForRecipe({ s: 108, from: 1, to: 2 }, { id: "Alafasy_128kbps" });
+  chk("فحص الصوت ينجح ويقيس أول وآخر آية",
+    probeUp.direct.ok === true && probeUp.proxy.ok === true && Boolean(probeUp.direct_last && probeUp.direct_last.ok),
+    JSON.stringify({ direct: probeUp.direct.ok, last: probeUp.direct_last && probeUp.direct_last.ok }));
+  chk("describeProbe يشرح النتيجة بجملة",
+    /^ok 206 2048B/.test(libAuto2.__test.describeProbe(probeUp.direct)) &&
+    /HTTP 503/.test(libAuto2.__test.describeProbe(probeDown.direct)));
+
+  /* اعتراض الصوت: فشل الجلب ⇒ 502 فورًا (لا انتظار /api/proxy 60s) */
+  let audioRouteHandler = null;
+  const audioFakePage = { route: async (matcher, handler) => { audioRouteHandler = handler; return true; } };
+  const stats = await libAuto2.__test.installAudioRoute(audioFakePage);
+  chk("installAudioRoute يعيد عدّادات", Boolean(stats && stats.ok === 0 && stats.miss === 0), JSON.stringify(stats));
+  global.fetch = async () => { throw new Error("ENOTFOUND everyayah.com"); };
+  let fulfilled = null;
+  await audioRouteHandler({
+    request: () => ({ url: () => "https://quran-reels.test/proxy?u=" + encodeURIComponent("https://everyayah.com/data/Alafasy_128kbps/108001.mp3") }),
+    fulfill: async (o) => { fulfilled = o; },
+    continue: async () => { fulfilled = { continued: true }; },
+    abort: async () => { fulfilled = { aborted: true }; },
+  });
+  chk("فشل الصوت ⇒ ردّ 502 فوري مع عدّاد",
+    fulfilled && fulfilled.status === 502 && stats.miss === 1 && Boolean(stats.lastMiss),
+    JSON.stringify({ status: fulfilled && fulfilled.status, miss: stats.miss, lastMiss: stats.lastMiss }));
+  let passed = null;
+  await audioRouteHandler({
+    request: () => ({ url: () => "https://quran-reels.test/proxy?u=" + encodeURIComponent("https://example.com/x.png") }),
+    fulfill: async (o) => { passed = o; },
+    continue: async () => { passed = { continued: true }; },
+  });
+  chk("مضيف غير صوتي يمرّ كما هو (لا وسيط مفتوح)", Boolean(passed && passed.continued), JSON.stringify(passed));
+  global.fetch = g42FetchBackup;
+
+  /* تشخيص الصوت داخل لقطة التعليق */
+  const errAudio = libAuto2.__test.exportError("stall", { pct: "0%", stage: "", exporting: false, count: 2, prepared: false, cache: 0, overlay: false, silent: false, prepErr: "timeout" }, 90000);
+  chk("سبب التعليق يذكر التحضير والكاش والنافذة",
+    /prepared=false/.test(errAudio.message) && /cache=0/.test(errAudio.message) && /overlay=false/.test(errAudio.message) && /silent=false/.test(errAudio.message),
+    errAudio.message.slice(0, 140));
+  chk("compactReport يحفظ حكم صوت التلاوة",
+    (() => { const r = libAuto2.__test.compactReport({ ok: false, audio_direct: { ok: false, status: 0, ms: 7, error: "ENOTFOUND" }, audio_proxy: { ok: true, status: 200, ms: 9, bytes: 2048 } });
+      return r.audio_direct && r.audio_direct.ok === false && r.audio_proxy && r.audio_proxy.ok === true; })());
+
+  /* الصفحة: نافذة التصدير تظهر قبل التحضير + جلب صوت بمهلة */
+  const g42CreatorSrc = fs.readFileSync(path.join(ROOT, "public", "js", "creator.js"), "utf8");
+  const g42ReelSrc = fs.readFileSync(path.join(ROOT, "public", "js", "reel.js"), "utf8");
+  chk("startExport يُظهر النافذة قبل تحضير التلاوة",
+    g42CreatorSrc.indexOf('ov.hidden = false;') > 0 &&
+    g42CreatorSrc.indexOf('ov.hidden = false;') < g42CreatorSrc.indexOf('if (!this.prepared && !AyahPlayer.playing)'),
+    "ترتيب النافذة/التحضير");
+  chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
+    /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v9 / publish v35 / sw qr-v47)",
+    /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /creator\.js\?v=9/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v47/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+
+  /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
+  chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
+  let eSilent = null;
+  try { await libAuto2.__test.assertAudioPresent({ evaluate: async () => ({ silent: true, cache: 0, prepErr: "HTTP 502" }) }); } catch (e) { eSilent = e; }
+  chk("يرفض الفيديو الصامت بسبب مسمّى",
+    Boolean(eSilent) && /لن يُنشر فيديو بلا صوت/.test(eSilent.message) && /HTTP 502/.test(eSilent.message),
+    eSilent && eSilent.message.slice(0, 90));
+  const aOk = await libAuto2.__test.assertAudioPresent({ evaluate: async () => ({ silent: false, cache: 3, prepErr: "" }) });
+  chk("يمرّ حين تكون التلاوة محمَّلة", aOk && aOk.silent === false && aOk.cache === 3, JSON.stringify(aOk));
+  chk("الفحص يقع قبل أي تنزيل أو رفع",
+    libSrcAudio.indexOf("await assertAudioPresent(page)") > 0 &&
+    libSrcAudio.indexOf("await assertAudioPresent(page)") < libSrcAudio.indexOf('page.click("#btnDownload")'));
+
+  const reelLoop = fs.readFileSync(path.join(ROOT, "public", "js", "reel.js"), "utf8");
+  chk("الحلقة الصامتة تُعيد جدولة نفسها بعد تقدّم الآية",
+    /this\._advance\(\);\s*\n\s*if \(this\.playing\) this\._raf = requestAnimationFrame\(step\);/.test(reelLoop));
+
+  /* assertExportStarted: ينتظر بدء التصدير بدل الحكم من قراءة واحدة، ويتجاهل تنبيهًا قديمًا */
+  let g43Calls = 0;
+  const pSlow = { evaluate: async () => (++g43Calls < 2 ? { exporting: false, running: false, toast: "تم إنشاء الفيديو بنجاح ✨", count: 3 } : { exporting: true, running: true, toast: "", count: 3 }), waitForTimeout: async () => {} };
+  let eSlow = null;
+  try { await libAuto2.__test.assertExportStarted(pSlow, { tries: 4, gapMs: 1 }); } catch (e) { eSlow = e; }
+  chk("لا يحكم بالرفض قبل بدء التصدير فعلًا", eSlow === null, eSlow && eSlow.message.slice(0, 80));
+
+  const pStale = { evaluate: async () => ({ exporting: false, running: false, toast: "تم إنشاء الفيديو بنجاح ✨", count: 3 }), waitForTimeout: async () => {} };
+  let eStale = null;
+  try { await libAuto2.__test.assertExportStarted(pStale, { tries: 2, gapMs: 1 }); } catch (e) { eStale = e; }
+  chk("تنبيه نجاح قديم لا يُقرأ كرفض", eStale === null, eStale && eStale.message.slice(0, 80));
+
+  /* 21) محاكي المتصفح الحقيقي: الوضع الصامت يرفض النشر (SILENT=1) */
+  const dailySim = fs.readFileSync(path.join(ROOT, "tools", "e2e_daily.js"), "utf8");
+  chk("المحاكي يدعم SILENT=1 لاختبار الحارس",
+    /const SILENT = process\.env\.SILENT === "1"/.test(dailySim) && /رفض النشر بلا صوت/.test(dailySim));
+
+  /* 23) G44: ربط منتهٍ (invalid_grant) — علامة على القناة + تنبيه في اللوحة.
+   * الواقع 2026-11-12 04:30: الرندر نجح والفيديو جاهز في التخزين، وفشل النشر
+   * بـ«تجديد التوكن فشل (youtube): invalid_grant» — رسالة لا تقول ما يُفعل. */
+  const pubLib = require(path.join(ROOT, "lib", "publish.js"));
+  chk("isReauthError يميّز انتهاء الربط عن الأعطال العابرة",
+    pubLib.__test.isReauthError("invalid_grant") === true &&
+    pubLib.__test.isReauthError("", "Token has been expired or revoked.") === true &&
+    pubLib.__test.isReauthError("429") === false);
+  const pubSrc3 = fs.readFileSync(path.join(ROOT, "lib", "publish.js"), "utf8");
+  chk("فشل التجديد الدائم يسجّل reauth_needed ويشرح الخطوة",
+    /markReauth\(conn,/.test(pubSrc3) && /انتهت صلاحية ربط/.test(pubSrc3) &&
+    /insert into system_checks \(kind, ok, detail\) values \('reauth_needed'/.test(pubSrc3) &&
+    !/needs_reauth/.test(pubSrc3));
+
+  setDb({
+    q1: async () => null,
+    rest: async (p2) => {
+      if (/social_connections/.test(p2)) return [{ id: "c1", platform: "youtube", account_name: "قناتي", updated_at: "2026-11-12T04:00:00Z" }];
+      if (/system_checks/.test(p2)) return [{ detail: { connection_id: "c1", platform: "youtube", reason: "invalid_grant" }, created_at: "2026-11-12T04:32:00Z" }];
+      return [];
+    },
+  });
+  const acctRe = await T.accountData("u9");
+  chk("accountData يبلّغ عن منصة من system_checks(reauth_needed)",
+    Array.isArray(acctRe.reauth) && acctRe.reauth.includes("youtube"), JSON.stringify(acctRe.reauth));
+
+  setDb({ q1: async () => null, rest: async (p2) => {
+    if (/social_connections/.test(p2)) return [{ id: "mine", platform: "youtube", updated_at: "2026-11-12T05:00:00Z" }];
+    if (/system_checks/.test(p2)) return [{ detail: { connection_id: "other", platform: "youtube" }, created_at: "2026-11-12T06:00:00Z" }];
+    return [];
+  }});
+  chk("علامة حساب آخر لا تظهر في لوحتي", !(await T.accountData("u9")).reauth.includes("youtube"));
+  setDb({ rest: async (p2) => {
+    if (/social_connections/.test(p2)) return [{ id: "mine", platform: "youtube", updated_at: "2026-11-12T05:00:00Z" }];
+    if (/system_checks/.test(p2)) return [{ detail: { connection_id: "mine", platform: "youtube" }, created_at: "2026-11-12T04:00:00Z" }];
+    if (/publish_queue/.test(p2)) return [{ platform: "youtube", error: "invalid_grant", updated_at: "2026-11-12T04:00:00Z" }];
+    return [];
+  }});
+  chk("التحذير القديم يختفي بعد إعادة ربط ناجحة", !(await T.accountData("u9")).reauth.includes("youtube"));
+
+  setDb({
+    q1: async () => null,
+    rest: async (p2) => {
+      if (/social_connections/.test(p2)) return [{ id: "c1", platform: "youtube", account_name: "Psych", meta: null }];
+      if (/publish_queue/.test(p2)) return [{ platform: "youtube", error: "تجديد التوكن فشل (youtube): invalid_grant" }];
+      return [];
+    },
+  });
+  const acctRe2 = await T.accountData("u9");
+  chk("accountData يستنتج إعادة الربط من آخر خطأ نشر",
+    Array.isArray(acctRe2.reauth) && acctRe2.reauth.includes("youtube"), JSON.stringify(acctRe2.reauth));
+
+  setDb({
+    q1: async () => null,
+    rest: async (p2) => {
+      if (/social_connections/.test(p2)) return [{ id: "c1", platform: "youtube", account_name: "Psych", meta: {} }];
+      if (/publish_queue/.test(p2)) return [{ platform: "youtube", error: "جوجل رفض الرفع: quota" }];
+      return [];
+    },
+  });
+  const acctRe3 = await T.accountData("u9");
+  chk("خطأ عابر (quota) لا يُعلَن كإعادة ربط",
+    Array.isArray(acctRe3.reauth) && acctRe3.reauth.length === 0, JSON.stringify(acctRe3.reauth));
+
+  const pubSrc4 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
+  chk("اللوحة تشرح المحاولة التلقائية بعد إعادة الربط",
+    /acctReauth/.test(pubSrc4) && /هيحاول ينشر الفيديو الجاهز بعد الربط/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
+  chk("اللوحة فيها زر «انشر الفيديو الجاهز» بإجراء retry_publish",
+    /btnRetryPublish/.test(pubSrc4) && /retry_publish/.test(pubSrc4) && /retry_publish/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
