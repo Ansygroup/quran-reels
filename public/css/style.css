@@ -960,3 +960,6 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 /* حالة الحفظ تبقى بجوار الإجراء وتظهر بوضوح على الجوال. */
 .acct-edit-state{margin:10px 0 0;line-height:1.7}
 .acct-edit-state.warn{padding:10px 12px;border-inline-start:3px solid #ffcf8b;background:rgba(255,207,139,.08);border-radius:8px}
+
+/* مراجعة نتيجة حفظ غير مؤكدة دون إخفاء مسودة المستخدم. */
+#acctRecovery p{margin:0 0 10px}#acctSavedReview{margin-top:14px}#acctSavedReviewText{max-height:18rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:rgba(0,0,0,.25);border-radius:10px;font-size:.82rem}

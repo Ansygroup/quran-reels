@@ -71,6 +71,65 @@ window.PublishApp = {
   connectPath,
   CONNECT_PLATFORM,
   
+  validAccountConfig(config) {
+    return Boolean(config && typeof config === "object" && typeof config.enabled === "boolean" &&
+      Array.isArray(config.platforms) && config.platforms.every(p => typeof p === "string") &&
+      config.template && typeof config.template === "object" && !Array.isArray(config.template));
+  },
+  savedMatches(config, body) {
+    const same = (actual, expected) => {
+      if (expected && typeof expected === "object") {
+        if (!actual || typeof actual !== "object" || Array.isArray(actual) !== Array.isArray(expected)) return false;
+        if (Array.isArray(expected) && actual.length !== expected.length) return false;
+        return Object.keys(expected).every(k => same(actual[k], expected[k]));
+      }
+      return actual === expected;
+    };
+    if (!this.validAccountConfig(config) || config.enabled !== body.enabled ||
+        !same(config.platforms, body.platforms) || config.all_channels !== body.all_channels ||
+        !same(config.template, body.template)) return false;
+    return body.template.background !== "custom" || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(config.template.background_image_id || "");
+  },
+  showUncertainty() {
+    const box = document.getElementById("acctRecovery");
+    if (box) box.hidden = !this._settingsUncertain;
+    const save = document.getElementById("autoSave"); if (save) save.disabled = Boolean(this._settingsUncertain || this._settingsPending);
+    const resume = document.getElementById("acctResume"); if (resume) resume.hidden = !this._reviewedUncertain;
+    const review = document.getElementById("acctSavedReview"); if (review) review.hidden = !this._reviewedUncertain;
+  },
+  async reviewSettings() {
+    if (!this._settingsUncertain || this._reviewPending) return;
+    this._reviewPending = true;
+    const owner = this._accountOwner, seq = this._initSeq = (this._initSeq || 0) + 1;
+    const button = document.getElementById("acctRecheck"); if (button) button.disabled = true;
+    try {
+      const token = await window.AuthApp.getToken();
+      if (!token || seq !== this._initSeq || owner !== this._accountOwner || await window.AuthApp.getUserId() !== owner || seq !== this._initSeq || owner !== this._accountOwner) return;
+      const res = await fetch("/api/autopilot", { method: "GET", cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (seq !== this._initSeq || owner !== this._accountOwner) return;
+      if (!res.ok || !this.validAccountConfig(data.config)) throw new Error("invalid response");
+      this.data = data;
+      const c = data.config, t = c.template;
+      const summary = { "الأتمتة": c.enabled ? "مفعّلة" : "موقوفة", "المنصات": c.platforms, "كل القنوات": c.all_channels === true ? "نعم" : "لا", "محتوى الفيديو": t.content_mode, "السورة": t.surah ?? "تلقائي", "من آية": t.from ?? "تلقائي", "إلى آية": t.to ?? "تلقائي", "القارئ": t.reciter || "تلقائي", "الخلفية": t.background, "معرّف الصورة": t.background_image_id || "لا يوجد", "تصميم الفيديو": t.design || "تلقائي" };
+      const output = document.getElementById("acctSavedReviewText"); if (output) output.textContent = JSON.stringify(summary, null, 2);
+      this._reviewedUncertain = true;
+      this.showUncertainty();
+    } catch {
+      if (seq === this._initSeq && typeof toast === "function") toast("تعذّر التحقق من إعدادات الخادم؛ حاول تاني", "err");
+    } finally {
+      this._reviewPending = false;
+      if (button) button.disabled = false;
+    }
+  },
+  resumeSettings() {
+    if (!this._settingsUncertain || !this._reviewedUncertain) return;
+    this._settingsUncertain = false; this._reviewedUncertain = false;
+    this.showUncertainty();
+    const toggle = document.getElementById("acctEnabled"); if (toggle) toggle.disabled = false;
+    this.renderStatus(this.data || {}); this.renderSteps(this.data || {});
+  },
+
   async init() {
     const seq = this._initSeq = (this._initSeq || 0) + 1;
     const uid = await window.AuthApp.getUserId();
@@ -86,7 +145,7 @@ window.PublishApp = {
         const node = document.getElementById(id); if (node) node.innerHTML = "";
       }
       const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
-      this.reauth = []; this._settingsUncertain = false;
+      this.reauth = []; this._settingsUncertain = false; this._reviewedUncertain = false; this.showUncertainty();
       const toggle = document.getElementById("acctEnabled"); if (toggle) { toggle.checked = false; toggle.disabled = true; }
       const label = document.getElementById("acctStateLabel"); if (label) label.textContent = "جارٍ التحقق…";
       const next = document.getElementById("acctNextRun"); if (next) next.textContent = "—";
@@ -130,10 +189,15 @@ window.PublishApp = {
       return;
     }
     
+    if (!this.validAccountConfig(data.config)) {
+      const notice = document.getElementById("acctNotice");
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "بيانات الحساب غير مكتملة؛ لم نغيّر الإعدادات. حاول تحميل الصفحة مرة أخرى."; }
+      return;
+    }
+    if (this._settingsUncertain) { this._reviewedUncertain = false; this.showUncertainty(); }
     const notice = document.getElementById("acctNotice");
     if (notice && notice.dataset.loadError) { delete notice.dataset.loadError; notice.hidden = true; notice.style.display = "none"; }
-    if (typeof data.config?.enabled === "boolean") this._settingsUncertain = false;
-    const toggle = document.getElementById("acctEnabled"); if (toggle) toggle.disabled = false;
+    const toggle = document.getElementById("acctEnabled"); if (toggle) toggle.disabled = Boolean(this._settingsUncertain);
     this.renderAccount(data);
     this.bindEvents(uid);
     this.startProgressPolling();
@@ -188,7 +252,7 @@ window.PublishApp = {
 
   articleLabel(data) {
     const n = data && data.articles && Number(data.articles.count) > 0 ? Number(data.articles.count) : 0;
-    return n ? `📚 توليد من مقال (${n.toLocaleString("ar-EG")} مقال)` : "📚 توليد من مقال";
+    return n ? `📚 إنشاء ونشر من مقال (${n.toLocaleString("ar-EG")} مقال)` : "📚 إنشاء ونشر من مقال";
   },
 
   /* ---------- سطر آخر تشغيل آلي ---------- */
@@ -272,8 +336,8 @@ window.PublishApp = {
     if (this._settingsUncertain) {
       if (toggle) toggle.disabled = true;
       if (dot) dot.className = "acct-dot warn";
-      if (label) label.textContent = "حالة الأتمتة غير مؤكدة";
-      if (nextEl) nextEl.textContent = "حدّث الصفحة وتأكد من الحالة قبل المحاولة تاني";
+      if (label) label.textContent = "نتيجة آخر تغيير غير مؤكدة";
+      if (nextEl) nextEl.textContent = "تحقق من إعدادات الخادم قبل المحاولة تاني";
       return;
     }
     if (toggle) toggle.checked = enabled;
@@ -894,8 +958,11 @@ window.PublishApp = {
       /* أزرار الربط/الفك/الافتراضية يتولاها wireConnections */
       if (el.dataset.connect || el.dataset.unlink || el.dataset.default !== undefined) return;
       const act = el.dataset.act || ACTIONS[el.id];
-      if (!act) return;
+      // مبدّل الأتمتة يعالجه حدث change؛ لا تمنع سلوك checkbox الافتراضي.
+      if (!act || act === "toggle-enabled") return;
       e.preventDefault();
+      if (act === "recheck-settings") return this.reviewSettings();
+      if (act === "resume-settings") return this.resumeSettings();
       if (act === "save") return this.saveSettings({ btn: el });
       if (act === "run" || act === "run_all") return this.runNow(act, el);
       if (act === "article_random") return this.randomArticle(el);
@@ -917,8 +984,8 @@ window.PublishApp = {
       const save = document.getElementById("autoSave");
       if (save) save.disabled = true;
       let out;
-      try { out = await this.api("set_enabled", { enabled: want }); }
-      catch { out = { ok: false, uncertain: true }; }
+      try { out = await this.api("set_enabled", { enabled: want }, owner); }
+      catch (e) { out = e?.beforeSend ? { ok: false, beforeSend: true, error: e.message } : { ok: false, uncertain: true }; }
       this._settingsPending = false;
       if (owner !== this._accountOwner) { this.init(); return; }
       if (save) save.disabled = false;
@@ -928,12 +995,12 @@ window.PublishApp = {
         this.renderStatus(this.data);
         this.renderSteps(this.data);
         if (typeof toast === "function") toast(want ? "✅ الأتمتة مفعّلة بالإعدادات المحفوظة" : "⏸️ الأتمتة اتوقفت — إعدادات النشر محفوظة");
-      } else if (out.uncertain || out.status >= 500 || (out.ok && out.enabled !== want)) {
+      } else if (out.uncertain || (!out.beforeSend && ![400, 401, 403, 409, 413, 422].includes(out.status)) || (out.ok && out.enabled !== want)) {
         // قد يكون الخادم حفظ قبل انقطاع الرد؛ لا نعرض الحالة القديمة كأنها مؤكدة.
-        this._settingsUncertain = true;
+        this._settingsUncertain = true; this._reviewedUncertain = false; this.showUncertainty();
         if (save) save.disabled = true;
         this.renderStatus(this.data);
-        if (typeof toast === "function") toast("تعذّر تأكيد الحالة؛ حدّث الصفحة وراجعها قبل المحاولة تاني", "err");
+        if (typeof toast === "function") toast("تعذّر تأكيد الحالة؛ تحقق من إعدادات الخادم قبل المحاولة تاني", "err");
       } else {
         t.disabled = false;
         t.checked = !want;
@@ -942,14 +1009,21 @@ window.PublishApp = {
     });
   },
 
-  async api(action, payload = {}) {
+  async api(action, payload = {}, expectedOwner = this._accountOwner) {
+    let token;
+    try {
+      token = await window.AuthApp.getToken();
+      if (expectedOwner && (expectedOwner !== this._accountOwner || await window.AuthApp.getUserId() !== expectedOwner || expectedOwner !== this._accountOwner || !token)) throw new Error("الحساب اتغيّر أو انتهت الجلسة قبل إرسال الطلب؛ راجع الحساب وحاول تاني");
+    } catch (cause) {
+      const error = new Error(cause?.message || "تعذّر التحقق من الحساب قبل إرسال الطلب"); error.beforeSend = true; throw error;
+    }
     const res = await fetch("/api/autopilot", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, ...payload }),
     });
     const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, ...data };
+    return { ...data, ok: res.ok && data.ok !== false, status: res.status };
   },
 
   // Normalize the user-selected image locally. Canvas drops EXIF / location metadata.
@@ -1014,17 +1088,25 @@ window.PublishApp = {
     this._settingsPending = true;
     if (toggle) toggle.disabled = true;
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
-    let out = { ok: false };
+    let out = { ok: false }, sent = false;
     try {
       if (imageFile) body.custom_image = await this.prepareAccountImage(imageFile);
-      out = await this.api("save", body);
-    } catch (e) { out = { ok: false, error: e?.message || "تعذّر الاتصال بالخادم" }; }
+      sent = true;
+      out = await this.api("save", body, owner);
+    } catch (e) { out = { ok: false, uncertain: sent && !e?.beforeSend, beforeSend: Boolean(e?.beforeSend), error: e?.message || "تعذّر الاتصال بالخادم" }; }
+    const confirmed = out.ok && this.savedMatches(out.config, body);
+    const uncertain = sent && !out.beforeSend && (out.uncertain || (out.ok && !confirmed) || (!out.ok && ![400, 401, 403, 409, 413, 422].includes(out.status)));
+    if (uncertain) out = { ...out, ok: false, uncertain: true, error: "تعذّر تأكيد نتيجة الحفظ؛ تحقق من الخادم قبل المحاولة" };
     this._settingsPending = false;
     if (owner !== this._accountOwner) { this.init(); return out; }
     if (toggle) toggle.disabled = false;
     if (btn) { btn.disabled = false; btn.textContent = old; }
 
-    if (out.ok) {
+    if (uncertain) {
+      this._autoDirty = true; this._settingsUncertain = true; this._reviewedUncertain = false;
+      this.renderEditState(); this.showUncertainty(); this.renderStatus(this.data || {});
+      if (typeof toast === "function") toast(out.error, "err");
+    } else if (confirmed) {
       // لا نعتبر تعديلًا حدث أثناء طلب الحفظ جزءًا من الاستجابة السابقة.
       this._autoDirty = (this._autoEditRevision || 0) !== editRevision;
       this.renderEditState();
@@ -1039,6 +1121,9 @@ window.PublishApp = {
   },
 
   async runNow(kind, btn) {
+    if (this._settingsPending || this._settingsUncertain) {
+      if (typeof toast === "function") toast("راجع حالة الإعدادات أولًا قبل التشغيل اليدوي", "err"); return;
+    }
     if (this._runPending) return;
     this._runPending = true;
     this._progressBaseline = this._lastProgressRunId || this.data?.runs?.[0]?.id || null;
@@ -1065,15 +1150,25 @@ window.PublishApp = {
   },
 
   async randomArticle(btn) {
-    if (btn) { btn.disabled = true; }
+    if (this._settingsPending || this._settingsUncertain) {
+      if (typeof toast === "function") toast("راجع حالة الإعدادات أولًا قبل التشغيل اليدوي", "err"); return;
+    }
+    if (this._runPending) return;
+    if (!confirm("سيُنشأ فيديو من مقال ويُحاول نشره فورًا بالإعدادات المحفوظة، وليس مسودة للمعاينة. هل تريد المتابعة؟")) return;
+    this._runPending = true;
+    if (btn) btn.disabled = true;
     try {
       const out = await this.api("article_random");
       if (out.ok) {
-        if (typeof toast === "function") toast(`📚 ${out.article_title || "مقال"} — ${out.url || ""}`);
-        else alert(`📚 ${out.article_title || "مقال"} — ${out.url || ""}`);
+        if (typeof toast === "function") toast(`📚 ${out.article_title || "مقال"} — راجع حالة النشر في السجل`);
+        else alert(`📚 ${out.article_title || "مقال"} — راجع حالة النشر في السجل`);
       } else if (typeof toast === "function") toast(String(out.error || "تعذّر التوليد من مقال"), "err");
-    } catch { }
-    if (btn) { btn.disabled = false; }
+    } catch {
+      if (typeof toast === "function") toast("الاتصال اتقطع؛ راجع حالة التشغيل قبل ما تحاول تاني", "err");
+    } finally {
+      this._runPending = false;
+      if (btn) btn.disabled = false;
+    }
   },
 
   async retryPublish(btn) {

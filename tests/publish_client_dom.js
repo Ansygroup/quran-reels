@@ -74,6 +74,7 @@ const consoleErrors = [];
 const alerts = [];
 window.console.error = (...a) => consoleErrors.push(a.join(" "));
 window.alert = (m) => { alerts.push(String(m)); };
+window.confirm = () => true;
 
 // بدائل الشبكة والمصادقة
 window.QRAuth = { user: () => ({ id: "u1", email: "a@b.c" }), token: async () => "test-token" };
@@ -86,7 +87,7 @@ window.fetch = async (url, opts = {}) => {
   calls.push({ url: String(url), method, body: opts.body, action });
   const payload =
     method === "GET" ? ACCOUNT :
-    action === "save" ? { ok: true, config: ACCOUNT.config } :
+    action === "save" ? { ok: true, config: JSON.parse(opts.body) } :
     action === "run" ? { ok: true, url: "https://youtu.be/x" } :
     action === "run_all" ? { ok: true, run_id: "r3" } :
     action === "article_random" ? { ok: true, article_title: "مقال قرآني", url: "https://quran-reels.test/articles/1" } :
