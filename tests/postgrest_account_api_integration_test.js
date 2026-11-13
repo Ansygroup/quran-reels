@@ -64,7 +64,9 @@ const gateway=http.createServer(async(req,res)=>{
     const enabled=await call({action:'set_enabled',enabled:true,expected_revision:created.body.config.settings_revision});
     assert.equal(enabled.statusCode,200,JSON.stringify(enabled.body)); assert.equal(enabled.body.enabled,true);
     const revision=enabled.body.config.settings_revision;
-    const one={...draft,enabled:true,expected_revision:revision};
+    // Both drafts must actually change the saved content. A genuine no-op is
+    // allowed to keep its revision and does not represent a conflicting write.
+    const one={...draft,enabled:true,expected_revision:revision,template:{content_mode:'sequential',background:'rotate'}};
     const two={...one,template:{content_mode:'famous',background:'rotate'}};
     const concurrent=await Promise.all([call(one),call(two)]);
     assert.deepEqual(concurrent.map(r=>r.statusCode).sort(),[200,409]);
@@ -84,4 +86,13 @@ const gateway=http.createServer(async(req,res)=>{
     assert.deepEqual(await row(A),originalA);
     console.log('PASS real account API + real db.js + real PostgREST: owner scoping, CAS, old clients and committed/lost reply (mock auth)');
   } finally { await new Promise(resolve=>gateway.close(resolve)); }
-})().catch(e=>{console.error(e);process.exitCode=1});
+})().catch(e=>{
+  console.error(e);
+  // Expose fixture-only failures as check annotations even if CI log download
+  // is blocked; escape workflow-command metacharacters and avoid any tokens.
+  if(process.env.GITHUB_ACTIONS==='true') {
+    const message=String(e?.stack||e).slice(0,3000).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A');
+    console.error('::error title=Account API integration::'+message);
+  }
+  process.exitCode=1;
+});
