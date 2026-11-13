@@ -410,9 +410,10 @@ button{cursor:pointer;background:none;border:none}
   width:100%;display:flex;justify-content:space-between;gap:14px;align-items:center;
   padding:17px 20px;font-weight:700;font-size:.99rem;text-align:right;
 }
+.faq-q:focus-visible{outline:3px solid var(--gold);outline-offset:-4px}
 .faq-q .caret{color:var(--gold);transition:.3s;font-size:.9rem}
 .faq-item.open .caret{transform:rotate(180deg)}
-.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease;color:var(--muted);font-size:.93rem}
+.faq-a{color:var(--muted);font-size:.93rem}
 .faq-a > div{padding:0 20px 18px}
 
 /* ---------- tool page ---------- */
@@ -762,3 +763,200 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 
 /* زر تثبيت التطبيق PWA */
 .install-btn{position:fixed;bottom:18px;inset-inline-start:18px;z-index:70;display:inline-flex;align-items:center;gap:.45em;padding:.65em 1.1em;border:0;border-radius:999px;background:linear-gradient(135deg,#e6c46a,#caa744);color:#0b1f18;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.45)}
+
+/* ================= حسابي — التصميم الجديد (2026) ================= */
+.acct-wrap{max-width:980px}
+.acct-hero{display:grid;grid-template-columns:1.5fr .9fr;gap:22px;align-items:center;padding:24px 22px}
+.acct-hero-l h1{font-size:2rem;margin:6px 0 10px}
+.acct-hero-l .lead{color:var(--muted);line-height:1.85;max-width:560px}
+.acct-status{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.22);border:1px solid var(--line-2);border-radius:16px;padding:14px 16px}
+.acct-status-txt{flex:1;min-width:0}
+.acct-status-txt b{display:block;font-size:.98rem;line-height:1.5}
+.acct-status-txt small{display:block}
+.acct-dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:#84908a;box-shadow:0 0 0 5px rgba(132,144,138,.13)}
+.acct-dot.on{background:#7ee0a2;box-shadow:0 0 0 5px rgba(126,224,162,.16)}
+.acct-dot.warn{background:#ffcf8b;box-shadow:0 0 0 5px rgba(255,207,139,.16)}
+.acct-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.acct-step{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;min-width:0}
+.acct-step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;font-size:.8rem;font-weight:800;background:rgba(255,255,255,.07);color:var(--muted);border:1px solid var(--line-2)}
+.acct-step.done{border-color:rgba(126,224,162,.4)}
+.acct-step.done .n{background:rgba(126,224,162,.16);color:#7ee0a2;border-color:rgba(126,224,162,.35)}
+.acct-step b{display:block;font-size:.92rem}
+.acct-step small{display:block;color:var(--muted);font-size:.76rem;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.acct-kpis .kpi{background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:12px 14px;min-width:0}
+.acct-kpis .kpi b{display:block;font-size:1.25rem;color:var(--gold);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-kpis .kpi.warn b{color:#ffcf8b}
+.acct-kpis .kpi span{display:block;color:var(--muted);font-size:.76rem;margin-top:2px}
+.acct-sec{margin-top:18px}
+.acct-sec-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px;flex-wrap:wrap}
+.acct-sec-head h2{font-size:1.1rem;margin:0}
+.acct-sec-head .hint{margin:0;max-width:520px;line-height:1.7}
+.acct-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.acct-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.acct-actions{margin-top:14px}
+.acct-notice{margin-top:18px;padding:12px 14px;border:1px solid rgba(212,175,55,.35);border-radius:14px;background:rgba(212,175,55,.07);line-height:1.8;font-size:.9rem}
+.acct-channels{display:flex;flex-direction:column;gap:16px}
+.chan-group{display:flex;flex-direction:column;gap:9px;min-width:0}
+.chan-group.muted{opacity:.72}
+.chan-head{display:flex;align-items:center;gap:9px}
+.chan-head b{font-size:.95rem}
+.chan-list{display:flex;flex-direction:column;gap:8px}
+.chan-card{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--panel-2,rgba(255,255,255,.03));border:1px solid var(--line-2);border-radius:14px;padding:10px 12px;transition:.18s}
+.chan-card.on{border-color:rgba(126,224,162,.4)}
+.chan-card.off{border-color:rgba(255,207,139,.42);background:rgba(255,207,139,.06)}
+.chan-card .chan-info{display:flex;flex-direction:column;flex:1;min-width:0}
+.chan-card .chan-info b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.93rem}
+.chan-card .chan-info small{font-size:.76rem;margin-top:2px}
+.chan-card .chan-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chan-ic{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:1.05rem;flex:0 0 auto}
+.chan-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chan-foot .hint{margin:0}
+.auto-warning{font-size:.88rem;line-height:1.8}
+@media (max-width:760px){
+  .acct-hero{grid-template-columns:1fr;gap:14px;padding:18px}
+  .acct-hero-l h1{font-size:1.6rem}
+  .acct-steps{grid-template-columns:1fr}
+  .acct-kpis{grid-template-columns:repeat(2,1fr)}
+  .acct-grid2,.acct-grid3{grid-template-columns:1fr}
+  .chan-card .chan-acts{width:100%}
+}
+
+/* مراحل حقيقية يسجلها الخادم، بلا نسبة تقديرية. */
+.acct-progress .progress-steps,.acct-progress .progress-channels{margin:12px 0;padding-inline-start:1.5rem;display:grid;gap:.5rem}
+.acct-progress .progress-steps{list-style:none;padding-inline-start:0}
+.acct-progress .progress-channels a{color:var(--gold,#c99838);text-decoration:underline}
+
+/* ترتيب لوحة الحساب: الأولوية للحالة والمتابعة، والتفاصيل الأقل استخدامًا قابلة للفتح. */
+.acct-wrap{max-width:1040px;padding-top:38px;padding-bottom:72px}
+.acct-hero{background:linear-gradient(130deg,rgba(25,67,52,.94),rgba(8,25,20,.96));border-color:rgba(212,175,55,.25);border-radius:22px;padding:30px;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+.acct-hero-l h1{font-size:2.15rem;letter-spacing:-.02em}
+.acct-hero-l .lead{max-width:490px;line-height:1.8}
+.acct-status{background:rgba(3,15,11,.48);padding:18px;border-radius:16px}
+.acct-steps{gap:10px;margin-top:14px}
+.acct-step{background:rgba(14,35,27,.8)}
+.acct-sec{border-radius:20px;padding:24px;margin-top:16px}
+.acct-sec-head{margin-bottom:16px}
+.acct-sec-head h2{font-size:1.18rem}
+.acct-sec-head .hint{margin-top:5px}
+.acct-progress{border-color:rgba(212,175,55,.23)}
+.acct-kpis{margin-top:16px}
+#acctAlerts:not(:empty){margin-top:14px;padding:4px 18px;border:1px solid var(--line-2);border-radius:16px;background:rgba(14,35,27,.8)}
+#acctAlerts .auto-warning{margin:10px 0}
+.acct-actions{gap:10px}
+.acct-more{margin-top:16px}
+.acct-more summary,.acct-disclosure summary{cursor:pointer;color:var(--gold-3);font-weight:700}
+.acct-more summary:focus-visible,.acct-disclosure summary:focus-visible{outline:2px solid var(--gold);outline-offset:5px;border-radius:4px}
+.acct-disclosure summary small{font-weight:400;color:var(--muted);margin-inline-start:10px}
+.acct-disclosure[open] summary{margin-bottom:14px}
+.acct-disclosure .hint{line-height:1.8}
+#queueList:empty{display:none}
+@media(max-width:760px){
+  .acct-wrap{padding-top:22px;padding-bottom:48px}
+  .acct-hero{padding:22px;gap:18px}
+  .acct-hero-l h1{font-size:1.8rem}
+  .acct-sec{padding:19px}
+  .acct-actions .btn{flex:1 1 auto;white-space:normal;text-align:center}
+  .acct-disclosure summary small{display:block;margin:4px 22px 0 0}
+}
+
+/* المنصات غير المختارة تُجمع دون إخفاء القنوات أو المنصات التي تحتاج ربطًا. */
+.chan-more{border-top:1px solid var(--line-2);padding-top:15px}
+.chan-more summary{cursor:pointer;color:var(--gold-3);font-weight:700}
+.chan-more summary:focus-visible{outline:2px solid var(--gold);outline-offset:5px;border-radius:4px}
+.chan-more summary small{color:var(--muted);font-weight:400}
+.chan-more-list{display:flex;flex-direction:column;gap:16px;margin-top:18px}
+
+/* واجهة الصانع: نقلّل التكرار ونترك المعاينة والإعدادات كلها متاحة. */
+#view-home .hero{padding:58px 0 34px}
+#view-home .hero-badge{margin-bottom:18px}
+#view-home .hero h1{max-width:760px}
+#view-home .hero-sub{max-width:610px;line-height:1.9}
+#view-home .hero-cta{margin-top:24px;gap:10px}
+#view-home .stats{grid-template-columns:repeat(3,minmax(0,1fr));max-width:680px;margin-top:32px;gap:10px}
+#view-home .stat{padding:12px 8px}
+#view-home #create .section-head{margin-bottom:28px}
+#view-home .creator-grid{gap:28px}
+#view-home .preview-label{display:flex;justify-content:space-between;align-items:center;margin:0 4px 10px;font-size:.88rem;font-weight:700}
+#view-home .preview-label span{font-size:.76rem;color:var(--emerald);font-weight:500}
+#view-home .controls-col .panel{padding:26px;border-radius:22px}
+#view-home .step-tab{min-height:42px}
+#view-home .step-tab:focus-visible,#view-home .icon-btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:1080px){
+  /* تصغير المعاينة في العمود الواحد يقرّب الإعدادات دون إخفاء الفيديو. */
+  #view-home .preview-col{max-width:280px}
+}
+@media(max-width:560px){
+  #view-home .hero{padding:36px 0 24px}
+  #view-home .hero-ayah{font-size:1.5rem}
+  #view-home .hero-sub{margin-top:12px}
+  #view-home .stats{margin-top:26px;gap:7px}
+  #view-home .stat span{font-size:.72rem}
+  #view-home .preview-col{max-width:220px}
+  #view-home .controls-col .panel{padding:18px}
+  #view-home .steps-tabs{gap:6px}
+  #view-home .step-tab{padding:8px 12px}
+}
+
+/* أقسام مساعدة مختصرة: المحتوى المهم أولًا وروابط الأدوات والمكتبة واضحة. */
+#view-home .home-features .features{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#view-home .home-features .feature{padding:20px}
+#view-home .home-features .f-ic{width:42px;height:42px;margin-bottom:12px;font-size:1.2rem}
+#view-home .home-library-card{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px;background:linear-gradient(135deg,rgba(212,175,55,.1),rgba(45,212,160,.08));border-color:var(--line)}
+#view-home .home-library-card h2{font-size:1.5rem}
+#view-home .home-library-card p{margin-top:8px;color:var(--muted);line-height:1.8}
+#view-home .home-library-card .btn{flex-shrink:0}
+@media(max-width:820px){#view-home .home-features .features{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  #view-home .home-features .feature{padding:16px}
+  #view-home .home-features .feature h3{font-size:.94rem}
+  #view-home .home-features .feature p{font-size:.82rem}
+  #view-home .home-library-card{align-items:flex-start;flex-direction:column;padding:22px;gap:16px}
+}
+#view-home #homeTools{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:820px){#view-home #homeTools{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){
+  #view-home #steps .steps-flow{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  #view-home #steps .step-card{padding:16px 12px}
+}
+
+/* صفحة الأدوات: البحث والنتائج في مكان واضح مع إبقاء كل الروابط متاحة. */
+#view-tools .tools-page{padding:42px 0 72px}
+#view-tools .tools-intro{text-align:center;padding:30px 20px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(135deg,rgba(25,67,52,.8),rgba(8,25,20,.9))}
+#view-tools .tools-intro h1{font-size:clamp(1.8rem,4vw,2.6rem);line-height:1.4}
+#view-tools .tools-intro p{color:var(--muted);margin-top:8px}
+#view-tools .tools-search{margin:22px auto 0;max-width:600px}
+#view-tools .tools-search .input{padding:14px 45px 14px 64px;background-color:rgba(0,0,0,.3)}
+#view-tools .tools-search input::-webkit-search-cancel-button{-webkit-appearance:none}
+#view-tools .tools-clear{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--gold-3);font-size:.86rem;padding:6px 8px;border-radius:8px}
+#view-tools .tools-clear:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#view-tools .tools-list-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 2px 14px;flex-wrap:wrap}
+#view-tools .tools-list-head h2{font-size:1.12rem}
+#view-tools .tools-list-head p{font-size:.85rem;color:var(--muted)}
+#view-tools .tools-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#view-tools .tool-card{min-width:0;padding:20px;display:flex;flex-direction:column;gap:4px}
+#view-tools .tool-card .t-ic{margin-bottom:8px}
+#view-tools .tool-card:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+#view-tools .tools-empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line-2);border-radius:16px}
+@media(max-width:900px){#view-tools .tools-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){
+  #view-tools .tools-page{padding:24px 0 48px}
+  #view-tools .tools-intro{padding:24px 16px}
+  #view-tools .tools-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  #view-tools .tool-card{padding:15px}
+  #view-tools .tool-card h3{font-size:.94rem}
+}
+
+/* معاينة إعدادات الأتمتة مستقلة عن صانع الصفحة الرئيسية. */
+.acct-reel-editor{display:grid;grid-template-columns:minmax(170px,260px) minmax(0,1fr);gap:24px;align-items:start;margin:20px 0}
+.acct-preview{max-width:260px;width:100%;margin-inline:auto}.acct-preview .phone-screen{border:1px solid var(--line);border-radius:20px}.acct-preview .hint{line-height:1.6}
+.acct-reel-controls{min-width:0}.acct-reel-controls .acct-grid2,.acct-reel-controls .acct-grid3{margin:12px 0}.acct-reel-controls input:not([type=checkbox]):not([type=range]){width:100%}
+@media(max-width:760px){.acct-reel-editor{grid-template-columns:1fr}.acct-preview{max-width:200px}}
+.acct-reel-controls [hidden]{display:none}
+.acct-preview [hidden]{display:none}.acct-preview audio{display:block;width:100%;margin-top:8px}
+/* Keep the account image picker within narrow mobile cards. */
+#acctBackgroundFile{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+
+/* حالة الحفظ تبقى بجوار الإجراء وتظهر بوضوح على الجوال. */
+.acct-edit-state{margin:10px 0 0;line-height:1.7}
+.acct-edit-state.warn{padding:10px 12px;border-inline-start:3px solid #ffcf8b;background:rgba(255,207,139,.08);border-radius:8px}
