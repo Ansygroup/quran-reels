@@ -48,32 +48,46 @@ const AyahPlayer = {
     return Math.min(28, Math.max(2.6, words * 0.75 + len * 0.028 + 1.1));
   },
 
+  /** جلب بمهلة: بلا مهلة كان الطلب ينتظر وسيط /proxy حتى ٦٠ ثانية لكل آية،
+   * فتبقى «جارٍ تحضير التلاوة…» بلا نهاية ولا يعرف أحد السبب. */
+  async _fetchAudio(url, ms = 20000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.max(1000, ms));
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.arrayBuffer();
+    } finally { clearTimeout(timer); }
+  },
+
   /** جلب وفك ترميز كل الآيات — يعيد {ok, total} */
   async prepare(reciter, ayat, onProgress) {
     this.reciter = reciter; this.ayat = ayat;
     this.silent = false;
+    this.lastPrepareError = "";
     this.estimates = ayat.map(v => this.estimate(v.s, v.a));
     this.ensureCtx();
+    const deadline = Date.now() + 45000; // سقف كلي: لا تعليق أبدًا
     let done = 0;
     const errs = [];
     for (const v of ayat) {
       const key = reciter + "/" + v.s + ":" + v.a;
       if (!this.cache.has(key)) {
+        const left = deadline - Date.now();
+        const budget = Math.min(20000, Math.max(3000, left));
         try {
-          const r = await fetch(this.url(reciter, v.s, v.a));
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          const buf = await r.arrayBuffer();
+          const buf = await this._fetchAudio(this.url(reciter, v.s, v.a), budget);
           const audio = await this.ctx.decodeAudioData(buf);
           this.cache.set(key, audio);
         } catch (e) {
           errs.push(v);
+          this.lastPrepareError = String((e && e.message) || e).slice(0, 120);
           // بديل: محاولة مباشرة بدون بروكسي (لو كان السماح بالـ CORS)
           try {
-            const r2 = await fetch(`https://everyayah.com/data/${reciter}/${pad(v.s)}${pad(v.a)}.mp3`);
-            const buf = await r2.arrayBuffer();
+            const buf = await this._fetchAudio(`https://everyayah.com/data/${reciter}/${pad(v.s)}${pad(v.a)}.mp3`, 12000);
             const audio = await this.ctx.decodeAudioData(buf);
             this.cache.set(key, audio);
-          } catch {}
+          } catch (e2) { this.lastPrepareError += " / " + String((e2 && e2.message) || e2).slice(0, 80); }
         }
       }
       done++;
@@ -169,7 +183,15 @@ const AyahPlayer = {
       let ayahElapsed;
       if (this.silent) {
         ayahElapsed = (performance.now() - this._silentStart) / 1000;
-        if (ayahElapsed >= this.durationAt(this.index)) { this._advance(); return; }
+        /* في الوضع الصامت لا يوجد onended يُحرّك الآية التالية، فكان `return`
+         * يقتل حلقة الرسم بعد الآية الأولى: التصدير يتجمّد عند نهاية أول آية
+         * (٤١٪ من ١٧ ثانية في محاكاة 2026-11-12) ولا ينتهي أبدًا. الآن
+         * نُعيد جدولة الحلقة ما دام التشغيل مستمرًا. */
+        if (ayahElapsed >= this.durationAt(this.index)) {
+          this._advance();
+          if (this.playing) this._raf = requestAnimationFrame(step);
+          return;
+        }
       } else {
         ayahElapsed = this.ctx.currentTime - this.startedAt;
         const dur = this.durationAt(this.index);
@@ -695,9 +717,9 @@ const ReelRecorder = {
       mimeType: mime || undefined,
       videoBitsPerSecond: canvas.height >= 1900 ? 9_000_000 : 5_000_000,
     });
-    this._chunks = [];
-    rec.ondataavailable = e => { if (e.data && e.data.size) this._chunks.push(e.data); };
-    const stopped = new Promise(res => { rec.onstop = res; });
+    const chunks = [];
+    this._chunks = chunks;
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
 
     onStage && onStage("recording");
     const total = player.totalDuration();
@@ -710,15 +732,37 @@ const ReelRecorder = {
       raf = requestAnimationFrame(drawLoop);
     };
 
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      let settled = false, finishing = false, endTimer = 0, stopTimer = 0;
       const cleanup = () => {
+        clearTimeout(endTimer); clearTimeout(stopTimer);
         cancelAnimationFrame(raf);
+        signal && signal.removeEventListener("abort", onAbort);
+        player.onEnd = null; player.onTick = null; player.onAyah = null;
         player.stop();
         try { rec.state !== "inactive" && rec.stop(); } catch {}
         stream.getVideoTracks().forEach(t => t.stop());
       };
-      const onAbort = () => { this._abort = true; cleanup(); reject(new Error("aborted")); };
+      const fail = error => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const onAbort = () => { this._abort = true; fail(new Error("aborted")); };
+      rec.onerror = e => fail(new Error("تعذّر تسجيل الفيديو: " + ((e.error && e.error.message) || "خطأ في التسجيل")));
+      rec.onstop = () => {
+        if (settled) return;
+        if (!finishing) { fail(new Error("توقف تسجيل الفيديو قبل اكتماله")); return; }
+        const blob = new Blob(chunks, { type: mime || "video/webm" });
+        if (!blob.size) { fail(new Error("ملف الفيديو الناتج فارغ")); return; }
+        settled = true;
+        cleanup();
+        onProgress && onProgress(1, total, total);
+        resolve({ blob, mime: mime || "video/webm" });
+      };
       signal && signal.addEventListener("abort", onAbort, { once: true });
+      if (signal && signal.aborted) { onAbort(); return; }
 
       player.onTick = (elapsed, tot) => {
         renderer.state.elapsed = elapsed;
@@ -728,20 +772,25 @@ const ReelRecorder = {
       };
       player.onAyah = i => { renderer.state.index = i; };
       player.onEnd = () => {
+        if (settled || finishing || endTimer) return;
         renderer.state.elapsed = total;
-        setTimeout(() => {
-          cleanup();
-          onProgress && onProgress(1, total, total);
-          setTimeout(() => {
-            const blob = new Blob(this._chunks, { type: mime || "video/webm" });
-            resolve({ blob, mime: mime || "video/webm" });
-          }, 260);
+        endTimer = setTimeout(() => {
+          endTimer = 0;
+          if (settled) return;
+          finishing = true;
+          cancelAnimationFrame(raf);
+          player.stop();
+          // dataavailable الأخير يسبق stop؛ الانتظار الثابت قد يُرجع ملفًا ناقصًا.
+          stopTimer = setTimeout(() => fail(new Error("تعذّر إنهاء تسجيل الفيديو")), 20000);
+          try { rec.stop(); } catch (error) { fail(error); }
         }, 500);
       };
 
-      drawLoop();
-      rec.start(400);
-      player.play(0, 0);
+      try {
+        drawLoop();
+        rec.start(400);
+        player.play(0, 0);
+      } catch (error) { fail(error); }
     });
   },
 };
