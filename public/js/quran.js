@@ -10,17 +10,34 @@ const Quran = {
   async load() {
     if (this.data) return this.data;
     if (this._loading) return this._loading;
-    this._loading = (async () => {
+    const pending = (async () => {
       const r = await fetch("data/quran-uthmani.json");
+      if (!r.ok) throw new Error("تعذّر تحميل بيانات القرآن (HTTP " + r.status + ")");
       const j = await r.json();
+      const surahs = j?.data?.surahs;
+      // فحص بنيوي فقط؛ لا يُثبت صحة النص القرآني أو رسمه.
+      if (!Array.isArray(surahs) || surahs.length !== 114) throw new Error("بيانات القرآن غير مكتملة");
+      let total = 0;
+      const parsed = surahs.map((s, i) => {
+        if (!s || s.number !== i + 1 || typeof s.name !== "string" || !s.name.trim() ||
+            !Array.isArray(s.ayahs) || !s.ayahs.length ||
+            (s.numberOfAyahs != null && s.numberOfAyahs !== s.ayahs.length) ||
+            s.ayahs.some((a, n) => !a || a.numberInSurah !== n + 1 || typeof a.text !== "string" || !a.text.trim())) {
+          throw new Error("بيانات القرآن غير مكتملة");
+        }
+        total += s.ayahs.length;
+        return { n: s.number, name: s.name, en: s.englishName, type: s.revelationType,
+          count: s.ayahs.length, ayat: s.ayahs };
+      });
+      if (total !== 6236) throw new Error("بيانات القرآن غير مكتملة");
+      // ننشر البيانات فقط بعد نجاح قراءة الملف وفحص بنيته بالكامل.
+      this.surahs = parsed;
       this.data = j.data;
-      this.surahs = this.data.surahs.map(s => ({
-        n: s.number, name: s.name, en: s.englishName, type: s.revelationType,
-        count: s.numberOfAyahs || s.ayahs.length, ayat: s.ayahs,
-      }));
       return this.data;
     })();
-    return this._loading;
+    this._loading = pending;
+    try { return await pending; }
+    finally { if (this._loading === pending) this._loading = null; }
   },
 
   surah(n) { return this.surahs[n - 1]; },
