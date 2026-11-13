@@ -145,8 +145,7 @@ const HEAD_EXTRA = `<meta property="og:site_name" content="قرآن ريلز">
 <link rel="stylesheet" href="/css/style.css?v=3">
 <link rel="stylesheet" href="/css/articles.css?v=1">
 <script defer src="/_vercel/insights/script.js"></script>
-<script defer src="/_vercel/speed-insights/script.js"></script>
-<script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>`;
+<script defer src="/_vercel/speed-insights/script.js"></script>`;
 
 const HEADER = `<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
 <header class="site-header">
@@ -452,7 +451,6 @@ ${legacyPublishing}
 <link rel="stylesheet" href="/css/articles.css?v=1">
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/_vercel/speed-insights/script.js"></script>
-<script src="https://quge5.com/88/tag.min.js" data-zone="303174" async data-cfasync="false"></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"CollectionPage","name":"مكتبة مقالات قرآن ريلز","url":"${loc}","inLanguage":"ar","isPartOf":{"@type":"WebSite","name":"قرآن ريلز","url":"${ORIGIN}/"},"mainEntity":{"@type":"ItemList","name":"محاور المكتبة","numberOfItems":${GROUPS.size},"itemListElement":[
 ${hubLD}
