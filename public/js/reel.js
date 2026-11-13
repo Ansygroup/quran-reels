@@ -195,8 +195,12 @@ const AyahPlayer = {
       } else {
         ayahElapsed = this.ctx.currentTime - this.startedAt;
         const dur = this.durationAt(this.index);
-        // حارس أمان لو لم يعمل onended
-        if (ayahElapsed > dur + 0.6 && this._src) { this._advance(); return; }
+        // حارس أمان لو تأخر onended؛ استمر في تحديث الآية الجديدة والتقدم.
+        if (ayahElapsed > dur + 0.6 && this._src) {
+          this._advance();
+          if (this.playing && !this.paused) this._raf = requestAnimationFrame(step);
+          return;
+        }
       }
       const elapsed = this.elapsedBefore(this.index) + Math.min(ayahElapsed, this.durationAt(this.index));
       this.onTick && this.onTick(elapsed, this.totalDuration(), this.index, ayahElapsed);
