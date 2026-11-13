@@ -3,8 +3,8 @@ const { RECIPES, RECITERS, CONTENT_MODES, parseTemplate, chooseRecipe, cairoDate
 const autopilotApi = require("../api/autopilot");
 const quran = require("../public/data/quran-uthmani.json");
 
-assert.equal(CONTENT_MODES.size, 3);
-assert.equal(RECITERS.length, 8);
+assert.equal(CONTENT_MODES.size, 5);
+assert.equal(RECITERS.length, 47);
 assert.ok(RECIPES.length >= 70, "curated rotation should include the prepared recipe library");
 for (const recipe of RECIPES) {
   assert.equal(recipe.title, recipe.title.normalize("NFC"));

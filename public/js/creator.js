@@ -56,13 +56,19 @@ const Creator = {
     sel.innerHTML = "";
     TRANSLATIONS.forEach(t => sel.appendChild(el("option", { value: t.id }, t.n)));
   },
+  // العنوان والمرجع من نفس بيانات القرآن، وليس من نص حر قابل للخطأ.
+  _famousLabel(s, a, b) {
+    const words = Quran.ayah(s, a).trim().split(/\s+/);
+    const excerpt = words.slice(0, 8).join(" ") + (words.length > 8 ? "…" : "");
+    return `${ayahRef(s, a, b)} — ${excerpt}`;
+  },
   _populateFamous() {
     const sel = $("#selFamous");
-    sel.innerHTML = `<option value="">— اختر من الآيات المشهورة —</option>`;
+    sel.innerHTML = `<option value="">— اختر من المقاطع المختارة —</option>`;
     for (const grp of FAMOUS) {
       const og = el("optgroup", { label: grp.g });
-      grp.i.forEach(([t, s, a, b], ix) => {
-        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, t));
+      grp.i.forEach(([s, a, b]) => {
+        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, this._famousLabel(s, a, b)));
       });
       sel.appendChild(og);
     }
@@ -285,23 +291,28 @@ const Creator = {
   _quickPick(id) {
     if (id === "all") {
       $("#selFamous").focus();
-      toast("اختر من قائمة الآيات المشهورة في تبويب النص");
+      toast("اختر من قائمة المقاطع المختارة في تبويب النص");
       return;
     }
-    let pool = FAMOUS;
     if (id === "me") {
-      const all = FAMOUS.flatMap(g => g.i);
-      const pick = all[Math.floor(Math.random() * all.length)];
-      this.setSelection(pick[1], pick[2], pick[3], true);
-      toast("رسالة لك: " + pick[0]);
+      const all = FAMOUS.filter(g => g.tag !== "other").flatMap(g => g.i);
+      if (!all.length) { toast("لا توجد رسائل مختارة", "err"); return; }
+      const [s, a, b] = all[Math.floor(Math.random() * all.length)];
+      this.setSelection(s, a, b, true);
+      this._showQuickVerse(s, a, b);
+      toast("رسالة لك: " + this._famousLabel(s, a, b));
       return;
     }
     const grp = FAMOUS.find(g => g.tag === id);
     if (!grp || !grp.i.length) { toast("لا توجد رسائل في هذا التصنيف", "err"); return; }
-    const pick = grp.i[Math.floor(Math.random() * grp.i.length)];
-    this.setSelection(pick[1], pick[2], pick[3], true);
-    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(pick[1], pick[2], pick[3])[0])}</div>
-      <div class="hint center">${esc(ayahRef(pick[1], pick[2], pick[3]))} — ${esc(pick[0])}</div>`;
+    const [s, a, b] = grp.i[Math.floor(Math.random() * grp.i.length)];
+    this.setSelection(s, a, b, true);
+    this._showQuickVerse(s, a, b);
+  },
+
+  _showQuickVerse(s, a, b) {
+    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(s, a, b)[0])}</div>
+      <div class="hint center">${esc(ayahRef(s, a, b))}</div>`;
   },
 
   /** اختيار مقطع من الخارج (آية اليوم مثلاً) */
@@ -552,18 +563,11 @@ const Creator = {
 
     const count = Selection.count();
     if (count < 1) { this.lastAbortReason = "لم تُحدَّد آيات — اختر الآيات أولًا"; toast("اختر الآيات أولًا", "err"); return; }
-    if (!this.prepared && !AyahPlayer.playing) {
-      // تحضير الصوت قبل التسجيل
-      this._setPlayIcon(false);
-      const ok = await this._prepareForExport();
-      if (ok === "abort") { this.lastAbortReason = "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)"; return; }
-    }
-    const total = AyahPlayer.totalDuration();
-    if (total > 300) {
-      const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
-      if (!yes) { this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»"; return; }
-    }
-
+    /* التحضير (تنزيل التلاوة) كان يحدث *قبل* ظهور نافذة التصدير، فتبدو الصفحة
+     * كأنها لم تفعل شيئًا: المرحلة والنسبة فارغتان والزر كأنه لا يعمل —
+     * وهذا بالضبط ما سجّلته تشغيلات 8–11 نوفمبر («غير معروف» 0%). الآن
+     * النافذة تظهر أولًا، ثم نُحضّر داخل إطار واضح.
+     * حوار «المدة طويلة» انتقل بعد التحضير لأن المدة الحقيقية لا تُعرف قبله. */
     this.exporting = true;
     this._abort = new AbortController();
     AyahPlayer.stop();
@@ -596,7 +600,21 @@ const Creator = {
     AyahPlayer.onEnd = null; AyahPlayer.onTick = null; AyahPlayer.onState = null;
 
     try {
-      if (!this.prepared) await this._prepareForExport();
+      if (!this.prepared && !AyahPlayer.playing) {
+        this._setPlayIcon(false);
+        await this._prepareForExport();
+      }
+      const total = AyahPlayer.totalDuration();
+      if (total > 300) {
+        const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
+        if (!yes) {
+          this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»";
+          this.exporting = false;
+          const ovCancel = $("#exportOverlay"); if (ovCancel) ovCancel.hidden = true;
+          if (this._savedDims) { this._savedDims = null; this._resizeCanvas(); }
+          return;
+        }
+      }
       $("#expStage").textContent = "جارٍ تسجيل الفيديو…";
       const res = await ReelRecorder.record({
         canvas: $("#reelCanvas"),
