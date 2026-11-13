@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=35)", /publish\.js\?v=35/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=36)", /publish\.js\?v=36/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -95,7 +95,7 @@ if (!JSDOM) {
     window.eval(publish);
     const P = window.PublishApp;
     let stErr = null;
-    try { await P.init(); } catch (e) { stErr = e; }
+    try { await P.init(); await new Promise(resolve => setTimeout(resolve, 20)); } catch (e) { stErr = e; }
     chk("init() لا يرمي استثناءً", !stErr, stErr && String(stErr.message).slice(0, 90));
     chk("يُطلب op=list عند فتح الحساب", fetched.some((u) => u.includes("/api/gw?op=list")), fetched.join(" · "));
 
@@ -140,7 +140,7 @@ if (!JSDOM) {
     w2.AuthApp = { getUserId: async () => "u1", getToken: async () => "T" };
     w2.eval(publish);
     let e2 = null;
-    try { await w2.PublishApp.init(); } catch (e) { e2 = e; }
+    try { await w2.PublishApp.init(); await new Promise(resolve => setTimeout(resolve, 20)); } catch (e) { e2 = e; }
     const notice2 = w2.document.getElementById("acctNotice");
     chk("init() مع ?setup=meta لا يرمي", !e2, e2 && String(e2.message).slice(0, 80));
     chk("رسالة ?setup تشرح المفاتيح الناقصة", Boolean(notice2 && /غير مهيأ/.test(notice2.textContent)), notice2 && notice2.textContent.slice(0, 90));

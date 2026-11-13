@@ -956,3 +956,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 .acct-preview [hidden]{display:none}.acct-preview audio{display:block;width:100%;margin-top:8px}
 /* Keep the account image picker within narrow mobile cards. */
 #acctBackgroundFile{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+
+/* حالة الحفظ تبقى بجوار الإجراء وتظهر بوضوح على الجوال. */
+.acct-edit-state{margin:10px 0 0;line-height:1.7}
+.acct-edit-state.warn{padding:10px 12px;border-inline-start:3px solid #ffcf8b;background:rgba(255,207,139,.08);border-radius:8px}

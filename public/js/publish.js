@@ -72,7 +72,26 @@ window.PublishApp = {
   CONNECT_PLATFORM,
   
   async init() {
+    const seq = this._initSeq = (this._initSeq || 0) + 1;
     const uid = await window.AuthApp.getUserId();
+    if (seq !== this._initSeq) return;
+    if (this._accountOwner !== uid) {
+      this._accountOwner = uid;
+      this._autoDirty = false;
+      const editor = document.getElementById("acctAuto"); if (editor) editor._reelGeneration = (editor._reelGeneration || 0) + 1;
+      if (this._progressTimer) clearTimeout(this._progressTimer);
+      this._progressWaiting = false; this._lastProgressRunId = null;
+      this.data = null; this.connections = []; this._bgPreviewCache = null;
+      for (const id of ["acctAuto", "acctAccountsList", "acctSteps", "acctKpis", "acctAlerts", "queueList", "acctQuickActions", "acctProgress"]) {
+        const node = document.getElementById(id); if (node) node.innerHTML = "";
+      }
+      const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
+      this.reauth = []; this._settingsUncertain = false;
+      const toggle = document.getElementById("acctEnabled"); if (toggle) { toggle.checked = false; toggle.disabled = true; }
+      const label = document.getElementById("acctStateLabel"); if (label) label.textContent = "جارٍ التحقق…";
+      const next = document.getElementById("acctNextRun"); if (next) next.textContent = "—";
+      const dot = document.getElementById("acctDot"); if (dot) dot.className = "acct-dot";
+    }
     if (!uid) {
       // لا نُخرج المستخدم من الصفحة: نفتح نافذة الدخول ونوضّح المطلوب.
       window.QRAuthUI?.open();
@@ -80,31 +99,51 @@ window.PublishApp = {
       if (notice) {
         notice.hidden = false;
         notice.style.display = "block";
+        notice.dataset.loadError = "1";
         notice.textContent = "سجّل الدخول لعرض لوحة النشر والأتمتة — بريدك + رابط سحري، أو جوجل.";
       }
       return;
     }
     
     // تحميل البيانات
-    const res = await fetch("/api/autopilot", { method: "GET", headers: { Authorization: `Bearer ${await window.AuthApp.getToken()}` } });
-    const data = await res.json().catch(() => ({}));
+    let res, data;
+    try {
+      const token = await window.AuthApp.getToken();
+      if (seq !== this._initSeq) return;
+      res = await fetch("/api/autopilot", { method: "GET", headers: { Authorization: `Bearer ${token}` } });
+      data = await res.json().catch(() => ({}));
+    } catch {
+      if (seq === this._initSeq) {
+        const notice = document.getElementById("acctNotice");
+        if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "تعذّر الاتصال لتحميل الحساب؛ حاول مرة أخرى. تعديلاتك غير المحفوظة باقية في الصفحة."; }
+      }
+      return;
+    }
+    if (seq !== this._initSeq || this._settingsPending) return;
     if (!res.ok) {
       if (res.status === 401) {
         const notice = document.getElementById("acctNotice");
-        if (notice) { notice.hidden = false; notice.textContent = "سجّل الدخول (من زر الحساب بالأعلى) لعرض لوحة النشر والأتمتة."; }
+        if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "سجّل الدخول (من زر الحساب بالأعلى) لعرض لوحة النشر والأتمتة."; }
         return;
       }
       alert(data.error || "خطأ في تحميل البيانات");
       return;
     }
     
+    const notice = document.getElementById("acctNotice");
+    if (notice && notice.dataset.loadError) { delete notice.dataset.loadError; notice.hidden = true; notice.style.display = "none"; }
     if (typeof data.config?.enabled === "boolean") this._settingsUncertain = false;
+    const toggle = document.getElementById("acctEnabled"); if (toggle) toggle.disabled = false;
     this.renderAccount(data);
     this.bindEvents(uid);
     this.startProgressPolling();
     // حالة الربط الحقيقية — تُقرأ من op=list (الخادم لا يرسل التوكنات أبدًا)
-    await this.renderConnections(await window.AuthApp.getToken());
-    this.reportLinkedFlag();
+    try {
+      const token = await window.AuthApp.getToken();
+      if (seq !== this._initSeq) return;
+      await this.renderConnections(token, seq);
+    } catch { /* تُعرض حالة القنوات عند المحاولة التالية */ }
+    if (seq === this._initSeq) this.reportLinkedFlag();
   },
 
   /* ============================================================
@@ -378,6 +417,7 @@ window.PublishApp = {
         <button class="btn btn-gold" id="autoSave" data-act="save" ${this._settingsPending || this._settingsUncertain ? "disabled" : ""}>💾 حفظ التعديلات</button>
         <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
       </div>
+      <p class="acct-edit-state hint" id="acctEditState" role="status" aria-live="polite">لا توجد تعديلات غير محفوظة في هذه الصفحة.</p>
       <details class="acct-more">
         <summary>خيارات إضافية</summary>
         <div class="row gap-lg acct-actions">
@@ -475,6 +515,7 @@ window.PublishApp = {
     const changed = e => {
       this._autoDirty = true;
       this._autoEditRevision = (this._autoEditRevision || 0) + 1;
+      this.renderEditState();
       if (e.target.id === "acctBackgroundFile" && e.target.files?.length) get("selBackground").value = "custom";
       if (/^acct(?:Style|Translation|Ratio|Quality|Accent|Font|Ded|ShowTrans|Watermark|Motion)$/.test(e.target.id)) get("acctDesignEnabled").checked = true;
       if (e.target.id === "acctTranslation") get("acctShowTrans").checked = e.target.value !== "none";
@@ -483,6 +524,13 @@ window.PublishApp = {
     // إعادة رسم البطاقة لا تكدّس مستمعات قديمة أو تعيد المعاينة أكثر من مرة.
     wrap.oninput = changed; wrap.onchange = changed;
     update();
+  },
+
+  renderEditState() {
+    const state = document.getElementById("acctEditState");
+    if (!state) return;
+    state.textContent = this._autoDirty ? "عندك تعديلات غير محفوظة؛ اضغط حفظ التعديلات لتطبيقها. التشغيل يستخدم الإعدادات المحفوظة. قد تضيع التعديلات عند تحديث الصفحة أو تغيير الحساب." : "لا توجد تعديلات غير محفوظة في هذه الصفحة.";
+    state.classList.toggle("warn", Boolean(this._autoDirty));
   },
 
   /* نعرض فقط المراحل التي سجّلها الخادم وحالة كل صف نشر فعلي. */
@@ -517,16 +565,19 @@ window.PublishApp = {
   async pollProgress() {
     if (this._progressBusy) return;
     this._progressBusy = true;
+    const owner = this._accountOwner;
     try {
       const token = await window.AuthApp.getToken();
       if (!token) throw new Error("no session");
       const res = await fetch("/api/autopilot?progress=1", { method: "GET", cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("unavailable");
       const data = await res.json();
+      if (owner !== this._accountOwner) return;
       if (this._progressWaiting && data.run && data.run.id !== this._progressBaseline) this._progressWaiting = false;
       if (data.run?.id) this._lastProgressRunId = data.run.id;
       this.renderProgress(data);
     } catch {
+      if (owner !== this._accountOwner) return;
       const wrap = document.getElementById("acctProgress");
       if (wrap) wrap.innerHTML = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div><p class="hint warn">مش قادرين نحدّث الحالة دلوقتي؛ ده مش معناه إن التشغيل وقف. راجعها قبل ما تشغّل تاني.</p>';
     } finally {
@@ -596,13 +647,14 @@ window.PublishApp = {
     this.renderStatus(data);
     this.renderSteps(data);
     this.renderKpis(data);
-    this.renderAutoPanel(data);
+    if (!this._autoDirty && !this._settingsPending) this.renderAutoPanel(data);
     this.renderHistory(runs);
     this.renderTools(data);
   },
 
   /* قائمة الحسابات المرتبطة + أزرار ربط/فك ربط لكل منصة */
-  async renderConnections(token) {
+  async renderConnections(token, initSeq = null) {
+    const owner = this._accountOwner;
     const card = document.getElementById("acctAccounts");
     const wrap = document.getElementById("acctAccountsList");
     if (!card || !wrap) return;
@@ -618,9 +670,11 @@ window.PublishApp = {
       conns = Array.isArray(data.connections) ? data.connections : [];
       if (!res.ok) throw new Error("connections unavailable");
     } catch {
+      if (owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq)) return;
       wrap.innerHTML = '<p class="hint warn">تعذّر تحميل الحسابات المرتبطة. حدّث الصفحة وحاول تاني.</p>';
       return;
     }
+    if (owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq)) return;
     this.connections = conns;
 
     const ICONS = { youtube: "▶️", facebook: "📘", instagram: "📸", tiktok: "🎵", x: "✖️", linkedin: "💼", telegram: "✈️", whatsapp: "💬" };
@@ -692,7 +746,7 @@ window.PublishApp = {
     this.renderStatus(this.data || {});
     this.renderSteps(this.data || {});
     // تحديث القنوات لا يمس التعديلات التي لم يضغط المستخدم حفظها بعد.
-    if (!this._autoDirty) this.renderAutoPanel(this.data || {});
+    if (!this._autoDirty && !this._settingsPending) this.renderAutoPanel(this.data || {});
     return conns;
   },
 
@@ -856,6 +910,8 @@ window.PublishApp = {
       if (!t || t.id !== "acctEnabled") return;
       const want = Boolean(t.checked);
       if (this._settingsPending || this._settingsUncertain) { t.checked = !want; return; }
+      const owner = this._accountOwner;
+      this._initSeq = (this._initSeq || 0) + 1;
       this._settingsPending = true;
       t.disabled = true;
       const save = document.getElementById("autoSave");
@@ -864,6 +920,7 @@ window.PublishApp = {
       try { out = await this.api("set_enabled", { enabled: want }); }
       catch { out = { ok: false, uncertain: true }; }
       this._settingsPending = false;
+      if (owner !== this._accountOwner) { this.init(); return; }
       if (save) save.disabled = false;
       if (out.ok && out.enabled === want) {
         t.disabled = false;
@@ -952,6 +1009,8 @@ window.PublishApp = {
     const old = btn ? btn.textContent : "";
     const toggle = q2("acctEnabled");
     const editRevision = this._autoEditRevision || 0;
+    const owner = this._accountOwner;
+    this._initSeq = (this._initSeq || 0) + 1;
     this._settingsPending = true;
     if (toggle) toggle.disabled = true;
     if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الحفظ…"; }
@@ -961,12 +1020,14 @@ window.PublishApp = {
       out = await this.api("save", body);
     } catch (e) { out = { ok: false, error: e?.message || "تعذّر الاتصال بالخادم" }; }
     this._settingsPending = false;
+    if (owner !== this._accountOwner) { this.init(); return out; }
     if (toggle) toggle.disabled = false;
     if (btn) { btn.disabled = false; btn.textContent = old; }
 
     if (out.ok) {
       // لا نعتبر تعديلًا حدث أثناء طلب الحفظ جزءًا من الاستجابة السابقة.
       this._autoDirty = (this._autoEditRevision || 0) !== editRevision;
+      this.renderEditState();
       this.data = { ...(this.data || {}), config: { ...((this.data || {}).config || {}), ...(out.config || {}), enabled: enabledNow, platforms, template: out.config?.template || template, all_channels: body.all_channels } };
       if (imageFile && q2("acctBackgroundFile")?.files[0] === imageFile) q2("acctBackgroundFile").value = "";
       this._bgPreviewCache = null;
@@ -1149,10 +1210,8 @@ window.QRAuthUI = (function () {
       QRAuth.on((u) => {
         const b = $("authBtn");
         if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
-        if (u) {
-          close();
-          if (window.location.hash === "#/account") window.PublishApp.init();
-        }
+        if (u) close();
+        if (/^#\/account(\?|$)/.test(window.location.hash || "")) window.PublishApp.init();
       });
       const b = $("authBtn");
       if (b) b.textContent = QRAuth.user() ? "🟢 حسابي" : "🔑 دخول";
