@@ -157,6 +157,7 @@ const Creator = {
     $("#selReciter").addEventListener("change", e => {
       Selection.reciter = e.target.value;
       this.prepared = false;
+      this._audioIssue = "";
       save();
     });
 
@@ -422,6 +423,7 @@ const Creator = {
     AyahPlayer.stop();
     AyahPlayer.prepareSilent(list);
     this.prepared = false;
+    this._audioIssue = "";
     this._updateTransForRenderer();
     this._updateDots(0);
     // معاينة النص + تقدير المدة
@@ -454,7 +456,11 @@ const Creator = {
   async _togglePlay() {
     if (this.exporting) return;
     if (AyahPlayer.playing && !AyahPlayer.paused) { AyahPlayer.pause(); return; }
-    if (AyahPlayer.playing && AyahPlayer.paused) { AyahPlayer.resume(); return; }
+    if (AyahPlayer.playing && AyahPlayer.paused) {
+      if (this.prepared) { AyahPlayer.resume(); return; }
+      // التحضير الناقص يجب أن يُعاد عند استئناف المعاينة، لا أن يبقى صامتًا إلى الأبد.
+      AyahPlayer.stop();
+    }
     const btn = $("#btnPlay");
     btn.disabled = true;
     const note = $("#previewNote");
@@ -464,17 +470,19 @@ const Creator = {
         const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
           note.textContent = `تحميل التلاوة… ${toAr(d)}/${toAr(t)}`;
         });
-        this.prepared = true;
+        this.prepared = res.failed === 0;
+        this._audioIssue = "";
         if (res.ok === 0) {
           AyahPlayer.prepareSilent(Selection.list());
-          toast("تعذّر تحميل الصوت — المعاينة بدون صوت", "err");
+          this._audioIssue = "تعذّر تحميل الصوت — المعاينة بدون صوت. أوقفها ثم شغّلها لإعادة المحاولة.";
         } else if (res.failed > 0) {
-          toast(`تعذّر تحميل ${toAr(res.failed)} آية — سيتم تخطّيها`, "err");
+          this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — سيتم تخطّيها. أوقف المعاينة ثم شغّلها لإعادة المحاولة.`;
         }
+        if (this._audioIssue) toast(this._audioIssue, "err");
       }
       this._wirePlayerEvents();
       AyahPlayer.play(AyahPlayer.index || 0, 0);
-      note.textContent = "المعاينة تعمل… استمتع 🎧";
+      note.textContent = this._audioIssue || "المعاينة تعمل… استمتع 🎧";
     } catch (e) {
       console.error(e);
       toast("تعذّر تشغيل المعاينة", "err");
@@ -514,7 +522,7 @@ const Creator = {
     AyahPlayer.onState = playing => this._setPlayIcon(playing);
     AyahPlayer.onEnd = () => {
       this._setPlayIcon(false);
-      $("#previewNote").textContent = "انتهت المعاينة — يمكنك الإنشاء الآن ✨";
+      $("#previewNote").textContent = this._audioIssue || "انتهت المعاينة — يمكنك الإنشاء الآن ✨";
       this.renderer.state.elapsed = this.renderer.state.total;
       this._dirty();
     };
@@ -651,14 +659,25 @@ const Creator = {
           $("#expBar").style.width = Math.round((d / t) * 15) + "%";
           note.textContent = `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
         });
-        this.prepared = true;
+        this.prepared = res.failed === 0;
+        this._audioIssue = "";
         if (res.ok === 0) {
           AyahPlayer.prepareSilent(Selection.list());
-          toast("سيُنشأ الفيديو بدون صوت (تعذّر تحميل التلاوة)", "err");
+          this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+        } else if (res.failed > 0) {
+          this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — الفيديو لا يحتوي على كل التلاوة`;
+        }
+        if (this._audioIssue) {
+          $("#expSub").textContent = this._audioIssue;
+          toast(this._audioIssue, "err");
         }
         resolve(true);
       } catch {
+        this.prepared = false;
         AyahPlayer.prepareSilent(Selection.list());
+        this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+        $("#expSub").textContent = this._audioIssue;
+        toast(this._audioIssue, "err");
         resolve(true);
       }
     });
@@ -682,7 +701,7 @@ const Creator = {
     $("#expResult").hidden = false;
     $("#expPct").textContent = "100%";
     $("#resultVideo").src = url;
-    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب`;
+    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب${this._audioIssue ? " · " + this._audioIssue : ""}`;
     const dl = $("#btnDownload");
     dl.href = url; dl.download = name;
     $("#btnShare").onclick = async () => {
