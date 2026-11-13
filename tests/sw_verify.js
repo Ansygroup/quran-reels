@@ -1,48 +1,36 @@
-/* كمل#27 — تحقّق سلوكي من متصفح فعلي: تسجيل /sw.js في الإنتاج،
- * نجاح importScripts لكود الـzone، بقاء عامل الأوفلاين qr-v4، وسلامة التحميل. */
+/* اختبار عامل الأوفلاين محليًا دون تحميل أي كود خارجي أو لمس الإنتاج. */
 "use strict";
-const { chromium } = require("playwright");
-const PROD = "https://quran-reels-tau.vercel.app/";
+const assert = require("assert");
+const fs = require("fs");
+const vm = require("vm");
 
-(async () => {
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
-  const log = { console: [], zone: [], pageerr: [], swresp: null };
-
-  page.on("console", m => {
-    const t = m.type();
-    if (t === "error" || t === "warning") log.console.push(t + ": " + m.text().slice(0, 180));
-  });
-  page.on("pageerror", e => log.pageerr.push(String(e).slice(0, 180)));
-  page.on("request", r => { if (r.url().includes("3nbf4.com")) log.zone.push("REQ " + r.url().slice(0, 110)); });
-  page.on("response", r => { if (r.url().includes("3nbf4.com")) { log.zone.push("RES " + r.status() + " " + r.url().slice(0, 90)); if (r.url().includes("service-worker.min")) log.swresp = r.status(); } });
-  page.on("requestfailed", r => { if (r.url().includes("3nbf4.com")) log.zone.push("FAIL " + (r.failure() || {}).errorText); });
-
-  await page.goto(PROD, { waitUntil: "load", timeout: 45000 });
-  await page.waitForTimeout(8000); // وقت للتسجيل + التثبيت + تحميل الكود البعيد
-
-  const reg = await page.evaluate(async () => {
-    const rs = await navigator.serviceWorker.getRegistrations();
-    if (!rs.length) return { none: true };
-    const r = rs[0];
-    for (let i = 0; i < 20 && (!r.active || r.active.state !== "activated"); i++) {
-      await new Promise(res => setTimeout(res, 500));
-    }
-    const out = { scope: r.scope, state: r.active ? r.active.state : null, installing: !!r.installing, waiting: !!r.waiting };
-    out.cacheKeys = await caches.keys();
-    if (out.cacheKeys.includes("qr-v4")) {
-      const c = await caches.open("qr-v4");
-      out.shellEntries = (await c.keys()).length;
-    } else out.shellEntries = 0;
-    out.controller = !!navigator.serviceWorker.controller;
-    return out;
-  });
-
-  console.log(JSON.stringify({ reg, swImportStatus: log.swresp, zoneEvents: log.zone, console: log.console.slice(0, 6), pageerr: log.pageerr.slice(0, 3) }, null, 1));
-
-  // ملاحظة: طلبات سياق العامل تُلتقط على مستوى browserContext (انظر runs يدوية) — هنا الدليل: تفعّل + qr-v4 ممتلئ + صفر أخطاء
-  const pass = reg && reg.state === "activated" && reg.shellEntries >= 20 && log.console.filter(c => c.startsWith("error")).length === 0;
-  console.log(pass ? "\nRESULT: PASS (activation + shell + zero console errors; zone endpoint separately verified 200/JS)" : "\nRESULT: FAIL");
-  await browser.close();
-  process.exit(pass ? 0 : 1);
-})().catch(e => { console.error("FATAL:", e.message); process.exit(2); });
+async function main() {
+  const handlers = {}, added = [], deleted = [], puts = [];
+  let skipped = false, claimed = false, unsubscribed = false, offline = false;
+  const shell = { label: "offline shell", clone() { return this; }, ok: true, type: "basic" };
+  const cache = { add: async request => { assert.equal(request.cache, "reload"); added.push(request.url); }, match: async () => shell, put: async (...args) => puts.push(args) };
+  const caches = { open: async name => { assert.equal(name, "qr-v58"); return cache; }, keys: async () => ["qr-v57", "qr-v58"], delete: async k => { deleted.push(k); }, match: async () => shell };
+  const self = { location: { origin: "https://example.test" }, registration: { pushManager: { getSubscription: async () => ({ unsubscribe: async () => { unsubscribed = true; } }) } }, clients: { claim: async () => { claimed = true; } }, skipWaiting: async () => { skipped = true; }, addEventListener: (name, fn) => { handlers[name] = fn; } };
+  const code = fs.readFileSync("public/sw.js", "utf8");
+  vm.runInNewContext(code, { self, caches, URL, Request: class { constructor(url, opts) { this.url = url; this.cache = opts.cache; } }, Response: { error: () => "error" }, fetch: async () => { if (offline) throw Error("offline"); return shell; } });
+  let pending;
+  handlers.install({ waitUntil: p => { pending = p; } }); await pending;
+  assert(skipped && added.includes("/") && added.length >= 20);
+  handlers.activate({ waitUntil: p => { pending = p; } }); await pending;
+  assert.deepStrictEqual(deleted, ["qr-v57"]); assert(unsubscribed && claimed);
+  // عدم توفر خدمة الإشعارات لا يعطّل التفعيل.
+  self.registration.pushManager.getSubscription = async () => { throw Error("denied"); };
+  claimed = false; handlers.activate({ waitUntil: p => { pending = p; } }); await pending; assert(claimed);
+  offline = true;
+  handlers.fetch({ request: { url: "https://example.test/some-page", method: "GET", mode: "navigate" }, respondWith: p => { pending = p; } });
+  assert.strictEqual(await pending, shell);
+  handlers.fetch({ request: { url: "https://example.test/css/style.css", method: "GET", mode: "no-cors" }, respondWith: p => { pending = p; } });
+  assert.strictEqual(await pending, shell);
+  for (const url of ["https://example.test/api/test", "https://example.test/proxy/test", "https://example.test/a.mp3", "https://other.test/x"]) {
+    let intercepted = false;
+    handlers.fetch({ request: { url, method: "GET" }, respondWith: () => { intercepted = true; } });
+    assert(!intercepted, url);
+  }
+  console.log(`SW PASS: ${added.length} shell assets, cache upgrade, unsubscribe, offline fallback, network-only exclusions`);
+}
+main().catch(e => { console.error(e); process.exitCode = 1; });

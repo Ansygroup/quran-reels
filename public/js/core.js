@@ -387,13 +387,16 @@ function accordionify(root) {
     if (!q || !a) return;
     q.addEventListener("click", () => {
       const open = item.classList.toggle("open");
-      a.style.maxHeight = open ? a.scrollHeight + "px" : "0";
+      // إخفاء الإجابة فعليًا يطابق حالتها لقارئ الشاشة ويمنع قصّها عند تغيير العرض.
+      q.setAttribute("aria-expanded", String(open));
+      a.hidden = !open;
     });
   });
 }
 
-function confirmDialog(title, text, okText = "متابعة") {
+function confirmDialog(title, text, okText = "متابعة", { signal } = {}) {
   return new Promise(res => {
+    if (signal?.aborted) { res(false); return; }
     const ov = el("div", { class: "overlay" });
     ov.innerHTML = `<div class="modal" style="position:relative">
       <div style="font-size:2rem">⚠️</div>
@@ -402,8 +405,19 @@ function confirmDialog(title, text, okText = "متابعة") {
         <button class="btn btn-gold" data-ok>${esc(okText)}</button>
         <button class="btn btn-ghost" data-cancel>إلغاء</button>
       </div></div>`;
+    let finished = false;
+    const finish = value => {
+      if (finished) return;
+      finished = true;
+      signal?.removeEventListener("abort", onAbort);
+      ov.remove();
+      res(value);
+    };
+    const onAbort = () => finish(false);
+    ov.querySelector("[data-ok]").onclick = () => finish(true);
+    ov.querySelector("[data-cancel]").onclick = () => finish(false);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) { onAbort(); return; }
     document.body.appendChild(ov);
-    ov.querySelector("[data-ok]").onclick = () => { ov.remove(); res(true); };
-    ov.querySelector("[data-cancel]").onclick = () => { ov.remove(); res(false); };
   });
 }

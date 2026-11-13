@@ -14,26 +14,33 @@ function toolCardHTML(t) {
 function renderHomeTools() {
   const wrap = $("#homeTools");
   if (!wrap) return;
-  wrap.innerHTML = TOOLS.slice(0, 12).map(toolCardHTML).join("");
+  // نعرض اختيارات شائعة فقط هنا، وكل الأدوات تظل في صفحة الأدوات.
+  const featured = ["prayer", "qibla", "adhkar", "zakat", "asma", "hadith"];
+  wrap.innerHTML = featured.map(id => TOOLS.find(t => t.id === id)).filter(Boolean).map(toolCardHTML).join("");
 }
 
 function renderAllTools(filter = "") {
   const wrap = $("#toolsGridAll");
   if (!wrap) return;
   const q = normAr(filter);
-  const list = TOOLS.filter(t => !q || normAr(t.n).includes(q) || normAr(t.d).includes(q) || t.id.includes(q));
+  // نطبّع المعرّف أيضًا حتى تعمل أسماء مثل baby-names بعد إزالة علامات الترقيم.
+  const list = TOOLS.filter(t => !q || normAr(t.n).includes(q) || normAr(t.d).includes(q) || normAr(t.id).includes(q));
   wrap.innerHTML = list.map(toolCardHTML).join("");
   $("#toolsEmpty").hidden = list.length > 0;
+  const results = $("#toolsResults");
+  if (results) results.textContent = q ? `${toAr(list.length)} من ${toAr(TOOLS.length)} أداة` : `كل الأدوات · ${toAr(TOOLS.length)} أداة`;
+  const clear = $("#toolsClear");
+  if (clear) clear.hidden = !filter;
 }
 
 /* ---------- الأسئلة الشائعة ---------- */
 function renderFaq() {
   const wrap = $("#faqList");
   if (!wrap) return;
-  wrap.innerHTML = FAQ.map(([q, a]) => `
+  wrap.innerHTML = FAQ.map(([q, a], i) => `
     <div class="faq-item">
-      <button class="faq-q">${esc(q)} <span class="caret">▼</span></button>
-      <div class="faq-a"><div>${esc(a)}</div></div>
+      <button type="button" class="faq-q" aria-expanded="false" aria-controls="faq-answer-${i}">${esc(q)} <span class="caret" aria-hidden="true">▼</span></button>
+      <div class="faq-a" id="faq-answer-${i}" hidden><div>${esc(a)}</div></div>
     </div>`).join("");
   accordionify(wrap);
 }
@@ -76,7 +83,7 @@ let _toolImplsP = null;
 function ensureToolImpls() {
   if (!_toolImplsP) {
     _toolImplsP = Promise.all(
-      ["js/tools-a.js?v=3", "js/tools-b.js?v=3", "js/tools-c.js?v=3"].map(src =>
+      ["js/tools-a.js?v=5", "js/tools-b.js?v=3", "js/tools-c.js?v=3"].map(src =>
         new Promise((res, rej) => {
           const sc = document.createElement("script");
           sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error(src));
@@ -142,6 +149,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderAllTools();
   renderFaq();
   attachSearch($("#toolsSearch"), v => v, renderAllTools);
+  // نرسل input عند المسح لإلغاء البحث المؤجل أيضًا وعدم ظهور نتائج قديمة.
+  $("#toolsClear")?.addEventListener("click", () => {
+    const input = $("#toolsSearch");
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.focus();
+  });
 
   // المسارات
   Router.on("tools", () => {

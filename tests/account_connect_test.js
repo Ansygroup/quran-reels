@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=19)", /publish\.js\?v=19/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=37)", /publish\.js\?v=37/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -75,11 +75,11 @@ if (!JSDOM) {
       fetched.push(String(url));
       if (String(url).includes("/api/gw?op=list")) {
         return json({ connections: [
-          { id: "conn-1", platform: "youtube", account_name: "Psychology World", expires_at: 1793878001416 },
+          { id: "conn-1", platform: "youtube", account_name: "Psychology World", expires_at: 1793878001416, has_refresh: false },
         ] });
       }
       if (String(url).includes("/api/autopilot")) {
-        return json({ config: {}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
+        return json({ config: {enabled:false, platforms:[], template:{}}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
           reciters: [], available: [
             { key: "youtube", name: "يوتيوب", publish: true, connect: "youtube", ready: true },
             { key: "tiktok", name: "تيك توك", publish: true, connect: "tiktok", ready: true },
@@ -95,7 +95,7 @@ if (!JSDOM) {
     window.eval(publish);
     const P = window.PublishApp;
     let stErr = null;
-    try { await P.init(); } catch (e) { stErr = e; }
+    try { await P.init(); await new Promise(resolve => setTimeout(resolve, 20)); } catch (e) { stErr = e; }
     chk("init() لا يرمي استثناءً", !stErr, stErr && String(stErr.message).slice(0, 90));
     chk("يُطلب op=list عند فتح الحساب", fetched.some((u) => u.includes("/api/gw?op=list")), fetched.join(" · "));
 
@@ -111,7 +111,9 @@ if (!JSDOM) {
     chk("لينكد إن يظهر «قريبًا» بلا زر ربط", Boolean(li && /قريبًا/.test(li.textContent)));
 
     /* جلسة منتهية: البطاقة كانت تعرض «مرتبط» بلا تحذير رغم أن النشر يفشل بـinvalid_grant */
-    chk("يوتيوب المنتهي يُنبّه «انتهت صلاحية الجلسة»", Boolean(yt && /انتهت صلاحية/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
+    chk("اتصال بلا توكن تجديد يُنبّه بغياب تصريح التجديد", Boolean(yt && /تصريح التجديد غير متاح/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
+    chk("الخادم يبلّغ has_refresh منطقيًا (بلا توكن)", /has_refresh/.test(fs.readFileSync(path.join(ROOT, "lib", "soc_list.js"), "utf8")));
+    chk("التحذير لا يعتمد على انتهاء access_token وحده", /has_refresh === false/.test(fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8")));
     chk("يوتيوب المنتهي يعرض «إعادة الربط»", Boolean(window.document.querySelector('[data-soc="youtube"] [data-connect="youtube"]')));
 
     /* مزوّد غير مهيأ (META_APP_ID/SECRET غائبة في Vercel): زر معطّل وسبب واضح */
@@ -133,12 +135,12 @@ if (!JSDOM) {
     w2.scrollTo = () => {};
     w2.fetch = (url) => {
       if (String(url).includes("/api/gw?op=list")) return json({ connections: [] });
-      return json({ config: {}, runs: [], connected: false, platforms: [], reciters: [], available: [], articles: { count: 7993 } });
+      return json({ config: {enabled:false, platforms:[], template:{}}, runs: [], connected: false, platforms: [], reciters: [], available: [], articles: { count: 7993 } });
     };
     w2.AuthApp = { getUserId: async () => "u1", getToken: async () => "T" };
     w2.eval(publish);
     let e2 = null;
-    try { await w2.PublishApp.init(); } catch (e) { e2 = e; }
+    try { await w2.PublishApp.init(); await new Promise(resolve => setTimeout(resolve, 20)); } catch (e) { e2 = e; }
     const notice2 = w2.document.getElementById("acctNotice");
     chk("init() مع ?setup=meta لا يرمي", !e2, e2 && String(e2.message).slice(0, 80));
     chk("رسالة ?setup تشرح المفاتيح الناقصة", Boolean(notice2 && /غير مهيأ/.test(notice2.textContent)), notice2 && notice2.textContent.slice(0, 90));
