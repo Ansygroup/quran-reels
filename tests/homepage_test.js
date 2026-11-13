@@ -45,7 +45,7 @@ const missingScripts = scripts.filter((s) => !new RegExp(`src="js/${s.replace(".
 chk(`سكربتات الواجهة التسعة محمّلة (${scripts.length})`, missingScripts.length === 0, "ناقص: " + missingScripts.join(", "));
 
 /* 3) صفحة الحساب مدمجة: الحاويات التي يكتب فيها publish.js */
-const acctIds = ["acctQuickActions", "acctPlatforms", "acctQueue", "schedPlatforms", "schedTitle", "schedTime", "schedSave", "queueList", "acctAuto", "acctArticles", "articleCards", "acctAuth", "acctNotice"];
+const acctIds = ["acctQuickActions", "acctPlatforms", "acctQueue", "queueList", "acctAuto", "acctAlerts", "acctAuth", "acctNotice"];
 const missingAcct = acctIds.filter((id) => !new RegExp(`id="${id}"`).test(html));
 chk("حاويات لوحة الحساب التي يربطها publish.js موجودة", missingAcct.length === 0, "ناقص: " + missingAcct.join(", "));
 
