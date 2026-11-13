@@ -607,14 +607,17 @@ const Creator = {
     $("#expSub").textContent = "اترك الصفحة مفتوحة حتى يكتمل الفيديو";
     AyahPlayer.onEnd = null; AyahPlayer.onTick = null; AyahPlayer.onState = null;
 
+    const signal = this._abort.signal;
     try {
       if (!this.prepared && !AyahPlayer.playing) {
         this._setPlayIcon(false);
-        await this._prepareForExport();
+        await this._prepareForExport(signal);
       }
+      if (signal.aborted) throw new Error("aborted");
       const total = AyahPlayer.totalDuration();
       if (total > 300) {
         const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
+        if (signal.aborted) throw new Error("aborted");
         if (!yes) {
           this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»";
           this.exporting = false;
@@ -628,7 +631,7 @@ const Creator = {
         canvas: $("#reelCanvas"),
         renderer: this.renderer,
         player: AyahPlayer,
-        signal: this._abort.signal,
+        signal,
         onStage: s => { if (s === "recording") $("#expStage").textContent = "جارٍ تسجيل الفيديو…"; },
         onProgress: (p, el_, tot) => {
           const pct = Math.round(p * 100);
@@ -652,36 +655,37 @@ const Creator = {
     }
   },
 
-  _prepareForExport() {
-    return new Promise(async resolve => {
-      const note = $("#expStage");
-      try {
-        const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
-          $("#expBar").style.width = Math.round((d / t) * 15) + "%";
-          note.textContent = `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
-        });
-        this.prepared = res.failed === 0;
-        this._audioIssue = "";
-        if (res.ok === 0) {
-          AyahPlayer.prepareSilent(Selection.list());
-          this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
-        } else if (res.failed > 0) {
-          this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — الفيديو لا يحتوي على كل التلاوة`;
-        }
-        if (this._audioIssue) {
-          $("#expSub").textContent = this._audioIssue;
-          toast(this._audioIssue, "err");
-        }
-        resolve(true);
-      } catch {
-        this.prepared = false;
+  async _prepareForExport(signal) {
+    const note = $("#expStage");
+    try {
+      const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
+        if (signal?.aborted) return;
+        $("#expBar").style.width = Math.round((d / t) * 15) + "%";
+        note.textContent = `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
+      }, signal);
+      if (signal?.aborted) throw new Error("aborted");
+      this.prepared = res.failed === 0;
+      this._audioIssue = "";
+      if (res.ok === 0) {
         AyahPlayer.prepareSilent(Selection.list());
         this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+      } else if (res.failed > 0) {
+        this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — الفيديو لا يحتوي على كل التلاوة`;
+      }
+      if (this._audioIssue) {
         $("#expSub").textContent = this._audioIssue;
         toast(this._audioIssue, "err");
-        resolve(true);
       }
-    });
+      return true;
+    } catch (error) {
+      this.prepared = false;
+      if (signal?.aborted) throw new Error("aborted");
+      AyahPlayer.prepareSilent(Selection.list());
+      this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+      $("#expSub").textContent = this._audioIssue;
+      toast(this._audioIssue, "err");
+      return true;
+    }
   },
 
   _mirrorExport() {
