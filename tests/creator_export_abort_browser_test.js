@@ -63,10 +63,17 @@ async function timeout(promise, ms) {
       const record = ReelRecorder.record.bind(ReelRecorder);
       ReelRecorder.record = (...args) => { window.testRecordCount++; return record(...args); };
     });
-    const running = page.evaluate(() => Creator.startExport());
+    // Two calls can arrive while the shared Quran load is pending.
+    await page.evaluate(() => {
+      window.originalQuranLoad = Quran.load;
+      const pending = new Promise(resolve => { window.releaseQuranLoad = resolve; });
+      Quran.load = () => pending;
+      window.exportOne = Creator.startExport(); window.exportTwo = Creator.startExport();
+      window.releaseQuranLoad(); Quran.load = window.originalQuranLoad;
+    });
     await timeout(firstRequest, 30000);
     await page.evaluate(() => Creator.cancelExport());
-    await timeout(running, 5000);
+    await timeout(page.evaluate(() => Promise.all([window.exportOne, window.exportTwo])), 5000);
     const cancelled = await page.evaluate(() => ({ exporting: Creator.exporting, reason: Creator.lastAbortReason,
       hidden: document.querySelector('#exportOverlay').hidden, resultHidden: document.querySelector('#expResult').hidden,
       recordCount: window.testRecordCount, prepared: Creator.prepared, cache: AyahPlayer.cache.size }));
@@ -78,8 +85,39 @@ async function timeout(promise, ms) {
     const retry = await page.evaluate(() => ({ exporting: Creator.exporting, resultHidden: document.querySelector('#expResult').hidden,
       recordCount: window.testRecordCount, prepared: Creator.prepared, cache: AyahPlayer.cache.size, videoSrc: document.querySelector('#resultVideo').src }));
     assert(!retry.resultHidden && !retry.exporting && retry.prepared && retry.videoSrc.startsWith('blob:'));
-    assert.equal(retry.recordCount, 1); assert.equal(retry.cache, 3); assert.equal(requests, 4); assert.deepEqual(pageErrors, []);
-    console.log('Creator browser abort PASS: interrupted local request, no recording, successful synthetic retry');
+    assert.equal(retry.recordCount, 1); assert.equal(retry.cache, 3); assert.equal(requests, 4);
+
+    // Force the duration-confirmation branch without producing a five-minute clip.
+    await page.evaluate(() => {
+      window.originalTotalDuration = AyahPlayer.totalDuration;
+      AyahPlayer.totalDuration = () => 301;
+      window.dialogExport = Creator.startExport();
+    });
+    await page.waitForSelector('.overlay [data-ok]', { timeout: 5000 });
+    await page.evaluate(() => Creator.cancelExport());
+    await timeout(page.evaluate(() => window.dialogExport), 5000);
+    let state = await page.evaluate(() => ({ dialog: !!document.querySelector('.overlay [data-ok]'), exporting: Creator.exporting,
+      hidden: document.querySelector('#exportOverlay').hidden, recordCount: window.testRecordCount, reason: Creator.lastAbortReason }));
+    assert(!state.dialog && !state.exporting && state.hidden); assert.equal(state.recordCount, 1); assert.equal(state.reason, 'aborted');
+
+    await page.evaluate(() => { window.dialogExport = Creator.startExport(); });
+    await page.waitForSelector('.overlay [data-cancel]', { timeout: 5000 });
+    await page.click('.overlay [data-cancel]');
+    await timeout(page.evaluate(() => window.dialogExport), 5000);
+    state = await page.evaluate(() => ({ dialog: !!document.querySelector('.overlay [data-ok]'), exporting: Creator.exporting,
+      hidden: document.querySelector('#exportOverlay').hidden, recordCount: window.testRecordCount }));
+    assert(!state.dialog && !state.exporting && state.hidden); assert.equal(state.recordCount, 1);
+
+    await page.evaluate(() => { window.dialogExport = Creator.startExport(); });
+    await page.waitForSelector('.overlay [data-ok]', { timeout: 5000 });
+    await page.evaluate(() => { AyahPlayer.totalDuration = window.originalTotalDuration; });
+    await page.click('.overlay [data-ok]');
+    await timeout(page.evaluate(() => window.dialogExport), 30000);
+    state = await page.evaluate(() => ({ dialog: !!document.querySelector('.overlay [data-ok]'), exporting: Creator.exporting,
+      resultHidden: document.querySelector('#expResult').hidden, recordCount: window.testRecordCount }));
+    assert(!state.dialog && !state.exporting && !state.resultHidden); assert.equal(state.recordCount, 2);
+    assert.equal(requests, 4); assert.deepEqual(pageErrors, []);
+    console.log('Creator browser PASS: concurrent starts, cancelled fetch and dialog, successful synthetic retries');
   } finally {
     if (browser) await browser.close().catch(() => {});
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

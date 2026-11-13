@@ -58,8 +58,8 @@ chk("نافذة التصدير لا تُشبه حوارًا (بلا data-ok) —
   !/id="exportOverlay"[\s\S]{0,2000}data-ok/.test(html));
 
 /* الكاش يكسر الملفات المتغيرة */
-chk("creator.js?v=13 في الماركب", /creator\.js\?v=13/.test(html));
-chk("sw مرفوع الإصدار (qr-v54)", /qr-v54/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+chk("creator.js?v=14 في الماركب", /creator\.js\?v=14/.test(html));
+chk("sw مرفوع الإصدار (qr-v55)", /qr-v55/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
 /* أدوات المحاكاة الحقيقية موجودة (توليد فعلي على Chromium) ولا تُنشر */
 const e2e = path.join(ROOT, "tools", "e2e_render.js");

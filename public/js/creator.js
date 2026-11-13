@@ -568,6 +568,8 @@ const Creator = {
     this.lastAbortReason = "";
     if (this.exporting) { this.lastAbortReason = "التصدير جارٍ بالفعل"; return; }
     await Quran.load();
+    // نداءان متزامنان قد يتجاوزان الحارس الأول أثناء انتظار تحميل القرآن.
+    if (this.exporting) { this.lastAbortReason = "التصدير جارٍ بالفعل"; return; }
 
     const count = Selection.count();
     if (count < 1) { this.lastAbortReason = "لم تُحدَّد آيات — اختر الآيات أولًا"; toast("اختر الآيات أولًا", "err"); return; }
@@ -616,7 +618,7 @@ const Creator = {
       if (signal.aborted) throw new Error("aborted");
       const total = AyahPlayer.totalDuration();
       if (total > 300) {
-        const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
+        const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة", { signal });
         if (signal.aborted) throw new Error("aborted");
         if (!yes) {
           this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»";
