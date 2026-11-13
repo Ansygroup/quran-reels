@@ -498,10 +498,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v5 / creator v8 / publish v35 / sw qr-v46)",
+  chk("نسخ الأصول مرفوعة (reel v5 / creator v9 / publish v35 / sw qr-v47)",
     /reel\.js\?v=5/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /creator\.js\?v=8/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v46/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /creator\.js\?v=9/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v47/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");

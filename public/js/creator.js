@@ -290,6 +290,7 @@ const Creator = {
 
   _quickPick(id) {
     if (id === "all") {
+      $('.step-tab[data-pane="text"]').click();
       $("#selFamous").focus();
       toast("اختر من قائمة المقاطع المختارة في تبويب النص");
       return;
