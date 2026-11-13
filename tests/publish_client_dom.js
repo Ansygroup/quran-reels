@@ -111,6 +111,7 @@ window.fetch = async (url, opts = {}) => {
 
   try {
     await window.PublishApp.init();
+    await new Promise(resolve => setTimeout(resolve, 20));
   } catch (e) {
     fail("PublishApp.init() رمى خطأ: " + e.message);
     return done();
