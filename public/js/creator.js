@@ -56,13 +56,19 @@ const Creator = {
     sel.innerHTML = "";
     TRANSLATIONS.forEach(t => sel.appendChild(el("option", { value: t.id }, t.n)));
   },
+  // العنوان والمرجع من نفس بيانات القرآن، وليس من نص حر قابل للخطأ.
+  _famousLabel(s, a, b) {
+    const words = Quran.ayah(s, a).trim().split(/\s+/);
+    const excerpt = words.slice(0, 8).join(" ") + (words.length > 8 ? "…" : "");
+    return `${ayahRef(s, a, b)} — ${excerpt}`;
+  },
   _populateFamous() {
     const sel = $("#selFamous");
-    sel.innerHTML = `<option value="">— اختر من الآيات المشهورة —</option>`;
+    sel.innerHTML = `<option value="">— اختر من المقاطع المختارة —</option>`;
     for (const grp of FAMOUS) {
       const og = el("optgroup", { label: grp.g });
-      grp.i.forEach(([t, s, a, b], ix) => {
-        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, t));
+      grp.i.forEach(([s, a, b]) => {
+        og.appendChild(el("option", { value: `${s}:${a}:${b}` }, this._famousLabel(s, a, b)));
       });
       sel.appendChild(og);
     }
@@ -151,6 +157,7 @@ const Creator = {
     $("#selReciter").addEventListener("change", e => {
       Selection.reciter = e.target.value;
       this.prepared = false;
+      this._audioIssue = "";
       save();
     });
 
@@ -284,24 +291,28 @@ const Creator = {
 
   _quickPick(id) {
     if (id === "all") {
+      $('.step-tab[data-pane="text"]').click();
       $("#selFamous").focus();
-      toast("اختر من قائمة الآيات المشهورة في تبويب النص");
+      toast("اختر من قائمة المقاطع المختارة في تبويب النص");
       return;
     }
-    let pool = FAMOUS;
     if (id === "me") {
-      const all = FAMOUS.flatMap(g => g.i);
-      const pick = all[Math.floor(Math.random() * all.length)];
-      this.setSelection(pick[1], pick[2], pick[3], true);
-      toast("رسالة لك: " + pick[0]);
+      const all = FAMOUS.filter(g => g.tag !== "other").flatMap(g => g.i);
+      if (!all.length) { toast("لا توجد رسائل مختارة", "err"); return; }
+      const [s, a, b] = all[Math.floor(Math.random() * all.length)];
+      this.setSelection(s, a, b, true);
+      toast("رسالة لك: " + this._famousLabel(s, a, b));
       return;
     }
     const grp = FAMOUS.find(g => g.tag === id);
     if (!grp || !grp.i.length) { toast("لا توجد رسائل في هذا التصنيف", "err"); return; }
-    const pick = grp.i[Math.floor(Math.random() * grp.i.length)];
-    this.setSelection(pick[1], pick[2], pick[3], true);
-    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(pick[1], pick[2], pick[3])[0])}</div>
-      <div class="hint center">${esc(ayahRef(pick[1], pick[2], pick[3]))} — ${esc(pick[0])}</div>`;
+    const [s, a, b] = grp.i[Math.floor(Math.random() * grp.i.length)];
+    this.setSelection(s, a, b, true);
+  },
+
+  _showQuickVerse(s, a, b) {
+    $("#msgVerse").innerHTML = `<div class="inline-ayah">${esc(Quran.range(s, a, b)[0])}</div>
+      <div class="hint center">${esc(ayahRef(s, a, b))}</div>`;
   },
 
   /** اختيار مقطع من الخارج (آية اليوم مثلاً) */
@@ -412,11 +423,13 @@ const Creator = {
     AyahPlayer.stop();
     AyahPlayer.prepareSilent(list);
     this.prepared = false;
+    this._audioIssue = "";
     this._updateTransForRenderer();
     this._updateDots(0);
     // معاينة النص + تقدير المدة
     const first = Quran.range(Selection.surah, Selection.from, Selection.from)[0];
     $("#curAyahPreview").innerHTML = `<div class="verse-preview">${esc(first)}</div>`;
+    this._showQuickVerse(Selection.surah, Selection.from, Selection.to);
     const est = AyahPlayer.totalDuration();
     $("#rangeInfo").innerHTML = `<span class="range-badge">${toAr(list.length)} آية · ${esc(ayahRef(Selection.surah, Selection.from, Selection.to))}</span>
       <span class="range-badge" style="background:rgba(212,175,55,.1);border-color:var(--line);color:var(--gold-3)">⏱ ~${toAr(Math.round(est))} ثانية</span>
@@ -443,7 +456,11 @@ const Creator = {
   async _togglePlay() {
     if (this.exporting) return;
     if (AyahPlayer.playing && !AyahPlayer.paused) { AyahPlayer.pause(); return; }
-    if (AyahPlayer.playing && AyahPlayer.paused) { AyahPlayer.resume(); return; }
+    if (AyahPlayer.playing && AyahPlayer.paused) {
+      if (this.prepared) { AyahPlayer.resume(); return; }
+      // التحضير الناقص يجب أن يُعاد عند استئناف المعاينة، لا أن يبقى صامتًا إلى الأبد.
+      AyahPlayer.stop();
+    }
     const btn = $("#btnPlay");
     btn.disabled = true;
     const note = $("#previewNote");
@@ -453,17 +470,19 @@ const Creator = {
         const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
           note.textContent = `تحميل التلاوة… ${toAr(d)}/${toAr(t)}`;
         });
-        this.prepared = true;
+        this.prepared = res.failed === 0;
+        this._audioIssue = "";
         if (res.ok === 0) {
           AyahPlayer.prepareSilent(Selection.list());
-          toast("تعذّر تحميل الصوت — المعاينة بدون صوت", "err");
+          this._audioIssue = "تعذّر تحميل الصوت — المعاينة بدون صوت. أوقفها ثم شغّلها لإعادة المحاولة.";
         } else if (res.failed > 0) {
-          toast(`تعذّر تحميل ${toAr(res.failed)} آية — سيتم تخطّيها`, "err");
+          this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — سيتم تخطّيها. أوقف المعاينة ثم شغّلها لإعادة المحاولة.`;
         }
+        if (this._audioIssue) toast(this._audioIssue, "err");
       }
       this._wirePlayerEvents();
       AyahPlayer.play(AyahPlayer.index || 0, 0);
-      note.textContent = "المعاينة تعمل… استمتع 🎧";
+      note.textContent = this._audioIssue || "المعاينة تعمل… استمتع 🎧";
     } catch (e) {
       console.error(e);
       toast("تعذّر تشغيل المعاينة", "err");
@@ -503,7 +522,7 @@ const Creator = {
     AyahPlayer.onState = playing => this._setPlayIcon(playing);
     AyahPlayer.onEnd = () => {
       this._setPlayIcon(false);
-      $("#previewNote").textContent = "انتهت المعاينة — يمكنك الإنشاء الآن ✨";
+      $("#previewNote").textContent = this._audioIssue || "انتهت المعاينة — يمكنك الإنشاء الآن ✨";
       this.renderer.state.elapsed = this.renderer.state.total;
       this._dirty();
     };
@@ -552,18 +571,11 @@ const Creator = {
 
     const count = Selection.count();
     if (count < 1) { this.lastAbortReason = "لم تُحدَّد آيات — اختر الآيات أولًا"; toast("اختر الآيات أولًا", "err"); return; }
-    if (!this.prepared && !AyahPlayer.playing) {
-      // تحضير الصوت قبل التسجيل
-      this._setPlayIcon(false);
-      const ok = await this._prepareForExport();
-      if (ok === "abort") { this.lastAbortReason = "تعذّر تحضير التلاوة (تعذّر تحميل الصوت)"; return; }
-    }
-    const total = AyahPlayer.totalDuration();
-    if (total > 300) {
-      const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
-      if (!yes) { this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»"; return; }
-    }
-
+    /* التحضير (تنزيل التلاوة) كان يحدث *قبل* ظهور نافذة التصدير، فتبدو الصفحة
+     * كأنها لم تفعل شيئًا: المرحلة والنسبة فارغتان والزر كأنه لا يعمل —
+     * وهذا بالضبط ما سجّلته تشغيلات 8–11 نوفمبر («غير معروف» 0%). الآن
+     * النافذة تظهر أولًا، ثم نُحضّر داخل إطار واضح.
+     * حوار «المدة طويلة» انتقل بعد التحضير لأن المدة الحقيقية لا تُعرف قبله. */
     this.exporting = true;
     this._abort = new AbortController();
     AyahPlayer.stop();
@@ -596,7 +608,21 @@ const Creator = {
     AyahPlayer.onEnd = null; AyahPlayer.onTick = null; AyahPlayer.onState = null;
 
     try {
-      if (!this.prepared) await this._prepareForExport();
+      if (!this.prepared && !AyahPlayer.playing) {
+        this._setPlayIcon(false);
+        await this._prepareForExport();
+      }
+      const total = AyahPlayer.totalDuration();
+      if (total > 300) {
+        const yes = await confirmDialog("المدة طويلة", `مدة الفيديو ~${Math.round(total / 60)} دقيقة (الحد 5 دقائق). هل تريد المتابعة؟`, "متابعة");
+        if (!yes) {
+          this.lastAbortReason = "لم يُؤكَّد حوار «المدة طويلة»";
+          this.exporting = false;
+          const ovCancel = $("#exportOverlay"); if (ovCancel) ovCancel.hidden = true;
+          if (this._savedDims) { this._savedDims = null; this._resizeCanvas(); }
+          return;
+        }
+      }
       $("#expStage").textContent = "جارٍ تسجيل الفيديو…";
       const res = await ReelRecorder.record({
         canvas: $("#reelCanvas"),
@@ -633,14 +659,25 @@ const Creator = {
           $("#expBar").style.width = Math.round((d / t) * 15) + "%";
           note.textContent = `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
         });
-        this.prepared = true;
+        this.prepared = res.failed === 0;
+        this._audioIssue = "";
         if (res.ok === 0) {
           AyahPlayer.prepareSilent(Selection.list());
-          toast("سيُنشأ الفيديو بدون صوت (تعذّر تحميل التلاوة)", "err");
+          this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+        } else if (res.failed > 0) {
+          this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — الفيديو لا يحتوي على كل التلاوة`;
+        }
+        if (this._audioIssue) {
+          $("#expSub").textContent = this._audioIssue;
+          toast(this._audioIssue, "err");
         }
         resolve(true);
       } catch {
+        this.prepared = false;
         AyahPlayer.prepareSilent(Selection.list());
+        this._audioIssue = "تعذّر تحميل التلاوة — الفيديو بدون صوت";
+        $("#expSub").textContent = this._audioIssue;
+        toast(this._audioIssue, "err");
         resolve(true);
       }
     });
@@ -664,7 +701,7 @@ const Creator = {
     $("#expResult").hidden = false;
     $("#expPct").textContent = "100%";
     $("#resultVideo").src = url;
-    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب`;
+    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب${this._audioIssue ? " · " + this._audioIssue : ""}`;
     const dl = $("#btnDownload");
     dl.href = url; dl.download = name;
     $("#btnShare").onclick = async () => {
