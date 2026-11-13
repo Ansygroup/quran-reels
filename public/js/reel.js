@@ -50,49 +50,85 @@ const AyahPlayer = {
 
   /** جلب بمهلة: بلا مهلة كان الطلب ينتظر وسيط /proxy حتى ٦٠ ثانية لكل آية،
    * فتبقى «جارٍ تحضير التلاوة…» بلا نهاية ولا يعرف أحد السبب. */
-  async _fetchAudio(url, ms = 20000) {
+  async _fetchAudio(url, ms = 20000, signal) {
     const ctrl = new AbortController();
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
     const timer = setTimeout(() => ctrl.abort(), Math.max(1000, ms));
     try {
+      if (signal?.aborted) throw new Error("aborted");
       const r = await fetch(url, { signal: ctrl.signal });
       if (!r.ok) throw new Error("HTTP " + r.status);
       return await r.arrayBuffer();
-    } finally { clearTimeout(timer); }
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  },
+
+  // فك الترميز لا يدعم الإلغاء؛ نتوقف عن انتظار نتيجته ونمنع حفظها المتأخر.
+  _awaitAudio(promise, signal) {
+    if (!signal) return promise;
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const finish = (failed, value) => {
+        if (done) return;
+        done = true;
+        signal.removeEventListener("abort", onAbort);
+        failed ? reject(value) : resolve(value);
+      };
+      const onAbort = () => finish(true, new Error("aborted"));
+      signal.addEventListener("abort", onAbort, { once: true });
+      Promise.resolve(promise).then(value => finish(false, value), error => finish(true, error));
+      if (signal.aborted) onAbort();
+    });
   },
 
   /** جلب وفك ترميز كل الآيات — يعيد {ok, total} */
-  async prepare(reciter, ayat, onProgress) {
+  async prepare(reciter, ayat, onProgress, signal) {
+    if (signal?.aborted) throw new Error("aborted");
     this.reciter = reciter; this.ayat = ayat;
     this.silent = false;
     this.lastPrepareError = "";
     this.estimates = ayat.map(v => this.estimate(v.s, v.a));
     this.ensureCtx();
-    const deadline = Date.now() + 45000; // سقف كلي: لا تعليق أبدًا
+    const deadline = Date.now() + 45000; // ميزانية إرشادية للوسيط، وليست سقفًا كليًا للمحاولات البديلة.
     let done = 0;
     const errs = [];
     for (const v of ayat) {
+      if (signal?.aborted) throw new Error("aborted");
       const key = reciter + "/" + v.s + ":" + v.a;
       if (!this.cache.has(key)) {
         const left = deadline - Date.now();
         const budget = Math.min(20000, Math.max(3000, left));
         try {
-          const buf = await this._fetchAudio(this.url(reciter, v.s, v.a), budget);
-          const audio = await this.ctx.decodeAudioData(buf);
+          const buf = await this._fetchAudio(this.url(reciter, v.s, v.a), budget, signal);
+          if (signal?.aborted) throw new Error("aborted");
+          const audio = await this._awaitAudio(this.ctx.decodeAudioData(buf), signal);
+          if (signal?.aborted) throw new Error("aborted");
           this.cache.set(key, audio);
         } catch (e) {
+          if (signal?.aborted) throw new Error("aborted");
           errs.push(v);
           this.lastPrepareError = String((e && e.message) || e).slice(0, 120);
           // بديل: محاولة مباشرة بدون بروكسي (لو كان السماح بالـ CORS)
           try {
-            const buf = await this._fetchAudio(`https://everyayah.com/data/${reciter}/${pad(v.s)}${pad(v.a)}.mp3`, 12000);
-            const audio = await this.ctx.decodeAudioData(buf);
+            const buf = await this._fetchAudio(`https://everyayah.com/data/${reciter}/${pad(v.s)}${pad(v.a)}.mp3`, 12000, signal);
+            if (signal?.aborted) throw new Error("aborted");
+            const audio = await this._awaitAudio(this.ctx.decodeAudioData(buf), signal);
+            if (signal?.aborted) throw new Error("aborted");
             this.cache.set(key, audio);
-          } catch (e2) { this.lastPrepareError += " / " + String((e2 && e2.message) || e2).slice(0, 80); }
+          } catch (e2) {
+            if (signal?.aborted) throw new Error("aborted");
+            this.lastPrepareError += " / " + String((e2 && e2.message) || e2).slice(0, 80);
+          }
         }
       }
+      if (signal?.aborted) throw new Error("aborted");
       done++;
       onProgress && onProgress(done, ayat.length);
     }
+    if (signal?.aborted) throw new Error("aborted");
     // المدد الحقيقية
     this.estimates = ayat.map((v, i) => {
       const b = this.cache.get(reciter + "/" + v.s + ":" + v.a);

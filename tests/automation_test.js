@@ -153,7 +153,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
 
   /* 10) الشارة الجديدة للنسخ */
   chk("نسخة الواجهة مرفوعة في الماركب والكاش",
-    /publish\.js\?v=35/.test(html) && /qr-v53/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
+    /publish\.js\?v=35/.test(html) && /qr-v54/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

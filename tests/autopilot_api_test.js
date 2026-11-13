@@ -503,12 +503,12 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     g42CreatorSrc.indexOf('ov.hidden = false;') > 0 &&
     g42CreatorSrc.indexOf('ov.hidden = false;') < g42CreatorSrc.indexOf('if (!this.prepared && !AyahPlayer.playing)'),
     "ترتيب النافذة/التحضير");
-  chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
-    /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v9 / creator v12 / publish v35 / sw qr-v53)",
-    /reel\.js\?v=9/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /creator\.js\?v=12/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v53/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("جلب التلاوة له مهلة وميزانية إرشادية للوسيط",
+    /_fetchAudio\(url, ms = 20000, signal\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
+  chk("نسخ الأصول مرفوعة (reel v10 / creator v13 / publish v35 / sw qr-v54)",
+    /reel\.js\?v=10/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /creator\.js\?v=13/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v54/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
