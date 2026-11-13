@@ -51,8 +51,14 @@ for (const opt of options) {
   const [s, a, b] = opt.attrs.value.split(':').map(Number);
   assert.strictEqual(opt.text, creator._famousLabel(s, a, b));
 }
+// Exercise the real selection and synchronization paths with a minimal player/renderer.
+ctx.AyahPlayer = { stop() {}, prepareSilent() {}, totalDuration: () => 0 };
+creator.renderer = { setConfig() {} };
+creator._updateTransForRenderer = creator._updateDots = creator._setPlayIcon = creator._dirty = () => {};
+vm.runInContext('Selection.save = () => {}', ctx);
+const originalSetSelection = creator.setSelection;
 let selected;
-creator.setSelection = (...args) => { selected = args; };
+creator.setSelection = function (...args) { selected = args; return originalSetSelection.apply(this, args); };
 creator._bind();
 for (const opt of options) {
   select.events.change({target: {value: opt.attrs.value}});
@@ -72,6 +78,17 @@ for (let i = 0; i < 50; i++) {
   assert.strictEqual($('#msgVerse').innerHTML, `<div class="inline-ayah">${quran.ayah(s, a)}</div>\n      <div class="hint center">${ref(s, a, b)}</div>`);
   assert(notifications.at(-1).includes(creator._famousLabel(s, a, b)));
 }
+// Loading/restoring and manual adjustments must not leave an old quick-message preview.
+vm.runInContext('Selection.surah = 2; Selection.from = 5; Selection.to = 10', ctx);
+creator._syncVerses();
+assert.strictEqual($('#msgVerse').innerHTML, `<div class="inline-ayah">${quran.ayah(2, 5)}</div>\n      <div class="hint center">${ref(2, 5, 10)}</div>`);
+$('#selSurah').events.change({target: {value: '48'}});
+assert($('#msgVerse').innerHTML.includes(quran.ayah(48, 1)));
+assert($('#msgVerse').innerHTML.includes(ref(48, 1, 29)));
+$('#txtFrom').value = '4'; $('#txtTo').value = '5';
+$('#txtFrom').events.change();
+assert($('#msgVerse').innerHTML.includes(quran.ayah(48, 4)));
+assert($('#msgVerse').innerHTML.includes(ref(48, 4, 5)));
 const textTab = $('.step-tab[data-pane="text"]');
 textTab.addEventListener('click', () => { select.parentVisible = true; });
 select.focus = function () { assert(this.parentVisible, 'text tab must be opened before focusing its select'); this.focused = true; };

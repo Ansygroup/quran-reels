@@ -399,3 +399,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/quick_verses_test.js && node tests/sw_verify.js && npm run pretest
   EXPECT: فتح تبويب السورة والآيات قبل تركيز القائمة دون تغيير المقطع السابق، والسماح باختيار مقطع منها؛ تحديث إصدارات الأصول والكاش.
   EVIDENCE: قبل الإصلاح أظهر Chromium محليًا أن القائمة مخفية ولا تستقبل التركيز؛ بعده نجحت التجربة والاختيار اليدوي بعروض 320 و390 و1440 دون أخطاء JavaScript.
+
+- [x] G83: معاينة الرسالة تواكب جميع تغييرات المقطع
+  CHECK: node tests/quick_verses_test.js && node tests/sw_verify.js && npm run pretest
+  EXPECT: عرض أول آية ومرجع المقطع الحالي عند التحميل وبعد الاختيار العشوائي أو اليدوي وتغيير السورة أو نطاق الآيات، من دون تغيير نص القرآن.
+  EVIDENCE: فشل التطابق قبل الإصلاح عند الاختيار اليدوي؛ نجحت المحاكاة وChromium محليًا بعروض 320 و390 و1440 بعد الإصلاح، دون نشر فيديو أو تغيير إعدادات حساب.
