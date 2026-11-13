@@ -640,6 +640,7 @@ const Creator = {
       this._onExportDone(res);
     } catch (e) {
       console.error(e);
+      this.lastAbortReason = String((e && e.message) || e || "تعذّر إنشاء الفيديو").slice(0, 160);
       if (e && e.message === "aborted") { toast("تم إيقاف الإنشاء"); }
       else {
         toast("حدث خطأ أثناء الإنشاء — جرّب جودة أقل", "err");

@@ -262,6 +262,13 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   let okRes = null, okErr = null;
   try { okRes = await w4(okPage, 30000, 10000); } catch (e) { okErr = e; }
   chk("waitForExport ينجح عند ظهور النتيجة", Boolean(okRes && okRes.result), okErr && String(okErr.message).slice(0, 80));
+  const failedPage = { evaluate: async () => ({ result: false, exporting: false, abort: "تعذّر تسجيل صوت التلاوة" }), waitForTimeout: async () => { throw Error("should not wait"); } };
+  let failedErr = null;
+  try { await w4(failedPage, 30000, 10000); } catch (e) { failedErr = e; }
+  chk("انتظار التصدير يبلّغ عن الخطأ فور توقف التصدير", Boolean(failedErr && failedErr.diag && failedErr.diag.kind === "failed" && /تعذّر تسجيل صوت التلاوة/.test(failedErr.message)));
+  const staleAbortStates = [{ result: false, exporting: true, abort: "التصدير جارٍ بالفعل" }, { result: true, exporting: false, abort: "التصدير جارٍ بالفعل" }];
+  const staleAbortPage = { _i: 0, evaluate: async () => staleAbortStates[Math.min(staleAbortPage._i++, 1)], waitForTimeout: async () => {} };
+  chk("لا يُعامل سبب قديم كفشل أثناء العمل أو بعد ظهور النتيجة", Boolean((await w4(staleAbortPage, 30000, 10000)).result));
 
   // فشل: الحالة ثابتة عند 0% → رسالة تشخيصية تحمل المرحلة والنسبة
   const stuckPage = { evaluate: async () => ({ pct: "0%", stage: "جارٍ تحضير التلاوة…", running: true, result: false }), waitForTimeout: async () => {} };
@@ -498,10 +505,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("تحضير التلاوة مسقوف بمهلة (لا تعليق أبدًا)",
     /_fetchAudio\(url, ms = 20000\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v7 / creator v11 / publish v35 / sw qr-v51)",
-    /reel\.js\?v=7/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /creator\.js\?v=11/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v51/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("نسخ الأصول مرفوعة (reel v8 / creator v12 / publish v35 / sw qr-v52)",
+    /reel\.js\?v=8/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /creator\.js\?v=12/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v52/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
