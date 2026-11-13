@@ -2,7 +2,7 @@
 /* Local-only render diagnostic. It marks each test verse with a colored square and
  * replaces recitation with three generated tones. No account, uploads or posts.
  * Requires playwright-core, @sparticuz/chromium and ffmpeg (or FFMPEG=/path).
- * Usage: node tools/render_sync_diagnostic.js [--no-gpu] [--stall-ms=1500]
+ * Usage: node tools/render_sync_diagnostic.js [--quality=720|1080] [--no-gpu] [--stall-ms=1500]
  * The labels measure an injected marker in encoded frames, NOT OCR or proof of
  * readable Quran text. Results from one machine do not prove production behavior. */
 'use strict';
@@ -63,6 +63,7 @@ function analyze(audio, video) {
     decoded_audio_seconds: audio.length / 4 / SAMPLE_RATE, decoded_video_seconds: video.length / 3 / 10,
     uncompared_audio_seconds: Math.max(0, audio.length / 4 / SAMPLE_RATE - count / 10),
     uncompared_video_seconds: Math.max(0, video.length / 3 / 10 - count / 10),
+    all_tones_sampled: count > 0 && summary.every(t => t.windows > 0),
     tones: summary, silent_windows: silentWindows, unclassified_audio_windows: unknownAudioWindows,
     mismatches: mismatches.map(({start_window, end_window, ...rest}) => ({start_seconds: start_window / 10, end_seconds: end_window / 10, ...rest})),
     caveat: 'Synthetic tones and injected frame markers only; 100ms sampling and frame duplication are approximate. This does not verify Quran text or production behavior.',
@@ -99,12 +100,22 @@ function staticServer(root) {
   });
 }
 
+function parseArgs(args) {
+  const result = { noGpu: false, stallMs: 0, quality: 720 }, seen = new Set();
+  for (const arg of args) {
+    const [key, ...rest] = arg.split('=');
+    if (seen.has(key)) throw new Error(`Duplicate option: ${key}`);
+    seen.add(key);
+    if (key === '--no-gpu' && rest.length === 0) result.noGpu = true;
+    else if (key === '--quality' && rest.length === 1 && /^(720|1080)$/.test(rest[0])) result.quality = Number(rest[0]);
+    else if (key === '--stall-ms' && rest.length === 1 && /^\d+$/.test(rest[0]) && Number(rest[0]) <= 10000) result.stallMs = Number(rest[0]);
+    else throw new Error('Usage: node tools/render_sync_diagnostic.js [--quality=720|1080] [--no-gpu] [--stall-ms=0..10000]');
+  }
+  return result;
+}
+
 async function run() {
-  const args = process.argv.slice(2), noGpu = args.includes('--no-gpu');
-  const stallArg = args.find(a => a.startsWith('--stall-ms='));
-  if (args.some(a => a !== '--no-gpu' && !a.startsWith('--stall-ms=')) || args.filter(a => a.startsWith('--stall-ms=')).length > 1) throw new Error('Usage: node tools/render_sync_diagnostic.js [--no-gpu] [--stall-ms=0..10000]');
-  const stallMs = stallArg ? Number(stallArg.split('=')[1]) : 0;
-  if (!Number.isInteger(stallMs) || stallMs < 0 || stallMs > 10000) throw new Error('stall-ms must be an integer between 0 and 10000');
+  const { noGpu, stallMs, quality } = parseArgs(process.argv.slice(2));
   const { chromium: pw } = require('playwright-core');
   const { default: bin } = await import(pathToFileURL(require.resolve('@sparticuz/chromium')).href);
   const server = staticServer(path.resolve(__dirname, '../public'));
@@ -121,8 +132,8 @@ async function run() {
     await page.route('**/*', route => { let url; try { url = new URL(route.request().url()); } catch { return route.abort(); } return url.origin === origin ? route.continue() : route.abort(); });
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 60000 });
     await page.waitForFunction(() => typeof Creator !== 'undefined' && Creator.ready && typeof Quran !== 'undefined' && Quran.data, null, { timeout: 60000 });
-    const output = await withTimeout(page.evaluate(async ({ stallMs }) => {
-      Selection.quality = 720; Creator.setSelection(48, 4, 6, true);
+    const output = await withTimeout(page.evaluate(async ({ stallMs, quality }) => {
+      Selection.ratio = '9:16'; Selection.quality = quality; Creator.setSelection(48, 4, 6, true);
       AyahPlayer.prepare = async function (reciter, verses) {
         this.reciter = reciter; this.ayat = verses; this.silent = false; this.estimates = [];
         const ctx = this.ensureCtx();
@@ -151,10 +162,11 @@ async function run() {
       await Creator.startExport();
       const video = document.querySelector('#resultVideo');
       if (document.querySelector('#expResult').hidden || !video.src) throw new Error(Creator.lastAbortReason || 'Export failed');
+      const dimensions = { width: Creator.renderer.cv.width, height: Creator.renderer.cv.height };
       const bytes = new Uint8Array(await (await fetch(video.src)).arrayBuffer()), parts = [];
       for (let i = 0; i < bytes.length; i += 8192) parts.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
-      return { base64: btoa(parts.join('')), metadata: document.querySelector('#resultMeta').textContent };
-    }, { stallMs }), 90000);
+      return { base64: btoa(parts.join('')), metadata: document.querySelector('#resultMeta').textContent, dimensions };
+    }, { stallMs, quality }), 90000);
     if (pageErrors.length) throw new Error('Page errors: ' + pageErrors.join('; '));
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'quran-sync-diagnostic-'));
     const file = path.join(directory, 'synthetic-video'); fs.writeFileSync(file, Buffer.from(output.base64, 'base64'));
@@ -162,8 +174,11 @@ async function run() {
     const audio = decode(ffmpeg, ['-i', file, '-vn', '-af', 'aresample=async=1:first_pts=0', '-ar', '8000', '-ac', '1', '-f', 'f32le', 'pipe:1']);
     const video = decode(ffmpeg, ['-i', file, '-an', '-vf', 'fps=10,crop=40:40:10:10,scale=1:1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1']);
     const report = analyze(audio, video);
-    if (report.tones.some(t => !t.windows) || !report.compared_seconds) throw new Error('Not all synthetic tones could be measured: ' + JSON.stringify(report));
-    console.log(JSON.stringify({ mode: { no_gpu: noGpu, injected_stall_ms: stallMs }, metadata: output.metadata, ...report }, null, 2));
+    console.log(JSON.stringify({ mode: { no_gpu: noGpu, injected_stall_ms: stallMs, quality }, dimensions: output.dimensions, metadata: output.metadata, ...report }, null, 2));
+    if (!report.all_tones_sampled) {
+      console.error('Incomplete measurement: at least one synthetic tone was not sampled in the compared portion.');
+      process.exitCode = 2;
+    }
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise(resolve => server.close(resolve));
@@ -171,5 +186,5 @@ async function run() {
   }
 }
 
-module.exports = { analyze, toneAt, frameAt };
+module.exports = { analyze, toneAt, frameAt, parseArgs };
 if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1; });
