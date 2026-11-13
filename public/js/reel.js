@@ -712,23 +712,33 @@ const ReelRecorder = {
     if (!window.MediaRecorder || !canvas || typeof canvas.captureStream !== "function") {
       throw new Error("متصفحك لا يدعم تسجيل الفيديو — جرّب Chrome أو Edge أو Safari حديثًا");
     }
+    // لا تخلط غياب مسار التسجيل الصوتي بوضع المعاينة الصامتة المقصود.
+    const audioRequired = !player.silent;
+    const audioTracks = audioRequired ? player.dest?.stream?.getAudioTracks?.() || [] : [];
+    const audioAvailable = () => !audioRequired || (audioTracks.length > 0 && audioTracks.every(t => t.readyState === "live" && t.enabled));
+    const audioError = () => new Error("تعذّر تسجيل صوت التلاوة — أعد المحاولة");
+    if (!audioAvailable()) throw audioError();
     const mime = this.pickMime();
+    const total = player.totalDuration();
     const stream = canvas.captureStream(30);
-    if (!player.silent && player.dest) {
-      player.dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    let rec;
+    try {
+      audioTracks.forEach(t => stream.addTrack(t));
+      if (audioRequired && !audioTracks.every(t => stream.getAudioTracks().includes(t))) throw audioError();
+      rec = new MediaRecorder(stream, {
+        mimeType: mime || undefined,
+        videoBitsPerSecond: canvas.height >= 1900 ? 9_000_000 : 5_000_000,
+      });
+      onStage && onStage("recording");
+      renderer.state.elapsed = 0;
+      renderer.state.total = total;
+    } catch (error) {
+      stream.getVideoTracks().forEach(t => t.stop());
+      throw error;
     }
-    const rec = new MediaRecorder(stream, {
-      mimeType: mime || undefined,
-      videoBitsPerSecond: canvas.height >= 1900 ? 9_000_000 : 5_000_000,
-    });
     const chunks = [];
     this._chunks = chunks;
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-
-    onStage && onStage("recording");
-    const total = player.totalDuration();
-    renderer.state.elapsed = 0;
-    renderer.state.total = total;
 
     let raf = 0;
     const drawLoop = () => {
@@ -742,6 +752,7 @@ const ReelRecorder = {
         clearTimeout(endTimer); clearTimeout(stopTimer);
         cancelAnimationFrame(raf);
         signal && signal.removeEventListener("abort", onAbort);
+        audioTracks.forEach(t => t.removeEventListener("ended", onAudioEnded));
         player.onEnd = null; player.onTick = null; player.onAyah = null;
         player.stop();
         try { rec.state !== "inactive" && rec.stop(); } catch {}
@@ -754,10 +765,12 @@ const ReelRecorder = {
         reject(error);
       };
       const onAbort = () => { this._abort = true; fail(new Error("aborted")); };
+      const onAudioEnded = () => fail(audioError());
       rec.onerror = e => fail(new Error("تعذّر تسجيل الفيديو: " + ((e.error && e.error.message) || "خطأ في التسجيل")));
       rec.onstop = () => {
         if (settled) return;
         if (!finishing) { fail(new Error("توقف تسجيل الفيديو قبل اكتماله")); return; }
+        if (!audioAvailable()) { fail(audioError()); return; }
         const blob = new Blob(chunks, { type: mime || "video/webm" });
         if (!blob.size) { fail(new Error("ملف الفيديو الناتج فارغ")); return; }
         settled = true;
@@ -765,10 +778,13 @@ const ReelRecorder = {
         onProgress && onProgress(1, total, total);
         resolve({ blob, mime: mime || "video/webm" });
       };
+      audioTracks.forEach(t => t.addEventListener("ended", onAudioEnded));
       signal && signal.addEventListener("abort", onAbort, { once: true });
       if (signal && signal.aborted) { onAbort(); return; }
+      if (!audioAvailable()) { fail(audioError()); return; }
 
       player.onTick = (elapsed, tot) => {
+        if (!audioAvailable()) { fail(audioError()); return; }
         renderer.state.elapsed = elapsed;
         renderer.state.total = tot;
         renderer.state.ayahElapsed = elapsed - player.elapsedBefore(player.index);
