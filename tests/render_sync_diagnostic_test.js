@@ -1,6 +1,20 @@
 'use strict';
 const assert = require('node:assert/strict');
-const { analyze, toneAt, frameAt, parseArgs } = require('../tools/render_sync_diagnostic');
+const { analyze, toneAt, frameAt, parseArgs, frameTiming } = require('../tools/render_sync_diagnostic');
+const showinfo = times => times.map((time, i) => `[Parsed_showinfo_0 @ 0x123] n: ${i} pts: ${i} pts_time:${time} duration: 1`).join('\n');
+const native = frameTiming(showinfo([0, 0.1, 1.1]));
+assert.equal(native.decoded_frames, 3); assert.equal(native.timestamp_order_valid, true);
+assert.equal(native.first_pts_seconds, 0); assert.equal(native.last_pts_seconds, 1.1);
+assert(Math.abs(native.max_interval_seconds - 1) < 1e-9);
+assert(Math.abs(native.mean_fps_between_first_and_last - 2 / 1.1) < 1e-9);
+for (const times of [[], [0, 'NOPTS'], [0, 0], [1, 0]]) {
+  const timing = frameTiming(showinfo(times));
+  assert.equal(timing.timestamp_order_valid, false); assert.equal(timing.max_interval_seconds, null);
+  assert.equal(timing.mean_fps_between_first_and_last, null);
+}
+assert.equal(frameTiming(showinfo([0])).mean_fps_between_first_and_last, null);
+assert.equal(frameTiming(showinfo([0, 1]).replace('] n: 1', '] n: 2')).timestamp_order_valid, false);
+assert.equal(frameTiming('[Parsed_showinfo_0 @ 0x123] n: 0 pts: 0').timestamp_order_valid, false);
 assert.deepEqual(parseArgs([]), { noGpu: false, stallMs: 0, quality: 720 });
 assert.deepEqual(parseArgs(['--quality=1080', '--no-gpu', '--stall-ms=1500']), { noGpu: true, stallMs: 1500, quality: 1080 });
 for (const args of [['--quality=480'], ['--quality='], ['--stall-ms='], ['--stall-ms=-1'], ['--stall-ms=10001'], ['--stall-ms=1.5'], ['--no-gpu=true'], ['--quality=720', '--quality=1080'], ['--no-gpu', '--no-gpu'], ['--unknown']]) assert.throws(() => parseArgs(args));

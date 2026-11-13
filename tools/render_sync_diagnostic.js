@@ -70,6 +70,45 @@ function analyze(audio, video) {
   };
 }
 
+// Parse frames before the diagnostic's fps=10 filter duplicates or drops them.
+function frameTiming(log) {
+  const timestamps = [];
+  let sequential = true;
+  for (const line of log.split(/\r?\n/)) {
+    const frame = line.match(/\[Parsed_showinfo_\d+\s+@[^\]]+\]\s+n:\s*(\d+)/);
+    if (!frame) continue;
+    if (Number(frame[1]) !== timestamps.length) sequential = false;
+    const pts = line.match(/\bpts_time:\s*(\S+)/);
+    const time = pts ? Number(pts[1]) : NaN;
+    timestamps.push(Number.isFinite(time) ? time : null);
+  }
+  const valid = timestamps.every(t => t !== null);
+  let monotonic = valid && sequential, maxInterval = null;
+  if (valid) for (let i = 1; i < timestamps.length; i++) {
+    const interval = timestamps[i] - timestamps[i - 1];
+    if (interval <= 0) monotonic = false;
+    if (maxInterval === null || interval > maxInterval) maxInterval = interval;
+  }
+  const first = timestamps.length && valid ? timestamps[0] : null;
+  const last = timestamps.length && valid ? timestamps[timestamps.length - 1] : null;
+  return {
+    decoded_frames: timestamps.length,
+    first_pts_seconds: first, last_pts_seconds: last,
+    timestamp_order_valid: timestamps.length > 0 && monotonic,
+    mean_fps_between_first_and_last: timestamps.length > 1 && monotonic ? (timestamps.length - 1) / (last - first) : null,
+    max_interval_seconds: timestamps.length > 1 && monotonic ? maxInterval : null,
+  };
+}
+
+function inspectFrameTiming(ffmpeg, file) {
+  const result = spawnSync(ffmpeg, ['-hide_banner', '-v', 'info', '-i', file, '-map', '0:v:0', '-an', '-vf', 'showinfo', '-f', 'null', '-'], { maxBuffer: 32 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`ffmpeg frame inspection failed: ${String(result.stderr).slice(-1000)}`);
+  const timing = frameTiming(String(result.stderr));
+  if (!timing.decoded_frames) throw new Error('No native video frames found in ffmpeg showinfo output');
+  return timing;
+}
+
 function decode(ffmpeg, args) {
   const result = spawnSync(ffmpeg, ['-v', 'error', ...args], { maxBuffer: 32 * 1024 * 1024 });
   if (result.error) throw result.error;
@@ -174,7 +213,8 @@ async function run() {
     const audio = decode(ffmpeg, ['-i', file, '-vn', '-af', 'aresample=async=1:first_pts=0', '-ar', '8000', '-ac', '1', '-f', 'f32le', 'pipe:1']);
     const video = decode(ffmpeg, ['-i', file, '-an', '-vf', 'fps=10,crop=40:40:10:10,scale=1:1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1']);
     const report = analyze(audio, video);
-    console.log(JSON.stringify({ mode: { no_gpu: noGpu, injected_stall_ms: stallMs, quality }, dimensions: output.dimensions, metadata: output.metadata, ...report }, null, 2));
+    const nativeFrameTiming = inspectFrameTiming(ffmpeg, file);
+    console.log(JSON.stringify({ mode: { no_gpu: noGpu, injected_stall_ms: stallMs, quality }, dimensions: output.dimensions, metadata: output.metadata, native_frame_timing: nativeFrameTiming, ...report }, null, 2));
     if (!report.all_tones_sampled) {
       console.error('Incomplete measurement: at least one synthetic tone was not sampled in the compared portion.');
       process.exitCode = 2;
@@ -186,5 +226,5 @@ async function run() {
   }
 }
 
-module.exports = { analyze, toneAt, frameAt, parseArgs };
+module.exports = { analyze, toneAt, frameAt, parseArgs, frameTiming, inspectFrameTiming };
 if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1; });
