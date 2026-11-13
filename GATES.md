@@ -394,3 +394,8 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: node tests/quick_verses_test.js && node tests/sw_verify.js && npm run pretest
   EXPECT: بعد كل اختيار عشوائي تُعرض الآية الأولى والمرجع من المقطع نفسه، مثل بقية التصنيفات، حتى بعد اختيار سابق مختلف؛ تحديث كاش صانع الريلز.
   EVIDENCE: محاكاة DOM لكل اختيار عشوائي، واختبار Chromium محلي بقراءات عشوائية مثبتة وتبديل التصنيفات بعروض 320 و390 و1440؛ بلا تغيير نص القرآن أو إعدادات حساب أو نشر فيديو.
+
+- [x] G82: زر «كل الرسائل» يفتح قائمة المقاطع المختارة
+  CHECK: node tests/quick_verses_test.js && node tests/sw_verify.js && npm run pretest
+  EXPECT: فتح تبويب السورة والآيات قبل تركيز القائمة دون تغيير المقطع السابق، والسماح باختيار مقطع منها؛ تحديث إصدارات الأصول والكاش.
+  EVIDENCE: قبل الإصلاح أظهر Chromium محليًا أن القائمة مخفية ولا تستقبل التركيز؛ بعده نجحت التجربة والاختيار اليدوي بعروض 320 و390 و1440 دون أخطاء JavaScript.

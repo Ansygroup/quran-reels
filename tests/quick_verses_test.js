@@ -9,7 +9,8 @@ function node(tag = 'div', attrs = {}, text = '') {
   return { tag, attrs, text, children: [], events: {}, innerHTML: '', value: '',
     appendChild(child) { this.children.push(child); },
     addEventListener(type, fn) { this.events[type] = fn; },
-    focus() { this.focused = true; }, classList: { add() {}, remove() {}, toggle() {} } };
+    focus() { this.focused = true; }, click() { this.clicked = true; if (this.events.click) this.events.click(); },
+    classList: { add() {}, remove() {}, toggle() {} } };
 }
 function $(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }
 const source = JSON.parse(fs.readFileSync('public/data/quran-uthmani.json', 'utf8')).data;
@@ -71,6 +72,12 @@ for (let i = 0; i < 50; i++) {
   assert.strictEqual($('#msgVerse').innerHTML, `<div class="inline-ayah">${quran.ayah(s, a)}</div>\n      <div class="hint center">${ref(s, a, b)}</div>`);
   assert(notifications.at(-1).includes(creator._famousLabel(s, a, b)));
 }
+const textTab = $('.step-tab[data-pane="text"]');
+textTab.addEventListener('click', () => { select.parentVisible = true; });
+select.focus = function () { assert(this.parentVisible, 'text tab must be opened before focusing its select'); this.focused = true; };
+const previous = selected;
 creator._quickPick('all');
+assert(textTab.clicked);
 assert(select.focused);
+assert.strictEqual(selected, previous, 'opening the list must not change the selected range');
 console.log(`Quick verse choices PASS: ${options.length} references, generated labels, menu and category selections`);
