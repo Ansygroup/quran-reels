@@ -567,7 +567,13 @@ const Creator = {
   async startExport() {
     this.lastAbortReason = "";
     if (this.exporting) { this.lastAbortReason = "التصدير جارٍ بالفعل"; return; }
-    await Quran.load();
+    try { await Quran.load(); }
+    catch (error) {
+      console.error("quran load", error);
+      this.lastAbortReason = "تعذّر تحميل بيانات القرآن — تحقّق من الاتصال وحاول مجددًا";
+      toast(this.lastAbortReason, "err");
+      return;
+    }
     // نداءان متزامنان قد يتجاوزان الحارس الأول أثناء انتظار تحميل القرآن.
     if (this.exporting) { this.lastAbortReason = "التصدير جارٍ بالفعل"; return; }
 
