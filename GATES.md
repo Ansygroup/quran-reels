@@ -490,7 +490,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   EXPECT: اختبار HTTP وJWT وصلاحيات RLS والتعارض المتزامن ورفض الكتابة المباشرة والإيقاف القديم داخل PostgreSQL وPostgREST مؤقتين فقط، بمفاتيح وبيانات وهمية ودون اتصال Supabase أو نشر.
   EVIDENCE: تشغيل GitHub Actions رقم 43416977566 على commit 9a010cc2 نجح، وخطوتا HTTP ومسودات الصلاحيات مرّتا في حاويات مؤقتة؛ لم يتوفر تنزيل السجل التفصيلي في بيئة العمل لكن حالة كل خطوة ناجحة. لا يُغني الاختبار عن مراجعة مخطط الإنتاج وإصداراته وخطة النشر.
 
-- [ ] G101: اختبار API الحساب الفعلي مع PostgREST معزول
+- [x] G101: اختبار API الحساب الفعلي مع PostgREST معزول
   CHECK: تشغيل خطوة Exercise actual account API with local PostgREST في .github/workflows/postgrest-account-guard.yml؛ git diff --check.
   EXPECT: معالج API وlib/db يستدعيان PostgREST حقيقيًا في حاوية اختبار فقط، مع جلسة محاكاة، والتحقق من تعارض الحفظ، وربط المالك، وردّ مفقود بعد التثبيت، وإيقاف عميل قديم؛ لا بيانات حقيقية ولا نشر.
-  EVIDENCE: الاختبار أُعدّ وقيد التشغيل؛ نجاحه لا يختبر Supabase Auth أو بيئة الإنتاج أو اتصال القنوات أثناء فصلها.
+  EVIDENCE: GitHub Actions رقم 43418021104 على commit 82cda46f نجح للخطوة الفعلية بعد فشل سابق واختبارين يعدّلان الإعدادات؛ بيانات الخطوات ناجحة، لكن تنزيل السجل التفصيلي غير متاح من بيئة العمل. لا يختبر Supabase Auth أو بيئة الإنتاج أو اتصال القنوات أثناء فصلها.
