@@ -52,5 +52,11 @@ creator._resizeCanvas = () => { resizeCalls++; }; creator._onExportDone = () => 
   assert.equal(prepareCalls, 1); assert(creator.exporting);
   creator.cancelExport(); await Promise.all([first, second]);
   assert(!creator.exporting); assert.equal(creator.lastAbortReason, 'aborted'); assert.equal(calls, 0);
-  console.log('Creator export abort PASS: preparation, dialog cancellation, cleanup and concurrent start');
+  env.Quran.load = async () => { throw Error('network'); };
+  await creator.startExport();
+  assert(!creator.exporting); assert.match(creator.lastAbortReason, /تعذّر تحميل بيانات القرآن/); assert.equal(calls, 0);
+  env.Quran.load = async () => {};
+  exporting = creator.startExport(); await new Promise(resolve => setImmediate(resolve));
+  assert(creator.exporting); assert.equal(creator.lastAbortReason, ''); creator.cancelExport(); await exporting;
+  console.log('Creator export abort PASS: preparation, dialog, concurrent start and Quran load failure/retry');
 })().catch(error => { console.error(error); process.exitCode = 1; });
