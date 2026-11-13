@@ -33,6 +33,15 @@ Module._load = function (request) {
   if (Object.prototype.hasOwnProperty.call(STUBS, request)) return STUBS[request];
   return origLoad.apply(this, arguments);
 };
+const pubPath = require.resolve(path.join(ROOT, "lib", "publish.js"));
+const pub = { calls: [], results: [], impl: async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id }) };
+require.cache[pubPath] = {
+  id: pubPath, filename: pubPath, loaded: true,
+  exports: {
+    publishRow: async (row, platform) => { pub.calls.push({ id: row.id, platform: platform || row.platform }); return pub.impl(row, platform); },
+    videoUrl: () => "", pickConnection: () => null, __test: { pickConnection: () => null },
+  },
+};
 const dbPath = require.resolve(path.join(ROOT, "lib", "db.js"));
 const dbCalls = [];
 const impl = {
@@ -84,7 +93,7 @@ const mkRoute = (url) => {
   const routes = [];
   const fakePage = { route: async (matcher, handler) => { routes.push({ matcher, handler }); } };
   const installed = await T.installAudioRoute(fakePage);
-  chk("يُثبّت مسارًا واحدًا على الصفحة", installed === true && routes.length === 1);
+  chk("يُثبّت مسارًا واحدًا ويعيد عدّادات الصوت", Boolean(installed && installed.ok === 0 && installed.miss === 0) && routes.length === 1);
   const m = routes[0].matcher;
   chk("يطابق /proxy?u=", m("https://quran-reels-tau.vercel.app/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
   chk("يطابق /api/proxy?u=", m("https://quran-reels-tau.vercel.app/api/proxy?u=https%3A%2F%2Feveryayah.com%2Fa.mp3") === true);
@@ -102,7 +111,7 @@ const mkRoute = (url) => {
   global.fetch = realFetch;
 
   chk("renderRecipe يثبّت المسار قبل التوجيه للصفحة",
-    /await installAudioRoute\(page\);\s*\n\s*await page\.goto/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
+    /await installAudioRoute\(page\);\s*\n[\s\S]{0,1400}?await page\.goto/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
 
   /* 3) إعادة المحاولة التلقائية */
   let n = 0;
@@ -137,7 +146,7 @@ const mkRoute = (url) => {
 
   /* 5) الربط في التشغيل اليومي */
   const src = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
-  chk("runDailyAutopilots يستخدم الإعادة والتسجيل", src.includes("runWithRetry(() => generateAndPublish") && src.includes("recordDaily(config.user_id"));
+  chk("runDailyAutopilots يستخدم الإعادة والتسجيل", /runWithRetry\(\(n\) => generateAndPublish/.test(src) && src.includes("recordDaily(config.user_id"));
   chk("النتيجة تُرجع attempts/recorded", /attempts, recorded/.test(src));
 
   /* 6) فحص النسخة المنشورة قبل التوليد (درس النافذة المفقودة) */
@@ -167,7 +176,13 @@ const mkRoute = (url) => {
   impl.q = async (sql, params) => { dbCalls.push({ sql, params }); return []; };
   const closed = await T.closeStaleRuns(45);
   chk("ينظّف autopilot_runs العالقة", closed === true && dbCalls.some((c) => /status='rendering'/.test(c.sql) && /completed_at=now\(\)/.test(c.sql)));
-  chk("لا يمسّ التشغيلات الحديثة (نافذة زمنية)", dbCalls.some((c) => /\(\$2 \|\| ' minutes'\)::interval/.test(c.sql)));
+  chk("التجهيز العالق يتحول لفشل تحذيري مع بقاء مسار الفيديو", dbCalls.some(c => /where status='queued'/.test(c.sql) && /غير مؤكدة/.test(c.params[0]) && !/video_path/.test(c.sql)));
+  const staleCall = dbCalls.find((c) => /status='rendering'/.test(c.sql)) || { params: [] };
+  const windowMin = (staleCall.params[1] ? Date.now() - Date.parse(staleCall.params[1]) : 0) / 60000;
+  /* طبقة db تُترجم إلى PostgREST ولا تفهم `now() - ($2 || ' minutes')::interval`،
+   * فكان الشرط الزمني يسقط ⇒ كل تشغيل 'rendering' يُغلق مهما كان عمره. */
+  chk("لا يمسّ التشغيلات الحديثة (نافذة زمنية فعلية)", /created_at < \$2/.test(staleCall.sql || "") && Math.abs(windowMin - 45) < 1,
+    JSON.stringify({ window: windowMin, sql: String(staleCall.sql || "").slice(0, 90) }));
 
   /* 8) الترتيب في التشغيل اليومي: تنظيف ← فحص ← توليد */
   const src2 = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
@@ -209,6 +224,326 @@ const mkRoute = (url) => {
   chk("قيد الإنشاء ⇒ يُتخطى (لا نُزاحم التشغيل الجاري)", cap2.length === 1 && cap2[0].skipped === "running", JSON.stringify(cap2));
   impl.q = async () => [];
   chk("بلا إعدادات مُفعّلة ⇒ لا شيء", (await T.catchUpDaily()).length === 0);
+
+  /* 11) تشخيص الفشل: سبب مقروء + لقطة كاملة محفوظة (لا JSON مقطوع) */
+  const lastState = { pct: "", stage: "", exporting: false, running: false, count: 0, dialog: false, toast: "حدّد آية", abort: "لا شيء محدد", result: false };
+  const errStall = T.exportError("stall", lastState, 90000);
+  chk("رسالة التوقف تحمل الحقول المفيدة بدل JSON مقطوع",
+    /exporting=false/.test(errStall.message) && /count=0/.test(errStall.message) &&
+    /toast=حدّد آية/.test(errStall.message) && /abort=لا شيء محدد/.test(errStall.message) &&
+    !/\{"pct"/.test(errStall.message), errStall.message);
+  chk("الخطأ يحمل diag.kind وdiag.last", errStall.diag && errStall.diag.kind === "stall" && errStall.diag.last.pct === "");
+  chk("رسالة التوقف لا تتجاوز 600 حرف", errStall.message.length <= 600);
+
+  const diagNoPage = await T.collectDiag(null, { errors: ["console: boom"], failed: ["x.js — net::ERR"], steps: ["click-create"] });
+  chk("collectDiag بلا صفحة يحفظ الأخطاء والخطوات", diagNoPage.errors[0] === "console: boom" && diagNoPage.failed.length === 1 && diagNoPage.steps[0] === "click-create");
+
+  const fakeDiagPage = {
+    evaluate: async () => ({
+      url: "https://example.test/?s=108",
+      present: { expPct: { exists: true, visible: false, text: "" } },
+      exporting: false,
+      abort: "",
+      count: 0,
+      toast: "",
+      dialog: false,
+      audio: [{ src: "https://everyayah.com/x.mp3", readyState: 0, paused: true, error: null }],
+      audioCtx: "suspended",
+      sw: "none",
+      scripts: ["js/creator.js?v=5"],
+    }),
+  };
+  const diagSnap = await T.collectDiag(fakeDiagPage, { errors: [], failed: [], steps: ["warm-audio"] });
+  chk("collectDiag يقرأ العناصر والصوت والسياق من الصفحة",
+    diagSnap.page && diagSnap.page.present.expPct.exists === true && diagSnap.page.audioCtx === "suspended" &&
+    diagSnap.page.audio.length === 1 && diagSnap.page.scripts[0].includes("creator.js"), JSON.stringify(diagSnap.page));
+  const diagBroken = await T.collectDiag({ evaluate: async () => { throw new Error("page closed"); } }, {});
+  chk("صفحة مغلقة لا تُسقط التشخيص", diagBroken.page && /page closed/.test(diagBroken.page.error));
+
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+  /* كما في renderRecipe: دمج لقطة الصفحة على خطأ التوقف قبل الحفظ */
+  errStall.diag = Object.assign({}, errStall.diag, diagSnap);
+  const rfOk = await T.recordRenderFailure("u1", { id: "run-9", run_key: "daily:u1:2026-11-12" }, errStall, errStall.message);
+  const rfBody = dbCalls[0] && JSON.parse(dbCalls[0].opts.body || "{}");
+  chk("الفشل يُحفظ في system_checks نوع render_failure",
+    rfOk === true && rfBody.kind === "render_failure" && rfBody.ok === false &&
+    rfBody.detail.run_key === "daily:u1:2026-11-12" && rfBody.detail.diag.kind === "stall", JSON.stringify(rfBody).slice(0, 300));
+  chk("التشخيص المحفوظ يحمل line/errors/steps كاملة", rfBody.detail.diag.last && Array.isArray(rfBody.detail.diag.errors) && Array.isArray(rfBody.detail.diag.steps));
+  impl.rest = async () => { throw new Error("db down"); };
+  chk("تعذّر حفظ التشخيص لا يُفشل التشغيل", (await T.recordRenderFailure("u1", { id: "x" }, errStall, "e")) === false);
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+
+  const autoSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("renderRecipe يلتقط pageerror/console/requestfailed", /page\.on\("pageerror"/.test(autoSrc) && /page\.on\("console"/.test(autoSrc) && /page\.on\("requestfailed"/.test(autoSrc));
+  chk("فشل التوليد يُسجَّل مع التشخيص", /recordRenderFailure\(userId, run, error, message\)/.test(autoSrc));
+
+  /* 12) الإعادة التلقائية كانت بلا فعل: المحاولة الثانية تصطدم بصفّها الفاشل */
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => { dbCalls.push({ p: p2, opts }); return []; };
+  impl.q1 = async () => ({ id: "r-old", run_key: "daily:u1:2026-11-12", status: "failed", external_url: null, publish_queue_id: null });
+  const cr1 = await T.createRun("u1", "daily", "2026-11-12", null, "", true);
+  const patchCall = dbCalls.find((c) => /autopilot_runs\?id=eq\.r-old/.test(String(c.p)) && c.opts && c.opts.method === "PATCH");
+  const patchBody = patchCall ? JSON.parse(patchCall.opts.body) : {};
+  chk("المحاولة الثانية تستكمل الصفّ الفاشل بدل duplicate",
+    cr1.existing === false && cr1.resumed === true && cr1.run.status === "rendering", JSON.stringify(cr1).slice(0, 200));
+  chk("الاستكمال يعيد الصفّ إلى rendering ويمسح الخطأ",
+    patchBody.status === "rendering" && patchBody.error === null, JSON.stringify(patchBody));
+
+  const cr2 = await T.createRun("u1", "daily", "2026-11-12", null, "", false);
+  chk("بلا استكمال يبقى السلوك القديم (duplicate)", cr2.existing === true && cr2.run.status === "failed");
+  impl.q1 = async () => ({ id: "r-pub", status: "failed", external_url: "https://youtu.be/abc", publish_queue_id: null });
+  chk("فشل بعد نشر جزئي لا يُستكمل (لا منشور مكرّر)", (await T.createRun("u1", "daily", "2026-11-12", null, "", true)).existing === true);
+  impl.q1 = async () => ({ id: "r-done", status: "published" });
+  chk("المنشور لا يُستكمل أبدًا", (await T.createRun("u1", "daily", "2026-11-12", null, "", true)).existing === true);
+  impl.q1 = async () => null;
+
+  const seenAttempts = [];
+  const rSeen = await T.runWithRetry(async (n) => { seenAttempts.push(n); return { ok: false, error: "x" }; }, { budgetMs: 600000, clock: () => Date.now() });
+  chk("runWithRetry يمرّر رقم المحاولة (1 ثم 2)", rSeen.attempts === 2 && seenAttempts.join(",") === "1,2", seenAttempts.join(","));
+
+  const retrySrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التشغيل اليومي والإنقاذ يمرّران reuseFailed للمحاولة الثانية",
+    (retrySrc.match(/reuseFailed: n > 1/g) || []).length >= 2 &&
+    /runWithRetry\(\(n\) => generateAndPublish/.test(retrySrc));
+
+  /* 13) تعويض اليوم الناقص: يوم ضاع لا يعود من نفسه */
+  chk("dayShift يعبر حدود الشهر", T.dayShift("2026-03-01", -1) === "2026-02-28" && T.dayShift("2026-11-12", -2) === "2026-11-10");
+  const runsToday = [{ run_date: "2026-11-12", status: "published", run_key: "daily:u:2026-11-12" }];
+  chk("يرجع الأيام الناقصة من الأحدث للأقدم", JSON.stringify(T.missingDays(runsToday, "2026-11-12", 2)) === JSON.stringify(["2026-11-11", "2026-11-10"]), JSON.stringify(T.missingDays(runsToday, "2026-11-12", 2)));
+  chk("التعويض يأخذ الأحدث فقط (خطوة واحدة)", T.missingDays(runsToday, "2026-11-12", 2)[0] === "2026-11-11");
+  chk("أمس منشور ⇒ يرجع ما قبله",
+    JSON.stringify(T.missingDays([...runsToday, { run_date: "2026-11-11", status: "published" }], "2026-11-12", 2)) === JSON.stringify(["2026-11-10"]));
+  chk("محاولة تعويض سابقة لا تُعاد",
+    JSON.stringify(T.missingDays([...runsToday, { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11:backfill" }], "2026-11-12", 2)) === JSON.stringify(["2026-11-10"]));
+  chk("لا نعوّض اليوم نفسه (catchUp يتولاه)", T.missingDays(runsToday, "2026-11-12", 0).length === 0 && !T.missingDays([], "2026-11-12", 2).includes("2026-11-12"));
+
+  impl.q = async () => [];
+  impl.rest = async () => [];
+  chk("بلا إعدادات مُفعّلة ⇒ لا تعويض", (await T.backfillDaily()).length === 0);
+
+  impl.q = async () => [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+  impl.rest = async () => [{ run_date: "2026-11-12", status: "failed", run_key: "daily:u1:2026-11-12" }];
+  const bf1 = await T.backfillDaily();
+  chk("اليوم غير منشور ⇒ لا تعويض (الأولوية لليوم)", bf1.length === 1 && bf1[0].skipped === "today-pending", JSON.stringify(bf1));
+
+  const publishedToday = [
+    { run_date: "2026-11-12", status: "published", run_key: "daily:u1:2026-11-12" },
+    { run_date: "2026-11-11", status: "published", run_key: "daily:u1:2026-11-11" },
+    { run_date: "2026-11-10", status: "published", run_key: "daily:u1:2026-11-10" },
+  ];
+  impl.rest = async () => publishedToday;
+  const bf2 = await T.backfillDaily();
+  chk("كل الأيام منشورة ⇒ لا شيء", bf2.length === 1 && bf2[0].skipped === "nothing-missing", JSON.stringify(bf2));
+
+  impl.rest = async () => [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
+  const savedFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div>' });
+  impl.q = async (sql) => (/from autopilot where enabled/i.test(String(sql)) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
+  dbCalls.length = 0;
+  impl.rest = async (p2, opts) => {
+    if (/autopilot_runs/.test(String(p2)) && (!opts || opts.method !== "POST")) return [publishedToday[0], { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" }];
+    dbCalls.push({ p: p2, opts });
+    return [];
+  };
+  const bf3 = await T.backfillDaily();
+  chk("نسخة ناقصة ⇒ يتوقف قبل الرندر بلا حرق ميزانية", bf3.length === 1 && bf3[0].skipped === "preflight" && bf3[0].day === "2026-11-11", JSON.stringify(bf3));
+  chk("فشل الفحص يُسجَّل في system_checks", dbCalls.some((c) => /system_checks/.test(String(c.p))));
+  global.fetch = savedFetch;
+
+  const bfSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  chk("التعويض يستخدم يومًا صريحًا ومفتاحًا خاصًا",
+    /runDate: day, runKeySuffix: "backfill"/.test(bfSrc) && /runDate: dayOverride/.test(bfSrc));
+  const monSrc2 = fs.readFileSync(path.join(ROOT, "api", "cron", "monitor.js"), "utf8");
+  chk("كرون الإنقاذ يعوّض بعد ضمان اليوم فقط",
+    /backfillDaily\(\)/.test(monSrc2) && /todaySettled/.test(monSrc2) && /rescue-pending/.test(monSrc2));
+  chk("الدوال متاحة للاستخدام خارج الوحدة (كرون/محاكي)", ["backfillDaily", "catchUpDaily", "missingDays", "dayShift"].every((k) => typeof T[k] === "function"));
+  chk("نتيجة التعويض تحمل مفتاحها ويومها", /run_key: `daily:\$\{userId\}:\$\{day\}:backfill`/.test(bfSrc));
+  impl.q = async () => [];
+  impl.rest = async () => [];
+
+  /* 14) إن فشل النشر فقط: نعيد النشر بلا إعادة توليد (ولا منشور مكرر) */
+  const queueRow = (id, platform) => ({ id, platform, connection_id: null, video_path: `u1/autopilot/2026-11-12-run1.mp4`, video_name: "x.mp4", title: "t", caption: "c", hashtags: "", status: "failed" });
+  const sqlCalls = [];
+  impl.q = async (sql) => {
+    const s2 = String(sql);
+    sqlCalls.push(s2);
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    if (/from publish_queue/i.test(s2)) return /status='published'/i.test(s2) ? [] : [queueRow("q1", "youtube")];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  pub.calls.length = 0; dbCalls.length = 0;
+  pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/" + row.id });
+  const cResume = await T.catchUpDaily();
+  chk("فشل نشر غير مؤكد ⇒ يتوقف بلا إعادة نشر أو توليد",
+    cResume.length === 1 && cResume[0].ok === false && cResume[0].skipped === "publish-failed" && pub.calls.length === 0,
+    JSON.stringify(cResume));
+  chk("لا يُعلن التشغيل منشورًا بلا دليل", !sqlCalls.some((q) => /update autopilot_runs set status='published'/.test(String(q))));
+
+  /* فشل جزئي: منصة نجحت وأخرى لا ⇒ لا إعادة توليد (كي لا يتكرر المنشور) */
+  impl.q = async (sql) => (/from publish_queue/i.test(sql)
+    ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube"), queueRow("q2", "tiktok")])
+    : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }] : []));
+  pub.calls.length = 0;
+  let pubSeq = 0;
+  pub.impl = async (row) => (++pubSeq === 1 ? { ok: true, url: "https://youtu.be/ok" } : { ok: false, error: "token" });
+  const cPartial = await T.catchUpDaily();
+  chk("نشر جزئي ⇒ يتوقف بلا إعادة توليد", cPartial.length === 1 && cPartial[0].skipped === "publish-failed" && cPartial[0].ok === false && pub.calls.length === 0, JSON.stringify(cPartial).slice(0, 240));
+
+  // اليوم منشور جزئيًا؛ نعيد المنصة الفاشلة فقط من الفيديو نفسه.
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [{ user_id: "u1", enabled: true, platforms: ["youtube", "tiktok"] }];
+    if (/from publish_queue/i.test(sql) && /status='failed'/i.test(sql)) return [queueRow("tiktok-failed", "tiktok")];
+    if (/from publish_queue/i.test(sql) && /status='published'/i.test(sql) && /select id, video_path/i.test(sql)) return [{ id: "yt-published", video_path: `u1/autopilot/${A.cairoDate()}-run1.mp4` }];
+    return [];
+  };
+  pub.calls.length = 0;
+  pub.impl = async (row) => ({ ok: true, url: "https://example.test/" + row.id });
+  const resumedPartial = await T.catchUpDaily();
+  chk("منشور جزئيًا ⇒ لا يخمّن نتيجة المنصة الفاشلة", resumedPartial.length === 1 && resumedPartial[0].skipped === "publish-failed" && pub.calls.length === 0, JSON.stringify(resumedPartial));
+
+  /* فشل النشر كله ⇒ الفيديو الجاهز يبقى ولا نعيد توليده */
+  impl.q = async (sql) => (/from publish_queue/i.test(sql)
+    ? (/status='published'/i.test(sql) ? [] : [queueRow("q1", "youtube")])
+    : (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []));
+  pub.calls.length = 0;
+  pub.impl = async () => ({ ok: false, error: "token" });
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => '<div id="exportOverlay"></div><div id="expPct"></div><div id="expStage"></div><div id="expRunning"></div><div id="expResult"></div><button id="btnCancelExport"></button>' });
+  const cFull = await T.catchUpDaily();
+  chk("فشل النشر كله ⇒ لا إعادة توليد", cFull.length === 1 && cFull[0].skipped === "publish-failed" && pub.calls.length === 0, JSON.stringify(cFull).slice(0, 240));
+
+  /* لا صفوف فاشلة ⇒ لا استدعاء للنشر */
+  impl.q = async (sql) => (/from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : []);
+  pub.calls.length = 0;
+  await T.catchUpDaily();
+  chk("بلا صفوف فاشلة ⇒ لا نداء نشر", pub.calls.length === 0);
+  impl.q = async () => [];
+  impl.rest = async () => [];
+  pub.impl = async (row) => ({ ok: true, url: "https://youtu.be/r-" + row.id });
+  pub.calls.length = 0;
+
+  /* 14c) تشغيل أساسي قُتل وترك صفّه rendering ⇒ الإنقاذ ينظّفه ولا يتخطاه */
+  const sqlSeen = [];
+  impl.q = async (sql, params) => {
+    const s2 = String(sql);
+    sqlSeen.push({ sql: s2, params });
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  await T.catchUpDaily();
+  const stale = sqlSeen.find((c) => /update autopilot_runs set status='failed'/.test(c.sql));
+  chk("الإنقاذ يغلق التشغيلات العالقة قبل الحكم عليها",
+    Boolean(stale) && /تنظيف تلقائي/.test(String(stale.params[0])) &&
+    Math.abs((Date.now() - Date.parse(stale.params[1])) / 60000 - 20) < 1,
+    stale ? JSON.stringify(stale.params) : "لم يُستدعَ closeStaleRuns");
+  /* والصفّ العالق فعليًا لا يُقرأ «جارٍ» بعد التنظيف: نتحقق من الترتيب في المصدر */
+  const cuSrc = fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8");
+  const catchUpBody = cuSrc.slice(cuSrc.indexOf("async function catchUpDaily"), cuSrc.indexOf("async function backfillDaily"));
+  chk("التنظيف يسبق قراءة صفوف اليوم في الإنقاذ",
+    catchUpBody.indexOf("closeStaleRuns(20)") > -1 && catchUpBody.indexOf("closeStaleRuns(20)") < catchUpBody.indexOf("select=id,status,run_key"));
+
+  /* 15) منع النشر المكرر: صفّ منشور في القائمة يتقدّم على حالة التشغيل */
+  impl.q = async (sql) => {
+    const s2 = String(sql);
+    if (/from autopilot where enabled/i.test(s2)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"] }];
+    /* الفلترة على يوم التشغيل صارت في جافاسكربت (لا like في SQL) — فالبديل
+     * يجب أن يحمل مسارًا يحمل علامة اليوم الفعلي. */
+    if (/from publish_queue/i.test(s2) && /status='published'/i.test(s2)) return [{ id: "qp", video_path: `u1/autopilot/${A.cairoDate()}-run1.mp4` }];
+    if (/from publish_queue/i.test(s2)) return [];
+    return [];
+  };
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: "daily:u1:2026-11-12" }] : []);
+  pub.calls.length = 0;
+  const cPub = await T.catchUpDaily();
+  chk("نُشر شيء اليوم ⇒ لا توليد ولا تكرار",
+    cPub.length === 1 && cPub[0].skipped === "review-needed" && cPub[0].ok === false && pub.calls.length === 0,
+    JSON.stringify(cPub).slice(0, 240));
+
+  // أثر فيديو محفوظ أو صف مجدول قديم يمنع الإنقاذ حتى مع غياب صف منشور.
+  const today = A.cairoDate();
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [{ user_id: "u1", enabled: true, platforms: ["youtube"], all_channels: true }];
+    if (/from publish_queue/i.test(sql) && !/status='failed'|status='published'/i.test(sql)) return [{ id: "scheduled", video_path: `u1/autopilot/${today}-old.mp4` }];
+    return [];
+  };
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", run_key: `daily:u1:${today}` }] : [];
+  pub.calls.length = 0;
+  const oldScheduled = await T.catchUpDaily();
+  chk("صف مجدول قديم يمنع فيديو بديل", oldScheduled[0].skipped === "review-needed" && pub.calls.length === 0, JSON.stringify(oldScheduled));
+  impl.q = async sql => /from autopilot where enabled/i.test(sql) ? [{ user_id: "u1", enabled: true, platforms: ["youtube"] }] : [];
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ id: "r1", status: "failed", video_path: `u1/autopilot/${today}-old.mp4` }] : [];
+  const lostReceipt = await T.catchUpDaily();
+  chk("مسار فيديو محفوظ يمنع الإنقاذ حتى لو الإدراج غير ظاهر", lostReceipt[0].skipped === "review-needed" && pub.calls.length === 0, JSON.stringify(lostReceipt));
+  const prev = A.dayShift(today, -1);
+  impl.rest = async p2 => /autopilot_runs/.test(String(p2)) ? [{ run_date: today, status: "published" }, { run_date: prev, status: "failed", video_path: `u1/autopilot/${prev}-old.mp4` }] : [];
+  const oldVideo = await T.backfillDaily({ lookback: 1 });
+  chk("مسار فيديو محفوظ يمنع التعويض لنفس اليوم", oldVideo[0].skipped === "review-needed" && oldVideo[0].day === prev, JSON.stringify(oldVideo));
+
+  /* التعويض لا يعيد يومًا نُشر فيه شيء فعليًا */
+  impl.rest = async (p2) => (/autopilot_runs/.test(String(p2)) ? [
+    { run_date: "2026-11-12", status: "published", run_key: "daily:u1:2026-11-12" },
+    { run_date: "2026-11-11", status: "failed", run_key: "daily:u1:2026-11-11" },
+  ] : []);
+  const bfPub = await T.backfillDaily();
+  /* كان الاختبار يتوقّع «already-published» لليوم 11 لأن dayHasPublish كانت
+   * تُسقط شرط المسار فترى صفوف اليوم 12 وتقول «نُشر» لكل يوم. الصواب: اليوم 12
+   * منشور (يُتخطى)، واليوم 11 فاشل فيُعالَج. */
+  chk("التعويض يعالج اليوم الفاشل (11) ولا يعيد المنشور (12)",
+    bfPub.length === 1 && bfPub[0].day === "2026-11-11" && bfPub[0].backfill === true, JSON.stringify(bfPub));
+
+  /* الفحص السلوكي للدالة نفسها: يوم بيوم لا «أي صفّ منشور» */
+  impl.q = async (sql) => {
+    if (/status='published'/i.test(sql)) return [{ id: "p1", video_path: "u1/autopilot/2026-11-12-run1.mp4" }];
+    return [];
+  };
+  const has12 = await T.dayHasPublish("u1", "2026-11-12");
+  const has11 = await T.dayHasPublish("u1", "2026-11-11");
+  chk("dayHasPublish تخصّ اليوم المطلوب (لا «أي صفّ منشور»)", has12 === true && has11 === false, JSON.stringify({ has12, has11 }));
+
+  // بقية الدفعة لا تختفي من تقرير الإنقاذ حين تنتهي أول ثلاث بلا توليد.
+  impl.q = async (sql) => /from autopilot where enabled/i.test(sql)
+    ? Array.from({ length: 5 }, (_, i) => ({ user_id: "u" + i, platforms: ["youtube"] })) : [];
+  impl.rest = async (p) => /autopilot_runs/.test(p) && /user_id=eq/.test(p) ? [{ status: "published" }] : [];
+  const waiting = await T.catchUpDaily();
+  chk("الإنقاذ يبلّغ عن الحسابات المتبقية خارج الدفعة", waiting.some(r => r.skipped === "deferred" && r.count === 2) && waiting.filter(r => r.skipped === "published").length === 3, JSON.stringify(waiting));
+
+  /* القاعدة غير متاحة لا تعني أن اليوم فارغًا؛ نتوقف قبل الرندر والنشر. */
+  let networkCalls = 0;
+  global.fetch = async () => { networkCalls++; throw new Error("unexpected preflight"); };
+  const config = { user_id: "u1", enabled: true, platforms: ["youtube"] };
+  impl.q = async (sql) => /from autopilot where enabled/i.test(sql) ? [config] : [];
+  impl.rest = async (p) => {
+    if (/autopilot_runs/.test(p) && /user_id=eq/.test(p)) throw new Error("db down");
+    return [];
+  };
+  const checkFail = await T.catchUpDaily();
+  chk("تعذّر قراءة تشغيل المستخدم ⇒ توقف بلا توليد", checkFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  impl.rest = async () => [];
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [config];
+    if (/from publish_queue/i.test(sql) && /status='published'/i.test(sql)) throw new Error("db down");
+    return [];
+  };
+  const publishedFail = await T.catchUpDaily();
+  chk("تعذّر فحص المنشورات ⇒ توقف بلا توليد", publishedFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  impl.q = async (sql) => {
+    if (/from autopilot where enabled/i.test(sql)) return [config];
+    if (/from publish_queue/i.test(sql) && /status='failed'/i.test(sql)) throw new Error("db down");
+    return [];
+  };
+  const failedFail = await T.catchUpDaily();
+  chk("تعذّر فحص الفيديو الجاهز ⇒ توقف بلا توليد", failedFail.some(r => r.skipped === "db-unavailable" && r.ok === false) && networkCalls === 0);
+  const retryFail = await A.publishReadyToday("u1");
+  chk("تعذّر قاعدة الفيديو الجاهز لا يُعرض كغياب فيديو", retryFail.ok === false && /تعذّر قراءة/.test(retryFail.error));
+  global.fetch = savedFetch;
+
+  chk("dayHasPublish متاحة ومحصورة بصفوف published",
+    typeof T.dayHasPublish === "function" && /status='published'/.test(fs.readFileSync(path.join(ROOT, "lib", "autopilot.js"), "utf8")));
+  impl.q = async () => [];
+  impl.rest = async () => [];
+  pub.calls.length = 0;
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
