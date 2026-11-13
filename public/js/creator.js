@@ -300,7 +300,6 @@ const Creator = {
       if (!all.length) { toast("لا توجد رسائل مختارة", "err"); return; }
       const [s, a, b] = all[Math.floor(Math.random() * all.length)];
       this.setSelection(s, a, b, true);
-      this._showQuickVerse(s, a, b);
       toast("رسالة لك: " + this._famousLabel(s, a, b));
       return;
     }
@@ -308,7 +307,6 @@ const Creator = {
     if (!grp || !grp.i.length) { toast("لا توجد رسائل في هذا التصنيف", "err"); return; }
     const [s, a, b] = grp.i[Math.floor(Math.random() * grp.i.length)];
     this.setSelection(s, a, b, true);
-    this._showQuickVerse(s, a, b);
   },
 
   _showQuickVerse(s, a, b) {
@@ -429,6 +427,7 @@ const Creator = {
     // معاينة النص + تقدير المدة
     const first = Quran.range(Selection.surah, Selection.from, Selection.from)[0];
     $("#curAyahPreview").innerHTML = `<div class="verse-preview">${esc(first)}</div>`;
+    this._showQuickVerse(Selection.surah, Selection.from, Selection.to);
     const est = AyahPlayer.totalDuration();
     $("#rangeInfo").innerHTML = `<span class="range-badge">${toAr(list.length)} آية · ${esc(ayahRef(Selection.surah, Selection.from, Selection.to))}</span>
       <span class="range-badge" style="background:rgba(212,175,55,.1);border-color:var(--line);color:var(--gold-3)">⏱ ~${toAr(Math.round(est))} ثانية</span>
