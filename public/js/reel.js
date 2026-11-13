@@ -32,7 +32,7 @@ const AyahPlayer = {
       this.gain.connect(this.ctx.destination);
       this.gain.connect(this.dest);
     }
-    if (this.ctx.state === "suspended") this.ctx.resume();
+    if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     return this.ctx;
   },
 
@@ -704,6 +704,31 @@ const ReelRecorder = {
     return "";
   },
 
+  // قد يترك المتصفح resume معلّقًا حتى تفاعل المستخدم؛ لا نبدأ التسجيل قبل نجاحه.
+  async waitForAudio(ctx, signal) {
+    const error = () => new Error("تعذّر تشغيل محرّك الصوت — اضغط إنشاء مجددًا وتحقق من إعدادات المتصفح");
+    if (signal?.aborted) throw new Error("aborted");
+    if (!ctx || ctx.state === "closed") throw error();
+    if (ctx.state === "running") return;
+    await new Promise((resolve, reject) => {
+      let settled = false, timer;
+      const finish = err => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        err ? reject(err) : resolve();
+      };
+      const onAbort = () => finish(new Error("aborted"));
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) { onAbort(); return; }
+      timer = setTimeout(() => finish(error()), 5000);
+      try {
+        Promise.resolve(ctx.resume()).then(() => finish(ctx.state === "running" ? null : error()), () => finish(error()));
+      } catch { finish(error()); }
+    });
+  },
+
   /**
    * تسجيل لحظي: يشغّل التلاوة ويسجّل الكانفاس مع الصوت حتى النهاية.
    */
@@ -717,6 +742,9 @@ const ReelRecorder = {
     const audioTracks = audioRequired ? player.dest?.stream?.getAudioTracks?.() || [] : [];
     const audioAvailable = () => !audioRequired || (audioTracks.length > 0 && audioTracks.every(t => t.readyState === "live" && t.enabled));
     const audioError = () => new Error("تعذّر تسجيل صوت التلاوة — أعد المحاولة");
+    if (!audioAvailable()) throw audioError();
+    const audioCtx = audioRequired ? player.ctx : null;
+    if (audioRequired && audioCtx?.state !== "running") await this.waitForAudio(audioCtx, signal);
     if (!audioAvailable()) throw audioError();
     const mime = this.pickMime();
     const total = player.totalDuration();
@@ -753,6 +781,7 @@ const ReelRecorder = {
         cancelAnimationFrame(raf);
         signal && signal.removeEventListener("abort", onAbort);
         audioTracks.forEach(t => t.removeEventListener("ended", onAudioEnded));
+        audioCtx?.removeEventListener("statechange", onAudioState);
         player.onEnd = null; player.onTick = null; player.onAyah = null;
         player.stop();
         try { rec.state !== "inactive" && rec.stop(); } catch {}
@@ -766,6 +795,8 @@ const ReelRecorder = {
       };
       const onAbort = () => { this._abort = true; fail(new Error("aborted")); };
       const onAudioEnded = () => fail(audioError());
+      const contextError = () => new Error("توقّف محرّك الصوت أثناء التسجيل — أعد المحاولة");
+      const onAudioState = () => { if (!endTimer && !finishing && audioCtx.state !== "running") fail(contextError()); };
       rec.onerror = e => fail(new Error("تعذّر تسجيل الفيديو: " + ((e.error && e.error.message) || "خطأ في التسجيل")));
       rec.onstop = () => {
         if (settled) return;
@@ -779,12 +810,15 @@ const ReelRecorder = {
         resolve({ blob, mime: mime || "video/webm" });
       };
       audioTracks.forEach(t => t.addEventListener("ended", onAudioEnded));
+      audioCtx?.addEventListener("statechange", onAudioState);
       signal && signal.addEventListener("abort", onAbort, { once: true });
       if (signal && signal.aborted) { onAbort(); return; }
       if (!audioAvailable()) { fail(audioError()); return; }
+      if (audioCtx && audioCtx.state !== "running") { fail(contextError()); return; }
 
       player.onTick = (elapsed, tot) => {
         if (!audioAvailable()) { fail(audioError()); return; }
+        if (audioCtx && audioCtx.state !== "running") { fail(contextError()); return; }
         renderer.state.elapsed = elapsed;
         renderer.state.total = tot;
         renderer.state.ayahElapsed = elapsed - player.elapsedBefore(player.index);
