@@ -44,9 +44,9 @@ await page.setInputFiles('#acctBackgroundFile',[]);await page.selectOption('#sel
 await page.waitForFunction(()=>document.querySelector('#acctPreviewNote')?.textContent.includes('معاينة تقريبية'));assert(await page.locator('#acctAudio').getAttribute('src'));await page.evaluate(()=>PublishApp.renderConnections('mock'));assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');assert.equal(await page.locator('#acctFrom').inputValue(),'255');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'mobile overflow');assert.equal(await page.evaluate(()=>JSON.stringify({s:Selection.surah,from:Selection.from,to:Selection.to,reciter:Selection.reciter})),before,'معاينة الحساب لا تعدّل صانع الرئيسية');
 await page.evaluate(()=>PublishApp.saveSettings()); const body=await page.evaluate(()=>window.__saved.body);assert.equal(body.enabled,true);assert.equal(body.all_channels,true);assert.deepEqual(body.platforms,['youtube']);assert.deepEqual([body.template.surah,body.template.from,body.template.to],[2,255,256]);assert.equal(body.template.design.style,'banner');assert.equal(body.template.design.translation,'en.sahih');assert.equal(body.template.design.dedText,'صدقة جارية');assert.equal(body.template.design.showWatermark,false);
 // تعديل أحدث أثناء الحفظ يجب أن يبقى غير محفوظ، ولا يضيع مع تحديث القنوات.
-await page.evaluate(()=>{PublishApp.api=()=>new Promise(resolve=>{window.__resolveSave=resolve});window.__pendingSave=PublishApp.saveSettings()});
+await page.evaluate(()=>{PublishApp.api=(action,body)=>new Promise(resolve=>{window.__pendingBody=body;window.__resolveSave=resolve});window.__pendingSave=PublishApp.saveSettings()});
 await page.fill('#acctDed','تعديل بعد بدء الحفظ');
-await page.evaluate(async()=>{window.__resolveSave({ok:true});await window.__pendingSave;await PublishApp.renderConnections('mock')});
+await page.evaluate(async()=>{window.__resolveSave({ok:true,config:window.__pendingBody});await window.__pendingSave;await PublishApp.renderConnections('mock')});
 assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');assert.equal(await page.evaluate(()=>PublishApp._autoDirty),true);assert.match(await page.locator('#acctEditState').innerText(),/غير محفوظة/);
 await page.evaluate(()=>PublishApp.renderAccount(PublishApp.data));assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');
 // طلب قراءة بدأ قبل الحفظ لا يعيد رسم الإعدادات القديمة عند وصوله متأخرًا.
@@ -55,7 +55,7 @@ await page.evaluate(async()=>{
  window.AuthApp={getUserId:async()=> 'race-user',getToken:async()=> 'mock'};app.startProgressPolling=()=>{};
  window.fetch=url=>String(url)==='/api/autopilot'?new Promise(resolve=>window.__resolveRead=resolve):window.__raceFetch(url);
  window.__raceRead=app.init();await new Promise(r=>setTimeout(r,0));
- app.api=async()=>({ok:true});await app.saveSettings();
+ app.api=async(action,body)=>({ok:true,config:body});await app.saveSettings();
  window.__resolveRead({ok:true,json:async()=>({config:{enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}},runs:[]})});await window.__raceRead;
  window.fetch=window.__raceFetch;window.AuthApp=window.__raceAuth;app.startProgressPolling=window.__racePoll;
 });
