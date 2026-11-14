@@ -35,3 +35,6 @@ create table public.social_connections(user_id uuid not null, platform text not 
 insert into public.social_connections(user_id,platform)
 values ('44444444-4444-4444-8444-444444444444','youtube');
 grant select on public.social_connections to service_role;
+-- Minimal temporary run ledger for HTTP transition/lost-reply tests.
+create table public.autopilot_runs(id uuid primary key,user_id uuid not null references auth.users(id),status text not null,video_path text,external_url text,error text,completed_at timestamptz,updated_at timestamptz not null default now());
+grant select,insert,update,delete on public.autopilot_runs to service_role;

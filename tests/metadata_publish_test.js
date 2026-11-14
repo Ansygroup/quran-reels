@@ -9,7 +9,7 @@ function json(data) { return {ok:true,status:200,headers:{get:()=> 'application/
 global.fetch = async (url,opts={}) => {
  const u=new URL(url), method=opts.method||'GET';
  if(u.hostname==='db.example') {
-  if(u.pathname==='/rest/v1/autopilot_runs' && method==='PATCH') return json([]);
+  if(u.pathname==='/rest/v1/autopilot_runs' && method==='PATCH') { const body=JSON.parse(opts.body); assert.equal(u.searchParams.get('user_id'),'eq.u1');assert.equal(u.searchParams.get('status'),'eq.rendering');return json([{id:'r1',user_id:'u1',...body}]); }
   if(u.pathname==='/rest/v1/publish_queue' && method==='POST') { rows.push(...JSON.parse(opts.body)); return json(rows.map(r=>({...r}))); }
   if(u.pathname==='/rest/v1/publish_queue' && method==='PATCH') {
     const id=(u.searchParams.get('id')||'').slice(3), r=rows.find(x=>x.id===id), expected=u.searchParams.get('status');

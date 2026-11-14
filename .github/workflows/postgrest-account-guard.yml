@@ -128,6 +128,8 @@ jobs:
         run: node tests/postgrest_guard_http_test.js guarded
       - name: Exercise actual account API with local PostgREST
         run: node tests/postgrest_account_api_integration_test.js
+      - name: Exercise run transition with disposable PostgREST
+        run: node tests/postgrest_run_transition_integration_test.js
       - name: Local PostgREST log on failure
         if: failure()
         run: docker logs qr-local-postgrest || true
