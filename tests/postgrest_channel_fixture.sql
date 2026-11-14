@@ -10,7 +10,7 @@ grant usage on schema auth to anon,authenticated,service_role;
 grant execute on function auth.uid() to anon,authenticated,service_role;
 create table public.social_connections(id uuid primary key,user_id uuid not null,platform text not null,is_default boolean not null default false,access_token text not null default 'fixture-ciphertext');
 create unique index one_default on public.social_connections(user_id,platform) where is_default;
-create table public.publish_queue(id uuid primary key,user_id uuid not null,platform text not null,connection_id uuid references public.social_connections(id) on delete set null,status text not null);
+create table public.publish_queue(id uuid primary key,user_id uuid not null,platform text not null,connection_id uuid references public.social_connections(id) on delete set null,status text not null,updated_at timestamptz not null default now(),error text);
 alter table public.social_connections enable row level security;
 alter table public.publish_queue enable row level security;
 create policy sc_own on public.social_connections for all to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());

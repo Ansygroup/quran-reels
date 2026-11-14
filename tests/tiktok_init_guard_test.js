@@ -6,7 +6,7 @@ let status,mode,calls,privacy,uploads;
 const db=require.resolve('../lib/db');
 require.cache[db]={id:db,filename:db,loaded:true,exports:{
  q:async(sql)=>{
-  if(/set status='publishing'/.test(sql)){status='publishing';return [{id:'job',user_id:'owner',platform:'tiktok',status,video_path:'video.mp4'}]}
+  if(/set status='publishing'/.test(sql)){status='publishing';return [{id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status,video_path:'video.mp4'}]}
   if(/from social_connections/.test(sql))return [{id:'channel',user_id:'owner',platform:'tiktok',access_token:'fixture-token',expires_at:Date.now()+3600000}];
   if(/set status='published'/.test(sql)){status='published';return []}
   if(/set status='failed'/.test(sql)){status='failed';return []}
@@ -33,7 +33,7 @@ global.fetch=async(url,opts={})=>{
  throw Error('unexpected network request');
 };
 const {publishRow}=require('../lib/publish');
-async function run(testMode){mode=testMode;status='scheduled';calls=0;privacy=[];uploads=0;const out=await publishRow({id:'job',user_id:'owner',platform:'tiktok',status:'scheduled',video_path:'video.mp4'});return out}
+async function run(testMode){mode=testMode;status='scheduled';calls=0;privacy=[];uploads=0;const out=await publishRow({id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status:'scheduled',video_path:'video.mp4'});return out}
 (async()=>{
  for(const testMode of ['network','malformed','empty','null','wrongtype','error-url','rejection']){
   const out=await run(testMode);assert.equal(out.ok,false,testMode);assert.equal(status,'failed',testMode);assert.equal(calls,1,testMode);assert.equal(uploads,0,testMode);assert.deepEqual(privacy,['SELF_ONLY_DISABLE']);assert.match(out.error,/راجع المنصة/);assert(!out.error.includes('sensitive-fixture'));

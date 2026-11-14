@@ -51,6 +51,8 @@ jobs:
         run: node tests/postgrest_channel_candidate_http_test.js foundation
       - name: Exercise disconnect handler against disposable PostgREST
         run: node tests/postgrest_disconnect_api_integration_test.js
+      - name: Exercise publish claim target guard against disposable PostgREST
+        run: node tests/postgrest_publish_claim_integration_test.js
       - name: Apply candidate ACLs in disposable container only
         shell: bash
         run: |
