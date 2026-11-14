@@ -27,7 +27,7 @@ global.fetch=async(url,opts={})=>{
   return result(snapshot);
  }
  if(method==='PATCH'){const row=table.get(rowkey);if(!row)return result([]);Object.assign(row,body);return result([{...row}])}
- if(method==='POST'){if(table.has(rowkey))return result({error:'unique fixture'},409);table.set(rowkey,{...body});return result([body])}
+ if(method==='POST'){if(table.has(rowkey))return result({error:'unique fixture'},409);const row={id:'fixture-channel',...body};table.set(rowkey,row);return result([row])}
  throw Error('unexpected method');
 };
 function response(){return {headers:{},setHeader(k,v){this.headers[k.toLowerCase()]=v},end(){}}}
@@ -41,16 +41,16 @@ const suppress=async fn=>{const old=console.error;console.error=()=>{};try{retur
  for(const provider of ['x','tiktok']){
   const id=provider==='x'?'123':'open-A',k=key('owner-1',provider,id),other=key('owner-2',provider,id);
   for(const code of ['absent','empty','null']){
-   reset();const old=seal('old-refresh'),otherToken=seal('other-refresh');table.set(k,{user_id:'owner-1',platform:provider,account_id:id,refresh_token:old});table.set(other,{user_id:'owner-2',platform:provider,account_id:id,refresh_token:otherToken});
+   reset();const old=seal('old-refresh'),otherToken=seal('other-refresh');table.set(k,{id:'fixture-channel',user_id:'owner-1',platform:provider,account_id:id,refresh_token:old});table.set(other,{id:'other-channel',user_id:'owner-2',platform:provider,account_id:id,refresh_token:otherToken});
    assert.equal(await run(provider,code),`/#/account?linked=${provider}`);assert.equal(table.get(k).refresh_token,old);assert.equal(table.get(other).refresh_token,otherToken);
    const patch=dbRequests.find(x=>x.method==='PATCH');assert(patch);assert(!Object.hasOwn(patch.body,'refresh_token'));assert.equal(open(table.get(k).access_token),'old-access');
   }
-  reset();table.set(k,{user_id:'owner-1',platform:provider,account_id:id,refresh_token:seal('old-refresh')});await run(provider,'fresh');assert.equal(open(table.get(k).refresh_token),'new-refresh');assert(Object.hasOwn(dbRequests.find(x=>x.method==='PATCH').body,'refresh_token'));
+  reset();table.set(k,{id:'fixture-channel',user_id:'owner-1',platform:provider,account_id:id,refresh_token:seal('old-refresh')});await run(provider,'fresh');assert.equal(open(table.get(k).refresh_token),'new-refresh');assert(Object.hasOwn(dbRequests.find(x=>x.method==='PATCH').body,'refresh_token'));
   reset();assert.equal(await run(provider,'absent'),`/#/account?linked=${provider}`);assert.equal(readRefreshToken(table.get(k).refresh_token),null);assert.equal(dbRequests.find(x=>x.method==='POST').body.user_id,'owner-1');
   for(const code of ['bad','blank']){reset();assert.match(await run(provider,code),/w=token/);assert.equal(dbRequests.length,0);assert.equal(automations.length,0)}
   // Hold an older no-refresh request after its existence read. A newer token
   // arrives first; the old PATCH must not write its previously observed token.
-  reset();table.set(k,{user_id:'owner-1',platform:provider,account_id:id,refresh_token:seal('old-refresh')});const gate=pauseNextRead();const older=run(provider,'absent');await gate.entered;
+  reset();table.set(k,{id:'fixture-channel',user_id:'owner-1',platform:provider,account_id:id,refresh_token:seal('old-refresh')});const gate=pauseNextRead();const older=run(provider,'absent');await gate.entered;
   assert.equal(await run(provider,'fresh'),`/#/account?linked=${provider}`);gate.release();assert.equal(await older,`/#/account?linked=${provider}`);assert.equal(open(table.get(k).refresh_token),'new-refresh');
   // This does not serialize the access token: explicitly expose the remaining race.
   assert.equal(open(table.get(k).access_token),'old-access');

@@ -6,7 +6,7 @@ for(const [k,v] of Object.entries({X_CLIENT_ID:'id',X_CLIENT_SECRET:'secret',TIK
 const registry=new Map(), writes=[], defaults=[], automations=[];let failStore=false;
 const db=require.resolve('../lib/db');require.cache[db]={id:db,filename:db,loaded:true,exports:{q:async(sql,params)=>{
  writes.push({sql,params});if(failStore)throw Error('fixture-store-failure');
- const platform=sql.includes("'tiktok'")?'tiktok':sql.includes("'x'")?'x':null;assert(platform);registry.set(`${params[0]}:${platform}:${params[1]}`,params);return [];
+ const platform=sql.includes("'tiktok'")?'tiktok':sql.includes("'x'")?'x':null;assert(platform);registry.set(`${params[0]}:${platform}:${params[1]}`,params);return platform==='x'?[{id:'channel',user_id:params[0],platform,account_id:params[1],access_token:params[4],refresh_token:params[5]}]:[];
 }}};
 const def=require.resolve('../lib/soc_default');const defaultStub=()=>{};defaultStub.ensureDefault=async(...args)=>{defaults.push(args);return true};require.cache[def]={id:def,filename:def,loaded:true,exports:defaultStub};
 const auto=require.resolve('../lib/autopilot');require.cache[auto]={id:auto,filename:auto,loaded:true,exports:{enableDefaultAutomation:async(...args)=>{automations.push(args);return 'created'}}};
