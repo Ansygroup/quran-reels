@@ -1,0 +1,59 @@
+'use strict';
+/* Real publisher with synthetic DB and providers. No real network or video. */
+const assert = require('node:assert/strict');
+process.env.SUPABASE_URL = 'https://storage.fixture';
+let platform, badStage, value, row, requests;
+const db = require.resolve('../lib/db');
+require.cache[db] = { id: db, filename: db, loaded: true, exports: {
+  q: async (sql, params) => {
+    if (/set status='publishing'/i.test(sql)) { row.status = 'publishing'; return [{ ...row }]; }
+    if (/from social_connections/i.test(sql)) return [{ id: 'channel', user_id: 'owner', platform, access_token: 'access', meta: JSON.stringify({ pages: [{ id: 'page', access_token: 'page-token' }], ig_id: 'instagram' }), expires_at: Date.now() + 3600000 }];
+    if (/set status='failed'/i.test(sql)) { row.status = 'failed'; row.error = params[1]; return [{ ...row }]; }
+    if (/set status='published'/i.test(sql)) { row.status = 'published'; row.external_url = params[1]; return [{ ...row }]; }
+    throw Error('unexpected DB query');
+  }, q1: async () => null,
+} };
+const crypt = require.resolve('../lib/crypt');
+require.cache[crypt] = { id: crypt, filename: crypt, loaded: true, exports: { open: x => x, seal: x => x } };
+const json = data => ({ ok: true, status: 200, json: async () => data });
+const NULL_BODY = Symbol('null body');
+const id = stage => stage === badStage ? value : 'valid_123';
+const reply = (stage, data) => json(stage === badStage && value === NULL_BODY ? null : data);
+global.fetch = async (url, opts = {}) => {
+  const u = new URL(url); requests.push({ host: u.host, path: u.pathname, method: opts.method || 'GET' });
+  if (u.origin === 'https://storage.fixture') return { ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
+  if (u.origin === 'https://www.googleapis.com') return { ok: true, headers: { get: () => 'https://upload.fixture/session' } };
+  if (u.origin === 'https://upload.fixture') return reply('youtube', { id: id('youtube') });
+  if (u.origin === 'https://graph.facebook.com' && u.pathname.endsWith('/videos')) return reply('facebook', { id: id('facebook') });
+  if (u.origin === 'https://graph.facebook.com' && u.pathname.endsWith('/instagram/media')) return reply('instagram-create', { id: id('instagram-create') });
+  if (u.origin === 'https://graph.facebook.com' && u.pathname.endsWith('/valid_123')) return json({ status_code: 'FINISHED' });
+  if (u.origin === 'https://graph.facebook.com' && u.pathname.endsWith('/instagram/media_publish')) return reply('instagram-publish', { id: id('instagram-publish') });
+  if (u.origin === 'https://api.x.com' && u.pathname.endsWith('/media/upload')) return reply('x-media', { data: { id: id('x-media') } });
+  if (u.origin === 'https://api.x.com' && u.pathname.endsWith('/tweets')) return reply('x-post', { data: { id: id('x-post') } });
+  throw Error('blocked unexpected network');
+};
+const { publishRow } = require('../lib/publish');
+const oldTimeout = global.setTimeout;
+global.setTimeout = fn => { fn(); return 0; }; // local Instagram polling only
+async function run(p, stage, v) {
+  platform = p; badStage = stage; value = v; requests = [];
+  row = { id: 'job', user_id: 'owner', platform, connection_id: null, status: 'scheduled', video_path: 'owner/video.mp4', title: 'fixture' };
+  const out = await publishRow({ ...row }); return { out, requests: [...requests], status: row.status, savedError: row.error };
+}
+(async () => {
+  const stages = [['youtube','youtube'], ['facebook','facebook'], ['instagram','instagram-create'], ['instagram','instagram-publish'], ['x','x-media'], ['x','x-post']];
+  for (const [p, stage] of stages) {
+    for (const invalid of [NULL_BODY, null, '', '  ', 123, {}, ['id'], 'foo/bar', 'foo?bar', 'abc\n', 'abc\r', 'x'.repeat(257)]) {
+      const result = await run(p, stage, invalid);
+      assert.equal(result.out.ok, false, `${p}/${stage}`); assert.equal(result.status, 'failed');
+      assert.match(result.out.error, /تعذّر التحقق/); assert.match(result.out.error, /راجع المنصة/);
+      assert.match(result.savedError, /راجع المنصة قبل أي إعادة نشر/);
+      if (stage === 'instagram-create') assert(!result.requests.some(r => r.path.endsWith('/media_publish')));
+      if (stage === 'x-media') assert(!result.requests.some(r => r.path.endsWith('/tweets')));
+    }
+  }
+  for (const p of ['youtube','facebook','instagram','x']) {
+    const result = await run(p, '', null); assert.equal(result.out.ok, true, p); assert.equal(result.status, 'published');
+  }
+  console.log('PASS malformed provider IDs fail for review; valid synthetic responses succeed; no provider traffic');
+})().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => { global.setTimeout = oldTimeout; });
