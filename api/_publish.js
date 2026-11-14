@@ -32,9 +32,13 @@ module.exports = async (req, res) => {
    * بلا تحديد ⇒ القناة الافتراضية، وإلا الأحدث (انظر pickConnection). */
   let connId = null;
   if (b.connection_id) {
-    const conn = await q1(`select id, platform from social_connections where id=$1 and user_id=$2`, [String(b.connection_id), uid]);
-    const okPlat = conn && (conn.platform === b.platform || (b.platform === "instagram" && conn.platform === "facebook"));
-    if (!okPlat) return json(res, 400, { error: "قناة غير مرتبطة بهذه المنصة" });
+    const wantedId = String(b.connection_id).toLowerCase(); // PostgreSQL emits UUIDs in lowercase.
+    let conn;
+    try { conn = await q1(`select id, platform from social_connections where id=$1 and user_id=$2`, [wantedId, uid]); }
+    catch { return json(res, 503, { error: "تعذّر التحقق من القناة — لم تُنشأ المهمة" }); }
+    // Meta stores Facebook and Instagram as separate connections; the publisher
+    // only searches the selected platform and never resolves a Facebook ID to IG.
+    if (!conn || conn.id !== wantedId || conn.platform !== b.platform) return json(res, 400, { error: "قناة غير مرتبطة بهذه المنصة" });
     connId = conn.id;
   }
 

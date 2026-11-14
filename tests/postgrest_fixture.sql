@@ -31,10 +31,10 @@ grant select,insert,update,delete,truncate,references,trigger,maintain on public
 -- Deliberately grant column privileges separately to test that revocation covers them.
 grant update(template),insert(enabled) on public.autopilot to authenticated;
 -- Minimal connected-platform fixture for the real API handler; no tokens.
-create table public.social_connections(user_id uuid not null, platform text not null);
+create table public.social_connections(id uuid primary key default gen_random_uuid(),user_id uuid not null, platform text not null);
 insert into public.social_connections(user_id,platform)
 values ('44444444-4444-4444-8444-444444444444','youtube');
-grant select on public.social_connections to service_role;
+grant select,insert,delete on public.social_connections to service_role;
 -- Minimal temporary run ledger for HTTP transition/lost-reply tests.
 create table public.autopilot_runs(id uuid primary key,user_id uuid not null references auth.users(id),status text not null,video_path text,external_url text,error text,completed_at timestamptz,updated_at timestamptz not null default now());
 grant select,insert,update,delete on public.autopilot_runs to service_role;

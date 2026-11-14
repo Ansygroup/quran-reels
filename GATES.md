@@ -502,3 +502,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 - **MANUAL-PUBLISH-DRAFT — تأكيد مهمة النشر اليدوي الفوري**
   CHECK: `node tests/manual_new_publish_guard_test.js`؛ CI المعزول: `tests/postgrest_manual_publish_integration_test.js`.
   EXPECT: طلب النشر الفوري الجديد يُدرج `draft` ويؤكد حقول الصف قبل استدعاء الناشر؛ رد الإدراج غير المؤكد لا يطلق المحاولة ولا يُعاد، والكرون لا يلتقط المسودة. الجدولة المستقبلية تظل `scheduled` وقد تُنفَّذ رغم فقد الرد؛ رسالة الفشل تنبه لمراجعة القائمة والمنصة. لا يمنع هذا تكرار طلبات مستقلة أو تدخل كاتب آخر أو النشر عند فقد رد بعد بدء المحاولة. الاختبارات بمزود محاكى وPostgREST مؤقت لا إنتاجي.
+
+- **MANUAL-EXACT-PLATFORM — قناة يدوية مطابقة لمنصتها**
+  CHECK: `node tests/manual_new_publish_guard_test.js` و`tests/postgrest_manual_publish_integration_test.js` في CI المعزول.
+  EXPECT: التحقق من معرف القناة وملكيتها ومنصتها قبل إنشاء مهمة يدوية؛ يُرفض معرف فيسبوك كهدف إنستغرام لأن الناشر يبحث في اتصالات إنستغرام فقط. فشل القراءة يمنع الإدراج، ولا يُغيّر هذا فصل القناة أو وجهتها بعد التحقق. اختبار PostgREST يستخدم صفوف قنوات اصطناعية ومزودًا محجوبًا.
