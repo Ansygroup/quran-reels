@@ -494,3 +494,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: تشغيل خطوة Exercise actual account API with local PostgREST في .github/workflows/postgrest-account-guard.yml؛ git diff --check.
   EXPECT: معالج API وlib/db يستدعيان PostgREST حقيقيًا في حاوية اختبار فقط، مع جلسة محاكاة، والتحقق من تعارض الحفظ، وربط المالك، وردّ مفقود بعد التثبيت، وإيقاف عميل قديم؛ لا بيانات حقيقية ولا نشر.
   EVIDENCE: GitHub Actions رقم 43418021104 على commit 82cda46f نجح للخطوة الفعلية بعد فشل سابق واختبارين يعدّلان الإعدادات؛ بيانات الخطوات ناجحة، لكن تنزيل السجل التفصيلي غير متاح من بيئة العمل. لا يختبر Supabase Auth أو بيئة الإنتاج أو اتصال القنوات أثناء فصلها.
+
+- **AUTOPILOT-DRAFT-BATCH — دفعة مسودات مؤكدة قبل النشر المباشر**
+  CHECK: `node tests/queue_atomic_safety_test.js && node tests/queue_draft_cron_guard_test.js`؛ CI المعزول: `tests/postgrest_draft_queue_integration_test.js` و`tests/postgrest_publish_claim_integration_test.js`.
+  EXPECT: علامة تشغيل مشروطة، ثم POST واحد لمهام `draft`، والتحقق من تطابق كل صف بما فيه المالك والوجهة والمحتوى والتوقيت قبل استدعاء النشر. رد ناقص أو مشوّه أو مفقود لا يُعاد ولا يتبعه نشر من تلك المحاولة؛ الكرون الاعتيادي يستعلم عن `scheduled` لا المسودات. يختبر PostgREST المؤقت الإدراج والرد المفقود بعد commit ويختبر claim الفعلي لمسودة مع حجب المزود، لا قاعدة الإنتاج أو مزودًا حقيقيًا. يمكن لكاتب آخر تغيير المسودة أو نشرها؛ وقد تتوقف المهمة وتبقى للمراجعة دون نشر آلي.

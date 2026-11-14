@@ -130,6 +130,8 @@ jobs:
         run: node tests/postgrest_account_api_integration_test.js
       - name: Exercise run transition with disposable PostgREST
         run: node tests/postgrest_run_transition_integration_test.js
+      - name: Exercise draft batch with disposable PostgREST
+        run: node tests/postgrest_draft_queue_integration_test.js
       - name: Local PostgREST log on failure
         if: failure()
         run: docker logs qr-local-postgrest || true

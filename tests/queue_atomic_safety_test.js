@@ -21,9 +21,17 @@ global.fetch = async (url, opts = {}) => {
   if (u.pathname.endsWith('/publish_queue') && method === 'POST') {
     assert(Array.isArray(body));
     if (mode === 'reject') return { ok: false, status: 400, text: async () => 'rejected atomically' };
-    rows.push(...body);
+    rows.push(...body.map(r=>({...r})));
     if (mode === 'lost') throw new Error('connection lost after commit');
     if (mode === 'partial_response') return respond(body.slice(0, 1));
+    if (mode === 'reverse') return respond(body.slice().reverse());
+    if (mode.startsWith('alter:')) {
+      const field=mode.slice(6), copy=body.map(r=>({...r}));
+      if(field==='missing')delete copy[0].connection_id;
+      else if(field==='duplicate')copy[1]={...copy[0]};
+      else copy[0][field]='different';
+      return respond(copy);
+    }
     return respond(body);
   }
   throw new Error(`unexpected ${method} ${url}`);
@@ -35,24 +43,35 @@ const queue = () => T.queueTargets('run1', 'u1', 'u1/autopilot/2026-11-12-run1.m
   const out = await queue();
   assert.equal(out.length, 2); assert.equal(rows.length, 2);
   assert.deepEqual(rows.map(r => r.connection_id), ['c1', 'c2']);
+  assert(rows.every(r=>r.status==='draft'),'cron must not see newly created batch as scheduled');
   assert.equal(calls.filter(c => c.path.endsWith('publish_queue') && c.method === 'POST').length, 1);
   assert.equal(calls[0].body.status, 'queued'); assert.equal(calls[0].body.video_path, rows[0].video_path);
   assert.equal(new Set(rows.map(r => r.id)).size, 2);
   assert.equal(T.shouldCatchUp([{ status: 'queued' }]), 'running');
   rows = []; calls = []; run = initialRun(); mode = 'reject';
-  await assert.rejects(queue, /400/); assert.equal(rows.length, 0); assert.equal(run.status, 'queued');
+  await assert.rejects(queue, /راجع المسودات/); assert.equal(rows.length, 0); assert.equal(run.status, 'queued');
   rows = []; calls = []; run = initialRun(); mode = 'lost';
-  await assert.rejects(queue, /connection lost/); assert.equal(rows.length, 2); assert.equal(run.status, 'queued');
+  await assert.rejects(queue, /راجع المسودات/); assert.equal(rows.length, 2); assert(rows.every(r=>r.status==='draft')); assert.equal(run.status, 'queued');
   run.status = 'failed';
   const resumed = await T.createRun('u1', 'daily', '2026-11-12', null, '', true);
   assert.equal(resumed.existing, true); assert.equal(calls.filter(c => c.path.endsWith('publish_queue') && c.method === 'POST').length, 1);
   mode = 'partial_response'; rows = []; calls = []; run = initialRun();
   await assert.rejects(queue, /تأكيد/); assert.equal(rows.length, 2);
+  for (const field of ['id','user_id','platform','connection_id','video_path','video_name','title','caption','hashtags','status','publish_at','missing','duplicate']) {
+    rows=[];calls=[];run=initialRun();mode='alter:'+field;
+    await assert.rejects(queue, /راجع المسودات/,field);assert.equal(rows.length,2);assert(rows.every(r=>r.status==='draft'));
+    assert.equal(calls.filter(c=>c.path.endsWith('publish_queue')&&c.method==='POST').length,1);
+  }
+  rows=[];calls=[];run=initialRun();mode='reverse';const reordered=await queue();assert.deepEqual(reordered.map(x=>x.connection_id),['c1','c2']);
   for (const m of ['marker-zero','marker-lost','marker-malformed']) {
     rows=[];calls=[];run=initialRun();mode=m;
     await assert.rejects(queue, e=>e.code==='RUN_STATE_UNCONFIRMED');
     assert.equal(rows.length,0);assert.equal(calls.filter(c=>c.path.endsWith('publish_queue')).length,0);
     if(m!=='marker-zero')assert.equal(run.status,'queued');
+  }
+  for (const invalid of [[], [{platform:'youtube'}], [{platform:'youtube',connection_id:'c1'},{platform:'youtube',connection_id:'c1'}], [{platform:'unsupported',connection_id:null}]]) {
+    rows=[];calls=[];run=initialRun();mode='normal';
+    await assert.rejects(T.queueTargets('run1','u1','file','r.mp4',invalid,{s:1,from:1,to:2},{name:'قارئ'}));assert.equal(calls.length,0);
   }
   let attempts = 0; const result = await T.runWithRetry(async () => { attempts++; return { ok: false, stage: 'publish' }; });
   assert.equal(result.attempts, 1); assert.equal(attempts, 1);

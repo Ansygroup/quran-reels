@@ -38,3 +38,5 @@ grant select on public.social_connections to service_role;
 -- Minimal temporary run ledger for HTTP transition/lost-reply tests.
 create table public.autopilot_runs(id uuid primary key,user_id uuid not null references auth.users(id),status text not null,video_path text,external_url text,error text,completed_at timestamptz,updated_at timestamptz not null default now());
 grant select,insert,update,delete on public.autopilot_runs to service_role;
+create table public.publish_queue(id uuid primary key,user_id uuid not null references auth.users(id),platform text not null,connection_id uuid,video_path text not null,video_name text,title text,caption text,hashtags text,status text not null,publish_at timestamptz);
+grant select,insert,update,delete on public.publish_queue to service_role;

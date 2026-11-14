@@ -2,7 +2,7 @@
 'use strict';
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),http=require('node:http');
 const UPSTREAM='http://127.0.0.1:3102',SECRET='LOCAL-ONLY-channel-fixture-secret-0123456789-abcdef';
-const U='11111111-1111-4111-8111-111111111111',A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',Q='ffffffff-ffff-4fff-8fff-ffffffffffff',Q2='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const U='11111111-1111-4111-8111-111111111111',A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',Q='ffffffff-ffff-4fff-8fff-ffffffffffff',Q2='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',Q3='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const b64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
 const p=b64({alg:'HS256',typ:'JWT'})+'.'+b64({role:'service_role',sub:U,exp:Math.floor(Date.now()/1000)+3600});
 const jwt=p+'.'+crypto.createHmac('sha256',SECRET).update(p).digest('base64url');
@@ -38,6 +38,10 @@ const gateway=http.createServer(async(req,res)=>{
   const before=observed.length;dropFailedReply=true;
   const lost=await publishRow(row2);assert.equal(lost.skipped,'result-unconfirmed');assert.equal(observed.length-before,2);
   const [committed]=await fixture('GET','/publish_queue?id=eq.'+Q2);assert.equal(committed.status,'failed');
+  const [draft]=await fixture('POST','/publish_queue',{id:Q3,user_id:U,platform:'youtube',connection_id:B,status:'draft'});
+  const draftOutcome=await publishRow(draft);assert.match(draftOutcome.error,/لا يوجد ربط/);
+  assert.equal((await fixture('GET','/publish_queue?id=eq.'+Q3))[0].status,'failed');
+  assert(observed.some(s=>s.get('status')==='eq.draft'&&s.get('connection_id')==='eq.'+B));
   assert(observed.some(s=>s.get('platform')==='eq.youtube'&&s.get('connection_id')==='eq.'+A));
   assert(observed.some(s=>s.get('platform')==='eq.youtube'&&s.get('connection_id')==='is.null'));
   assert(observed.some(s=>s.get('platform')==='eq.youtube'&&s.get('connection_id')==='eq.'+B));
@@ -45,6 +49,7 @@ const gateway=http.createServer(async(req,res)=>{
  }finally{
   await fixture('DELETE','/publish_queue?id=eq.'+Q).catch(()=>{});
   await fixture('DELETE','/publish_queue?id=eq.'+Q2).catch(()=>{});
+  await fixture('DELETE','/publish_queue?id=eq.'+Q3).catch(()=>{});
   await new Promise(r=>gateway.close(r));
  }
 })().catch(e=>{console.error(e);if(process.env.GITHUB_ACTIONS==='true')console.error('::error title=Publish claim integration::'+String(e?.stack||e).slice(0,3000).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A'));process.exitCode=1});
