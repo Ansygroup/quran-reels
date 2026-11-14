@@ -79,7 +79,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   setDb({
     q: async (sql) => {
       pq.push(sql);
-      if (/set status='publishing'/i.test(sql)) return [{ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, status: "publishing" }];
+      if (/set status='publishing'/i.test(sql)) return [{ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "publishing" }];
       if (/from social_connections/i.test(sql)) return [{ ...older, user_id: 'user-7', is_default: true }, { ...newer, user_id: 'user-7' }];
       return [];
     },
@@ -87,13 +87,13 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   });
   const realFetch = global.fetch;
   global.fetch = async () => ({ ok: false, status: 500, headers: { get: () => "0" }, json: async () => ({}), text: async () => "" });
-  try { await pub.publishRow({ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, title: "t", status: "scheduled" }); } catch (e) { rowErr = e; }
+  try { await pub.publishRow({ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", title: "t", status: "scheduled" }); } catch (e) { rowErr = e; }
   global.fetch = realFetch;
   chk("publishRow يقرأ كل قنوات المنصة (لا limit 1 في الاستعلام)",
     pq.some((sql) => /from social_connections/i.test(sql) && !/limit 1/i.test(sql)), pq.filter((sql) => /social_connections/i.test(sql)).join(" | ").slice(0, 160));
 
-  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, status: "publishing" }] : /set status='failed'/i.test(sql) ? [{ id: "q2", user_id: "user-7", status: "failed" }] : []), q1: async () => null });
-  const noConn = await pub.publishRow({ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, status: "scheduled" });
+  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "publishing" }] : /set status='failed'/i.test(sql) ? [{ id: "q2", user_id: "user-7", status: "failed" }] : []), q1: async () => null });
+  const noConn = await pub.publishRow({ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "scheduled" });
   chk("بلا أي قناة مرتبطة ⇒ رسالة واضحة", noConn.ok === false && /لا يوجد ربط/.test(String(noConn.error)), String(noConn.error));
 
   /* 3) تعيين القناة الافتراضية عبر /api/gw?op=default */
