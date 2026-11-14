@@ -57,7 +57,7 @@ global.fetch = async (url, opts = {}) => {
   const name = u.pathname.split("/").at(-1);
   if (!tables[name]) throw new Error("table " + name);
   if (failReads && method === "GET" && name === "publish_queue") throw new Error("DB unavailable");
-  if (failPrevious && method === "GET" && name === "social_connections" && u.searchParams.get("select") === "refresh_token") throw new Error("DB unavailable");
+  if (failPrevious && method === "GET" && name === "social_connections") throw new Error("DB unavailable");
   let selected = tables[name].filter(r => match(r, u.searchParams));
   const order = u.searchParams.get("order") || "";
   if (order.includes("created_at.desc")) selected.sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)));
@@ -103,7 +103,10 @@ async function link() {
   reset(); grantRefresh = undefined; tables.social_connections = []; await link();
   assert.equal(tables.social_connections[0].refresh_token, ""); assert(tables.social_connections[0].expires_at > Date.now() + 3500000);
   reset(); channelId = null; assert.match(await link(), /linked=youtube_err.*w=channel/); assert.equal(open(tables.social_connections[0].access_token), "old");
-  reset(); grantRefresh = undefined; failPrevious = true; assert.match(await link(), /linked=youtube_err.*w=store/); assert.equal(open(tables.social_connections[0].access_token), "old");
+  reset(); grantRefresh = undefined; failPrevious = true;
+  const oldConsoleError = console.error; console.error = () => {}; // Expected synthetic lookup failure.
+  try { assert.match(await link(), /linked=youtube_err.*w=store/); } finally { console.error = oldConsoleError; }
+  assert.equal(open(tables.social_connections[0].access_token), "old");
   reset(); tables.autopilot[0].enabled = false; channelId = "UC2";
   tables.social_connections.push({ ...tables.social_connections[0], id: "c2", account_id: "UC2", is_default: false });
   assert.match(await link(), /channel=nondefault/); assert.equal(tables.social_connections[0].is_default, true); assert.equal(tables.social_connections[1].is_default, false);
