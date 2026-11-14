@@ -25,11 +25,11 @@ global.fetch=async(url,opts={})=>{
   if(mode==='empty')return {ok:true,json:async()=>({data:{}})};
   if(mode==='null')return {ok:true,json:async()=>null};
   if(mode==='wrongtype')return {ok:true,json:async()=>({data:{upload_url:12}})};
-  if(mode==='error-url')return {ok:false,json:async()=>({data:{upload_url:'https://upload.invalid/session'}})};
+  if(mode==='error-url')return {ok:false,json:async()=>({data:{upload_url:'https://open-upload.tiktokapis.com/video/?upload_id=fixture'}})};
   if(mode==='rejection')return {ok:false,json:async()=>({error:{message:'sensitive-fixture'},data:{}})};
-  return {ok:true,json:async()=>({data:{upload_url:'https://upload.invalid/session',publish_id:'fixture'}})};
+  return {ok:true,json:async()=>({data:{upload_url:'https://open-upload.tiktokapis.com/video/?upload_id=fixture',publish_id:'fixture'}})};
  }
- if(u.origin==='https://upload.invalid'){uploads++;return {ok:mode!=='put-fail',status:mode==='put-fail'?500:200}}
+ if(u.origin==='https://open-upload.tiktokapis.com'){uploads++;return {ok:mode!=='put-fail',status:mode==='put-fail'?500:200}}
  throw Error('unexpected network request');
 };
 const {publishRow}=require('../lib/publish');

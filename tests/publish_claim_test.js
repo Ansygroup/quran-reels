@@ -23,8 +23,8 @@ global.fetch = async (url, opts = {}) => {
     if (method === "HEAD") return { ok: true, headers: { get: () => "4" } };
     return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
   }
-  if (u.hostname === "www.googleapis.com") return { ok: true, headers: { get: () => "https://upload.example/session" } };
-  if (u.hostname === "upload.example") { uploads++; return json({ id: "video1" }); }
+  if (u.hostname === "www.googleapis.com" && method === "POST") return { ok: true, headers: { get: () => "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=fixture" } };
+  if (u.hostname === "www.googleapis.com" && method === "PUT") { uploads++; return json({ id: "video1" }); }
   throw new Error(`unexpected request ${method} ${url}`);
 };
 (async () => {

@@ -19,11 +19,11 @@ global.fetch = async (url,opts={}) => {
   if(u.pathname==='/rest/v1/social_connections') return json(conns);
   if(u.pathname.startsWith('/storage/')) return method==='HEAD' ? {ok:true,headers:{get:()=> '4'}} : {ok:true,status:200,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
  }
- if(u.hostname==='www.googleapis.com') {
+ if(u.hostname==='www.googleapis.com' && method==='POST') {
    const snippet=JSON.parse(opts.body).snippet; uploads.push({ auth:opts.headers.Authorization, snippet });
-   return {ok:true,headers:{get:()=>`https://upload.example/${uploads.length}`}};
+   return {ok:true,headers:{get:()=>`https://www.googleapis.com/upload/youtube/v3/videos?upload_id=${uploads.length}`}};
  }
- if(u.hostname==='upload.example') return json({id:'video'+u.pathname.slice(1)});
+ if(u.hostname==='www.googleapis.com' && method==='PUT') return json({id:'video'+u.searchParams.get('upload_id')});
  throw Error(`unexpected ${method} ${url}`);
 };
 (async()=>{

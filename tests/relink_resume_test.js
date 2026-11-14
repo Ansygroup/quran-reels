@@ -44,8 +44,8 @@ global.fetch = async (url, opts = {}) => {
   requests.push({ url: u, method });
   if (u.hostname === "oauth2.googleapis.com") return result({ access_token: "fresh", refresh_token: grantRefresh, expires_in: 3600 });
   if (u.hostname === "www.googleapis.com" && u.pathname.includes("/channels")) return result({ items: [{ id: channelId, snippet: { title: "test" } }] });
-  if (u.hostname === "www.googleapis.com" && u.pathname.includes("/upload/")) return { ok: true, headers: { get: () => "https://upload.example/session" } };
-  if (u.hostname === "upload.example") { uploads++; return result({ id: "vid1" }); }
+  if (u.hostname === "www.googleapis.com" && u.pathname.includes("/upload/") && method === "POST") return { ok: true, headers: { get: () => "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=fixture" } };
+  if (u.hostname === "www.googleapis.com" && u.pathname.includes("/upload/") && method === "PUT") { uploads++; return result({ id: "vid1" }); }
   if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) return method === "HEAD" ? { ok: true, headers: { get: () => "4" } } : { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer };
   if (u.hostname !== "db.example") throw new Error("unexpected " + url);
   if (u.pathname.endsWith('/rpc/link_autopilot_platform_guarded')) {

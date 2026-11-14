@@ -31,12 +31,12 @@ global.fetch = async (url, opts = {}) => {
     if (mode === 'body-error') return { ok: true, status: 200, arrayBuffer: async () => { throw Error('sensitive-fixture'); } };
     return { ok: true, status: 200, arrayBuffer: async () => bytes() };
   }
-  if (u.origin === 'https://www.googleapis.com') return { ok: true, headers: { get: () => 'https://upload.fixture/session' } };
-  if (u.origin === 'https://upload.fixture') return json({ id: 'video_1' });
+  if (u.origin === 'https://www.googleapis.com' && opts.method === 'POST') return { ok: true, headers: { get: () => 'https://www.googleapis.com/upload/youtube/v3/videos?upload_id=fixture' } };
+  if (u.origin === 'https://www.googleapis.com' && opts.method === 'PUT') return json({ id: 'video_1' });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/media/upload') return json({ data: { id: 'media_1' } });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/tweets') return json({ data: { id: 'post_1' } });
-  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://tiktok-upload.fixture/session', publish_id: 'fixture' } });
-  if (u.origin === 'https://tiktok-upload.fixture') return { ok: true, status: 200 };
+  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=fixture', publish_id: 'fixture' } });
+  if (u.origin === 'https://open-upload.tiktokapis.com') return { ok: true, status: 200 };
   throw Error('unexpected network blocked');
 };
 const { publishRow } = require('../lib/publish');
@@ -65,7 +65,7 @@ async function run(p, m) {
     if (p === 'youtube') {
       const start = ok.calls.find(c => c.origin === 'https://www.googleapis.com');
       assert.equal(start.opts.headers['X-Upload-Content-Length'], '4');
-      assert.equal(ok.calls.find(c => c.origin === 'https://upload.fixture').opts.body.byteLength, 4);
+      assert.equal(ok.calls.find(c => c.origin === 'https://www.googleapis.com' && c.method === 'PUT').opts.body.byteLength, 4);
     }
     if (p === 'x') {
       const upload = ok.calls.find(c => c.origin === 'https://api.x.com' && c.opts.body instanceof FormData);
@@ -75,7 +75,7 @@ async function run(p, m) {
       const start = ok.calls.find(c => c.origin === 'https://open.tiktokapis.com');
       assert.equal(JSON.parse(start.opts.body).post_info.privacy_level, 'SELF_ONLY_DISABLE');
       assert.equal(ok.calls.filter(c => c.origin === 'https://open.tiktokapis.com').length, 1);
-      assert.deepEqual([...ok.calls.find(c => c.origin === 'https://tiktok-upload.fixture').opts.body], [1, 2, 3, 4]);
+      assert.deepEqual([...ok.calls.find(c => c.origin === 'https://open-upload.tiktokapis.com').opts.body], [1, 2, 3, 4]);
     }
   }
   console.log('PASS storage failure blocks provider upload/init for YouTube, X and TikTok (synthetic only)');

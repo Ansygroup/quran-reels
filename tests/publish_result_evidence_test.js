@@ -21,8 +21,8 @@ global.fetch=async(url,opts={})=>{
  }
  if(u.origin==='https://db.example'&&u.pathname==='/rest/v1/social_connections')return json([conn]);
  if(u.origin==='https://db.example'&&u.pathname.startsWith('/storage/'))return method==='HEAD'?{ok:true,headers:{get:()=> '4'}}:{ok:true,status:200,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
- if(u.origin==='https://www.googleapis.com')return {ok:true,headers:{get:()=> 'https://upload.example/session'}};
- if(u.origin==='https://upload.example'){
+ if(u.origin==='https://www.googleapis.com'&&method==='POST')return {ok:true,headers:{get:()=> 'https://www.googleapis.com/upload/youtube/v3/videos?upload_id=fixture'}};
+ if(u.origin==='https://www.googleapis.com'&&method==='PUT'){
   uploads++;if(mode==='provider-lost'||mode==='failed-lost'){if(mode==='failed-lost')mode='lost';throw Error('provider reply lost')}
   if(mode==='reclaimed')row.status='failed';
   return json({id:'video1'});
