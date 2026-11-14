@@ -5,11 +5,11 @@ process.env.SUPABASE_URL='https://fixture.invalid';
 let status,mode,calls,privacy,uploads;
 const db=require.resolve('../lib/db');
 require.cache[db]={id:db,filename:db,loaded:true,exports:{
- q:async(sql)=>{
+ q:async(sql,params)=>{
   if(/set status='publishing'/.test(sql)){status='publishing';return [{id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status,video_path:'video.mp4'}]}
   if(/from social_connections/.test(sql))return [{id:'channel',user_id:'owner',platform:'tiktok',access_token:'fixture-token',expires_at:Date.now()+3600000}];
-  if(/set status='published'/.test(sql)){status='published';return []}
-  if(/set status='failed'/.test(sql)){status='failed';return []}
+  if(/set status='published'/.test(sql)){status='published';return [{id:'job',user_id:'owner',status,external_url:params[1]}]}
+  if(/set status='failed'/.test(sql)){status='failed';return [{id:'job',user_id:'owner',status}]}
   throw Error('unexpected database query');
  },q1:async()=>{throw Error('unexpected database query')}
 }};

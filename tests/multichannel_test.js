@@ -92,7 +92,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("publishRow يقرأ كل قنوات المنصة (لا limit 1 في الاستعلام)",
     pq.some((sql) => /from social_connections/i.test(sql) && !/limit 1/i.test(sql)), pq.filter((sql) => /social_connections/i.test(sql)).join(" | ").slice(0, 160));
 
-  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, status: "publishing" }] : []), q1: async () => null });
+  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, status: "publishing" }] : /set status='failed'/i.test(sql) ? [{ id: "q2", user_id: "user-7", status: "failed" }] : []), q1: async () => null });
   const noConn = await pub.publishRow({ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, status: "scheduled" });
   chk("بلا أي قناة مرتبطة ⇒ رسالة واضحة", noConn.ok === false && /لا يوجد ربط/.test(String(noConn.error)), String(noConn.error));
 
