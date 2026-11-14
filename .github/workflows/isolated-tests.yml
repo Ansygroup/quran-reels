@@ -74,6 +74,8 @@ jobs:
           node tests/oauth_state_test.js
           node tests/oauth_state_deadline_test.js
           node tests/oauth_identity_guard_test.js
+          node tests/oauth_available_redirect_test.js
+          node tests/oauth_youtube_identity_guard_test.js
           node tests/oauth_meta_identity_test.js
           node tests/oauth_refresh_preservation_test.js
           node tests/oauth_refresh_sql_test.js
