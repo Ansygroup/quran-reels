@@ -17,7 +17,7 @@ global.fetch = async (url,opts={}) => {
     Object.assign(r,JSON.parse(opts.body)); return json([{...r}]);
   }
   if(u.pathname==='/rest/v1/social_connections') return json(conns);
-  if(u.pathname.startsWith('/storage/')) return method==='HEAD' ? {ok:true,headers:{get:()=> '4'}} : {ok:true,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
+  if(u.pathname.startsWith('/storage/')) return method==='HEAD' ? {ok:true,headers:{get:()=> '4'}} : {ok:true,status:200,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
  }
  if(u.hostname==='www.googleapis.com') {
    const snippet=JSON.parse(opts.body).snippet; uploads.push({ auth:opts.headers.Authorization, snippet });

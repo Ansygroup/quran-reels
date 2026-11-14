@@ -17,7 +17,7 @@ const crypt=require.resolve('../lib/crypt');
 require.cache[crypt]={id:crypt,filename:crypt,loaded:true,exports:{open:x=>x,seal:x=>x}};
 global.fetch=async(url,opts={})=>{
  const u=new URL(url);
- if(u.origin==='https://fixture.invalid')return {arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
+ if(u.origin==='https://fixture.invalid')return {ok:true,status:200,arrayBuffer:async()=>new Uint8Array([1,2,3,4]).buffer};
  if(u.origin==='https://open.tiktokapis.com'&&u.pathname==='/v2/post/publish/video/init/'){
   calls++;privacy.push(JSON.parse(opts.body).post_info.privacy_level);
   if(mode==='network')throw Error('simulated lost response');

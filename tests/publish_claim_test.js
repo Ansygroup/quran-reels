@@ -21,7 +21,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.hostname === "db.example" && u.pathname === "/rest/v1/social_connections") return json([conn]);
   if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) {
     if (method === "HEAD") return { ok: true, headers: { get: () => "4" } };
-    return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
+    return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
   }
   if (u.hostname === "www.googleapis.com") return { ok: true, headers: { get: () => "https://upload.example/session" } };
   if (u.hostname === "upload.example") { uploads++; return json({ id: "video1" }); }

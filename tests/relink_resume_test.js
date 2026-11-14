@@ -46,7 +46,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.hostname === "www.googleapis.com" && u.pathname.includes("/channels")) return result({ items: [{ id: channelId, snippet: { title: "test" } }] });
   if (u.hostname === "www.googleapis.com" && u.pathname.includes("/upload/")) return { ok: true, headers: { get: () => "https://upload.example/session" } };
   if (u.hostname === "upload.example") { uploads++; return result({ id: "vid1" }); }
-  if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) return method === "HEAD" ? { ok: true, headers: { get: () => "4" } } : { ok: true, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer };
+  if (u.hostname === "db.example" && u.pathname.startsWith("/storage/")) return method === "HEAD" ? { ok: true, headers: { get: () => "4" } } : { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1,2,3,4]).buffer };
   if (u.hostname !== "db.example") throw new Error("unexpected " + url);
   if (u.pathname.endsWith('/rpc/link_autopilot_platform_guarded')) {
     const body=JSON.parse(opts.body); let row=tables.autopilot.find(r=>r.user_id===body.p_user_id);

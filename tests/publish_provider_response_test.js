@@ -36,7 +36,7 @@ const reply = (stage, data) => {
 };
 global.fetch = async (url, opts = {}) => {
   const u = new URL(url); requests.push({ host: u.host, path: u.pathname, method: opts.method || 'GET' });
-  if (u.origin === 'https://storage.fixture') return { ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
+  if (u.origin === 'https://storage.fixture') return { ok: true, status: 200, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
   if (u.origin === 'https://www.googleapis.com') return { ok: true, headers: { get: () => 'https://upload.fixture/session' } };
   if (u.origin === 'https://upload.fixture') return reply('youtube', { id: id('youtube') });
   if (u.origin === 'https://graph.facebook.com' && u.pathname.endsWith('/videos')) return reply('facebook', { id: id('facebook') });
