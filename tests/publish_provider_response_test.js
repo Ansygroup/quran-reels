@@ -17,8 +17,23 @@ const crypt = require.resolve('../lib/crypt');
 require.cache[crypt] = { id: crypt, filename: crypt, loaded: true, exports: { open: x => x, seal: x => x } };
 const json = data => ({ ok: true, status: 200, json: async () => data });
 const NULL_BODY = Symbol('null body');
-const id = stage => stage === badStage ? value : 'valid_123';
-const reply = (stage, data) => json(stage === badStage && value === NULL_BODY ? null : data);
+const ERROR_BODY = Symbol('contradictory error');
+const ERRORS_BODY = Symbol('contradictory errors');
+const EMPTY_ERRORS = Symbol('empty errors');
+const X_TOP = Symbol('top-level media id');
+const X_TOP_ERROR = Symbol('top-level media id with error');
+const validIdCases = [ERROR_BODY, ERRORS_BODY, EMPTY_ERRORS, X_TOP, X_TOP_ERROR];
+const id = stage => stage === badStage && !validIdCases.includes(value) ? value : 'valid_123';
+const reply = (stage, data) => {
+  if (stage !== badStage) return json(data);
+  if (value === NULL_BODY) return json(null);
+  if (value === ERROR_BODY) return json({ ...data, error: { message: 'sensitive-fixture' } });
+  if (value === ERRORS_BODY) return json({ ...data, errors: [{ message: 'sensitive-fixture' }] });
+  if (value === EMPTY_ERRORS) return json({ ...data, error: null, errors: [] });
+  if (value === X_TOP) return json({ id: 'valid_123', errors: [] });
+  if (value === X_TOP_ERROR) return json({ id: 'valid_123', errors: [{ message: 'sensitive-fixture' }] });
+  return json(data);
+};
 global.fetch = async (url, opts = {}) => {
   const u = new URL(url); requests.push({ host: u.host, path: u.pathname, method: opts.method || 'GET' });
   if (u.origin === 'https://storage.fixture') return { ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
@@ -43,17 +58,25 @@ async function run(p, stage, v) {
 (async () => {
   const stages = [['youtube','youtube'], ['facebook','facebook'], ['instagram','instagram-create'], ['instagram','instagram-publish'], ['x','x-media'], ['x','x-post']];
   for (const [p, stage] of stages) {
-    for (const invalid of [NULL_BODY, null, '', '  ', 123, {}, ['id'], 'foo/bar', 'foo?bar', 'abc\n', 'abc\r', 'x'.repeat(257)]) {
+    for (const invalid of [NULL_BODY, ERROR_BODY, ERRORS_BODY, null, '', '  ', 123, {}, ['id'], 'foo/bar', 'foo?bar', 'abc\n', 'abc\r', 'x'.repeat(257)]) {
       const result = await run(p, stage, invalid);
       assert.equal(result.out.ok, false, `${p}/${stage}`); assert.equal(result.status, 'failed');
       assert.match(result.out.error, /تعذّر التحقق/); assert.match(result.out.error, /راجع المنصة/);
       assert.match(result.savedError, /راجع المنصة قبل أي إعادة نشر/);
+      assert(!result.savedError.includes('sensitive-fixture'), 'do not store raw provider details');
       if (stage === 'instagram-create') assert(!result.requests.some(r => r.path.endsWith('/media_publish')));
       if (stage === 'x-media') assert(!result.requests.some(r => r.path.endsWith('/tweets')));
     }
+    const emptyErrors = await run(p, stage, EMPTY_ERRORS);
+    assert.equal(emptyErrors.out.ok, true, `${p}/${stage} empty errors`);
   }
+  const topError = await run('x', 'x-media', X_TOP_ERROR);
+  assert.equal(topError.out.ok, false); assert.match(topError.savedError, /راجع المنصة/);
+  assert(!topError.requests.some(r => r.path.endsWith('/tweets')));
+  const topOk = await run('x', 'x-media', X_TOP);
+  assert.equal(topOk.out.ok, true); assert.equal(topOk.status, 'published');
   for (const p of ['youtube','facebook','instagram','x']) {
     const result = await run(p, '', null); assert.equal(result.out.ok, true, p); assert.equal(result.status, 'published');
   }
-  console.log('PASS malformed provider IDs fail for review; valid synthetic responses succeed; no provider traffic');
+  console.log('PASS malformed IDs and contradictory provider errors fail for review; valid synthetic responses succeed; no provider traffic');
 })().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => { global.setTimeout = oldTimeout; });

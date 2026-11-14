@@ -41,6 +41,7 @@ async function run(input) {
   const invalid = [
     response({ status_code: 'FINISHED' }, false),
     response({ status_code: 'FINISHED', error: { message: 'fixture' } }),
+    response({ status_code: 'FINISHED', errors: [{ message: 'fixture' }] }),
     response(null), response([]), response({}), response({ status_code: 1 }),
     response({ status_code: 'PUBLISHED' }), response({ status_code: 'UNKNOWN' }),
     { ok: true, status: 200, json: async () => { throw Error('bad JSON'); } },
@@ -71,7 +72,7 @@ async function run(input) {
   result = await run([response({ status_code: 'IN_PROGRESS' }), response({ status_code: 'FINISHED' })]);
   assert.equal(result.out.ok, true); assert.equal(result.saved.status, 'published');
   assert.equal(result.polls, 2); assert.equal(result.paths.filter(p => p === '/v21.0/ig/media_publish').length, 1);
-  result = await run([response({ status_code: 'FINISHED' })]);
+  result = await run([response({ status_code: 'FINISHED', error: null, errors: [] })]);
   assert.equal(result.out.ok, true); assert.equal(result.polls, 1);
   console.log('PASS Instagram processing response guard with mocked DB and provider; no real network');
 })().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => { global.setTimeout = originalTimeout; });
