@@ -147,6 +147,7 @@ jobs:
         run: |
           node tests/account_save_uncertain_browser_test.js
           node tests/account_layout_browser_test.js
+          node tests/account_controls_accessibility_browser_test.js
           node tests/account_reel_browser_test.js
           node tests/account_quran_recovery_browser_test.js
           node tests/account_oauth_browser_test.js

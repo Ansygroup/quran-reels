@@ -525,10 +525,10 @@ window.PublishApp = {
           </div>
           <p class="hint">لو اخترت آيات بنفسك، نفس المقطع هيتكرر في التشغيل التلقائي. للمقاطع الطويلة ممكن يتوقف التشغيل بدل ما يقصّ آياتك.</p>
       </div>
-      <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
+      <div class="f-group" role="group" aria-labelledby="acctPlatformsTitle"><label id="acctPlatformsTitle">المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
       ${multi ? `<div class="switch-row">
-        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل قد تختار المهمة بلا قناة محددة الافتراضية وقت النشر، أو أحدث اتصال إذا غابت؛ المهام الموجودة قد تختلف. القنوات الظاهرة: ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
-        <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
+        <div class="t"><span id="acctAllChannelsTitle">انشر على كل القنوات المرتبطة</span><small id="acctAllChannelsDescription">عند التعطيل قد تختار المهمة بلا قناة محددة الافتراضية وقت النشر، أو أحدث اتصال إذا غابت؛ المهام الموجودة قد تختلف. القنوات الظاهرة: ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
+        <label class="switch"><input type="checkbox" id="chkAllChannels" aria-labelledby="acctAllChannelsTitle" aria-describedby="acctAllChannelsDescription" ${config.all_channels ? "checked" : ""}><i aria-hidden="true"></i></label>
       </div>` : ""}
       <div class="row gap-lg acct-actions">
         <button class="btn btn-gold" id="autoSave" data-act="save" ${this._settingsPending || this._settingsUncertain ? "disabled" : ""}>💾 حفظ التعديلات</button>
