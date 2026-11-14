@@ -43,6 +43,7 @@ jobs:
           node tests/account_disconnect_timeout_test.js
           node tests/account_disconnect_api_test.js
           node tests/account_schema_probe_test.js
+          node tests/db_redirect_guard_test.js
           node tests/tiktok_unavailable_test.js
           node tests/meta_unavailable_test.js
           node tests/publish_claim_evidence_test.js
