@@ -18,7 +18,7 @@ async function main() {
     match: async key => stored.get(typeof key === 'string' ? key : key.url),
     put: async (key, value) => { puts.push([key, value]); stored.set(key, value); },
   };
-  const caches = { open: async name => { assert.equal(name, "qr-v81"); return cache; }, keys: async () => ["qr-v80", "qr-v81"], delete: async k => { deleted.push(k); } };
+  const caches = { open: async name => { assert.equal(name, "qr-v82"); return cache; }, keys: async () => ["qr-v81", "qr-v82"], delete: async k => { deleted.push(k); } };
   const self = { location: { origin: "https://example.test" }, registration: { pushManager: { getSubscription: async () => ({ unsubscribe: async () => { unsubscribed = true; } }) } }, clients: { claim: async () => { claimed = true; } }, skipWaiting: async () => { skipped = true; }, addEventListener: (name, fn) => { handlers[name] = fn; } };
   const code = fs.readFileSync("public/sw.js", "utf8");
   vm.runInNewContext(code, { self, caches, URL, Request: class { constructor(url, opts) { this.url = url; this.cache = opts.cache; } }, Response: { error: () => "error" }, fetch: async req => { if (offline) throw Error("offline"); if (req.cache === 'reload') { fetched.push(req.url); if (req.url === '/js/tools-a.js?v=5') return makeResponse('missing', {status:404}); } return networkResponse; } });
@@ -27,7 +27,7 @@ async function main() {
   assert(skipped && stored.get('/') === networkResponse && fetched.length >= 20);
   assert(!stored.has('/js/tools-a.js?v=5'), 'failed assets are not cached');
   handlers.activate({ waitUntil: p => { pending = p; } }); await pending;
-  assert.deepStrictEqual(deleted, ["qr-v80"]); assert(unsubscribed && claimed);
+  assert.deepStrictEqual(deleted, ["qr-v81"]); assert(unsubscribed && claimed);
   self.registration.pushManager.getSubscription = async () => { throw Error("denied"); };
   claimed = false; handlers.activate({ waitUntil: p => { pending = p; } }); await pending; assert(claimed);
 

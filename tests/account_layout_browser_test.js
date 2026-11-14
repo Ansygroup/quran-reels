@@ -23,6 +23,14 @@ try{
  await page.evaluate(()=>PublishApp.renderConnections('fixture'));
  for(const id of ['acctCustomize','acctHistoryDisclosure','acctPendingDisclosure','acctFailedDisclosure','acctGuide','acctTools'])assert.equal(await page.locator('#'+id).evaluate(e=>e.open),false,id);
  assert.equal(await page.locator('#acctEnabled + i').isVisible(),true);assert.match(await page.locator('#acctPendingSummary').innerText(),/1 في اللقطة/);assert.match(await page.locator('#acctFailedSummary').innerText(),/تعذّر التحقق/);
+ await page.evaluate(()=>PublishApp.renderAccount({...PublishApp.data, stats:null, runs_available:true}));
+ assert.equal(await page.locator('#acctHistoryDisclosure').evaluate(e=>e.open),false);
+ assert.match(await page.locator('#acctHistorySummary').innerText(),/تعذّر تحميل الإحصاءات/);
+ assert.equal(await page.locator('#acctHistorySummary').evaluate(e=>e.classList.contains('warn')),true);
+ await page.evaluate(()=>PublishApp.renderAccount({...PublishApp.data, runs_available:false}));
+ assert.match(await page.locator('#acctHistorySummary').innerText(),/تعذّر تحميل السجل.*تعذّر تحميل الإحصاءات/);
+ await page.evaluate(()=>PublishApp.renderAccount({...PublishApp.data,stats:{published:2},runs_available:true}));
+ assert.equal(await page.locator('#acctHistorySummary').evaluate(e=>e.classList.contains('warn')),false);
  assert.match(await page.locator('#acctProgress').innerText(),/تحتاج مراجعة/);
  if(process.env.ACCOUNT_SCREENSHOT)await page.screenshot({path:process.env.ACCOUNT_SCREENSHOT,fullPage:true});
  await page.locator('.acct-progress-detail summary').click();await page.evaluate(()=>PublishApp.renderProgress({run:{status:'queued'},events:[{stage:'publishing'}],targets:[],targets_available:true}));assert.equal(await page.locator('.acct-progress-detail').evaluate(e=>e.open),true);
@@ -41,6 +49,7 @@ try{
  // Missing preview engine must not hide fixed range or allow a missing image to be saved.
  await page.evaluate(()=>{ReelRenderer = undefined; PublishApp.renderAutoPanel(PublishApp.data)});
  assert.match(await page.locator('#acctAppearanceSummary').innerText(),/المعاينة غير متاحة/);
+ assert.match(await page.locator('#acctCustomizeSummary').innerText(),/المعاينة غير متاحة/);
  await page.selectOption('#selContentMode','fixed');assert.equal(await page.locator('#acctFixedRange').isVisible(),true);
  await page.selectOption('#selContentMode','mix');await page.selectOption('#selBackground','custom');
  assert.equal(await page.locator('#acctAppearance').evaluate(e=>e.open),true);
@@ -50,6 +59,7 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement.id),'acctBackgroundFile');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'no horizontal overflow');assert.deepEqual(errors,[]);
  await page.evaluate(()=>PublishApp.clearAccountData('other'));assert.equal(await page.locator('#acctDraftBadge').isHidden(),true);assert.match(await page.locator('#acctPendingSummary').textContent(),/جارٍ التحقق/);
+ assert.match(await page.locator('#acctCustomizeSummary').textContent(),/المحتوى، الشكل والمنصات/);assert.equal(await page.locator('#acctCustomizeSummary').evaluate(e=>e.classList.contains('warn')),false);
  await ctx.close();console.log('PASS uncluttered account layout, keyboard disclosures, truthful review indicators and preserved draft (mocked browser)');
 }finally{await browser.close();server.close()}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1});

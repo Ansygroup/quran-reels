@@ -173,7 +173,7 @@ window.PublishApp = {
     const notice = document.getElementById("acctNotice");
     if (notice) { notice.textContent = ""; notice.hidden = true; notice.style.display = "none"; notice.style.color = ""; delete notice.dataset.loadError; }
     const badge = document.getElementById("acctDraftBadge"); if (badge) badge.hidden = true;
-    for (const [id, text] of [["acctHistorySummary", "نتائج المحاولات وإحصاءات النشر"], ["acctPendingSummary", "جارٍ التحقق من المهام…"], ["acctFailedSummary", "جارٍ التحقق من المحاولات…"]]) {
+    for (const [id, text] of [["acctCustomizeSummary", "المحتوى، الشكل والمنصات"], ["acctHistorySummary", "نتائج المحاولات وإحصاءات النشر"], ["acctPendingSummary", "جارٍ التحقق من المهام…"], ["acctFailedSummary", "جارٍ التحقق من المحاولات…"]]) {
       const summary = document.getElementById(id); if (summary) { summary.textContent = text; summary.classList.remove("warn"); }
     }
     const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
@@ -571,6 +571,13 @@ window.PublishApp = {
     this.renderEditState();
   },
 
+  setPreviewSummary(warning = "") {
+    const summary = document.getElementById("acctCustomizeSummary");
+    if (!summary) return;
+    summary.textContent = warning || "المحتوى، الشكل والمنصات";
+    summary.classList.toggle("warn", Boolean(warning));
+  },
+
   /* نرسم بمحرك الصانع نفسه، من غير إنشاء أو نشر أو تغيير إعداداته المحلية. */
   initReelEditor(wrap) {
     const generation = (wrap._reelGeneration || 0) + 1;
@@ -583,6 +590,7 @@ window.PublishApp = {
       // The draft must remain protected even if preview dependencies fail to load.
       const summary = wrap.querySelector("#acctAppearanceSummary");
       if (summary) { summary.textContent = "المعاينة غير متاحة؛ افتح التفاصيل وراجع إعداداتك."; summary.classList.add("warn"); }
+      this.setPreviewSummary("المعاينة غير متاحة؛ افتح الإعدادات للمراجعة.");
       const note = wrap.querySelector("#acctPreviewNote");
       if (note) note.textContent = "المعاينة غير متاحة؛ حدّث الصفحة وحاول مجددًا.";
       const mark = e => { syncSelection(e); this._autoDirty = true; this._autoEditRevision = (this._autoEditRevision || 0) + 1; this.renderEditState(); };
@@ -595,6 +603,7 @@ window.PublishApp = {
       const summary = get("acctAppearanceSummary");
       summary.textContent = warning ? text : "صورة الخلفية، الترجمة، المقاس والألوان";
       summary.classList.toggle("warn", warning);
+      this.setPreviewSummary(warning ? text : "");
     };
     let revision = 0;
     const current = token => wrap.isConnected && wrap._reelGeneration === generation && token === revision;
@@ -754,13 +763,14 @@ window.PublishApp = {
   },
 
   /* ---------- سجل التشغيل ---------- */
-  renderHistory(runs, available = true) {
+  renderHistory(runs, available = true, statsAvailable = true) {
     const list = document.getElementById("queueList");
     const summary = document.getElementById("acctHistorySummary");
     const rows = Array.isArray(runs) ? runs : [];
     if (summary) {
-      summary.classList.toggle("warn", !available);
-      summary.textContent = !available ? "تعذّر تحميل السجل — افتح التفاصيل" : rows.length ? `${rows.length} تشغيل في العرض · وإحصاءات النشر` : "لا تشغيلات ظاهرة · وإحصاءات النشر";
+      summary.classList.toggle("warn", !available || !statsAvailable);
+      const historyText = !available ? "تعذّر تحميل السجل" : rows.length ? `${rows.length} تشغيل في العرض` : "لا تشغيلات ظاهرة";
+      summary.textContent = `${historyText} · ${statsAvailable ? "إحصاءات النشر" : "تعذّر تحميل الإحصاءات"}`;
     }
     if (!list) return;
     if (!available) { list.innerHTML = '<p class="hint warn">تعذّر تحميل السجل. حاول تحديث الصفحة؛ هذا لا يعني عدم وجود تشغيلات.</p>'; return; }
@@ -873,7 +883,7 @@ window.PublishApp = {
     this.renderSteps(data);
     this.renderKpis(data);
     if (!this._autoDirty && !this._settingsPending) this.renderAutoPanel(data);
-    this.renderHistory(runs, data.runs_available !== false);
+    this.renderHistory(runs, data.runs_available !== false, Boolean(data.stats && typeof data.stats === "object"));
     this.renderPendingReview(data.pending_review);
     this.renderFailedReview(data.failed_review);
     this.renderTools(data);
