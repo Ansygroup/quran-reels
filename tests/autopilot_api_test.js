@@ -439,7 +439,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=55/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=56/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -508,10 +508,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("جلب التلاوة له مهلة وميزانية إرشادية للوسيط",
     /_fetchAudio\(url, ms = 20000, signal\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v55 / sw qr-v78)",
+  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v56 / sw qr-v79)",
     /reel\.js\?v=10/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=15/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v78/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v79/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");

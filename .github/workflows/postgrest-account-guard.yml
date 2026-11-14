@@ -49,6 +49,8 @@ jobs:
             postgrest/postgrest:v12.2.3
       - name: Inspect fixture access over HTTP before revocation
         run: node tests/postgrest_channel_candidate_http_test.js foundation
+      - name: Exercise disconnect handler against disposable PostgREST
+        run: node tests/postgrest_disconnect_api_integration_test.js
       - name: Apply candidate ACLs in disposable container only
         shell: bash
         run: |

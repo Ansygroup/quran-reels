@@ -10,7 +10,7 @@ function setup(){
  w.setTimeout=(fn,ms)=>{assert.equal(ms,20000);const t={fn,active:true};timers.push(t);return t};w.clearTimeout=t=>{t.active=false};
  app.renderConnections=async()=>{refreshes++};
  w.AuthApp={getToken:async()=>'token-a',getUserId:()=> 'a'};
- w.fetch=async(...args)=>{calls.push(args);return {ok:true,json:async()=>({ok:true})}};
+ w.fetch=async(...args)=>{calls.push(args);return {ok:true,json:async()=>({ok:true,deleted:true})}};
  d.querySelector('#acctAccountsList').innerHTML='<button data-unlink="channel-a">فك الربط</button>';app.wireConnections();
  return {dom,w,app,realRender,button:d.querySelector('[data-unlink]'),messages,calls,get refreshes(){return refreshes},fire(){const t=timers.find(x=>x.active);assert(t);t.fn()}};
 }
@@ -41,5 +41,7 @@ function setup(){
  // reports only that the request was made, never provider revocation.
  {const x=setup();x.w.AuthApp.getToken=async()=>null;x.button.click();await tick();await tick();assert.equal(x.calls.length,0);assert.match(x.messages[0].message,/لم يُرسل/);x.dom.window.close();}
  {const x=setup();x.button.click();await tick();await tick();assert.equal(x.calls.length,1);assert.match(x.messages[0].message,/تم طلب فك الربط/);assert.equal(x.refreshes,1);assert.equal(x.button.disabled,false);x.dom.window.close();}
+ // An old server's success response does not prove a row was deleted.
+ {const x=setup();x.w.fetch=async(...args)=>{x.calls.push(args);return {ok:true,json:async()=>({ok:true})}};x.button.click();await tick();await tick();assert.match(x.messages[0].message,/تعذّر تأكيد فك الربط/);assert.equal(x.refreshes,0);x.dom.window.close();}
  console.log('ALL OK: bounded disconnect through auth, identity, network and body; late responses ignored (mocked)');
 })().catch(e=>{console.error(e);process.exitCode=1});

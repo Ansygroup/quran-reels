@@ -1171,7 +1171,7 @@ window.PublishApp = {
             });
             const data = await res.json().catch(() => ({}));
             if (controller.signal.aborted || !(await current()) || controller.signal.aborted) return false;
-            if (!res.ok || data.ok !== true) throw new Error("unconfirmed");
+            if (!res.ok || data.ok !== true || data.deleted !== true) throw new Error("unconfirmed");
             return true;
           })();
           if (await Promise.race([operation, deadline])) {
