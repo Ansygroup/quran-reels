@@ -44,6 +44,16 @@ const gateway=http.createServer(async(req,res)=>{
     require.cache[sess]={id:sess,filename:sess,loaded:true,exports:{getUserId:async req=>req.headers.authorization==='Bearer local-test'?D:null}};
     const api=require('../api/autopilot');
     const {rest}=require('../lib/db');
+    // The probe uses GET only; remap its fixed-shaped requests to this
+    // hardcoded disposable PostgREST, never to a production service.
+    const {probe,RPCS}=require('../scripts/probe_account_schema_readonly');
+    const evidence=await probe({base:'http://fixture.invalid',key:serviceJwt,fetchImpl:(url,options)=>{
+      const path=new URL(url).pathname, search=new URL(url).search;
+      assert(path.startsWith('/rest/v1/'));assert.equal(options.method,'GET');
+      return fetch(UPSTREAM+path.slice('/rest/v1'.length)+search,options);
+    }});
+    assert.equal(evidence.columns,'visible',JSON.stringify(evidence));
+    assert(RPCS.every(n=>evidence.rpcs[n]==='listed'),JSON.stringify(evidence));
     async function call(body,auth=true) {
       const req=Readable.from([JSON.stringify(body)]);
       Object.assign(req,{method:'POST',url:'/api/autopilot',headers:auth?{authorization:'Bearer local-test'}:{}});

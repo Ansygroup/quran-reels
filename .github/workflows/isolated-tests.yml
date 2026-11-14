@@ -41,6 +41,7 @@ jobs:
           node tests/account_oauth_return_test.js
           node tests/account_disconnect_timeout_test.js
           node tests/account_disconnect_api_test.js
+          node tests/account_schema_probe_test.js
           node tests/auth_session_race_test.js
           node tests/static_account_copy_test.js
           node tests/account_oauth_start_safe_test.js
