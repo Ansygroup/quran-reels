@@ -144,7 +144,8 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
 
   /* 5) مسار النشر يقبل connection_id ويتحقق من الملكية */
   const gw = fs.readFileSync(path.join(ROOT, "api", "_publish.js"), "utf8");
-  chk("insert publish_queue يحفظ connection_id", /connection_id\)/.test(gw) && /\$10/.test(gw));
+  // السلوك الفعلي مع إدراج PostgREST والوجهة المثبتة يُختبر في manual_new_publish_guard_test.
+  chk("تمثيل المهمة يتضمن connection_id", /connection_id:\s*connId/.test(gw) && /JSON\.stringify\(expected\)/.test(gw));
   chk("يتحقق من ملكية القناة قبل القبول", /select id, platform from social_connections where id=\$1 and user_id=\$2/.test(gw));
   chk("يرفض قناة من منصة أخرى", /قناة غير مرتبطة بهذه المنصة/.test(gw));
 
