@@ -949,7 +949,7 @@ window.PublishApp = {
           <div class="chan-list">${mine.map(one).join("")}</div>
           <div class="chan-foot">
             ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}" data-connect-intent="add" ${this._connectPending ? "disabled" : ""}>➕ إضافة قناة</button>` : ""}
-            <small class="hint">${savedMode} ${defaultHint} قد تتغير وجهة النشر؛ راجع التفاصيل والمهام الموجودة.</small>
+            <small class="hint">${savedMode} هذا عرض للخادم وليس للمسودة غير المحفوظة. ${defaultHint} عند النشر بلا قناة محددة قد تُختار الافتراضية أو أحدث اتصال إذا غابت؛ قد تتغير الوجهة.</small>
             <details class="chan-detail" ${openDetails.has(p.key) ? "open" : ""}><summary>تفاصيل الوجهة والربط</summary>
               <small class="hint">هذا عرض للخادم وليس لتعديلات المسودة غير المحفوظة. عند النشر بلا قناة محددة قد يختار النظام الافتراضية وقت التنفيذ، أو أحدث اتصال إذا غابت؛ عند تساوي أوقات التحديث أو نقصها لا يمكن الجزم بالاختيار. وقد تتغير الوجهة. القائمة لقطة قد تكون غير مكتملة ولا تحدد وجهات المهام الموجودة.</small>
               <small class="hint">الحساب يُختار لدى المنصة؛ محاولة إعادة الربط لا تضمن تحديث القناة المقصودة، والإضافة قد تحدّث حسابًا موجودًا. راجع القنوات والأتمتة بعد العودة.</small>
