@@ -80,7 +80,7 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
     q: async (sql) => {
       pq.push(sql);
       if (/set status='publishing'/i.test(sql)) return [{ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, status: "publishing" }];
-      if (/from social_connections/i.test(sql)) return [{ ...older, is_default: true }, newer];
+      if (/from social_connections/i.test(sql)) return [{ ...older, user_id: 'user-7', is_default: true }, { ...newer, user_id: 'user-7' }];
       return [];
     },
     q1: async () => null,

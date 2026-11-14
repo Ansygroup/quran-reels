@@ -2,15 +2,15 @@
 'use strict';
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),http=require('node:http');
 const UPSTREAM='http://127.0.0.1:3102',SECRET='LOCAL-ONLY-channel-fixture-secret-0123456789-abcdef';
-const U='11111111-1111-4111-8111-111111111111',A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',Q='ffffffff-ffff-4fff-8fff-ffffffffffff',Q2='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',Q3='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const U='11111111-1111-4111-8111-111111111111',A='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',B='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',Q='ffffffff-ffff-4fff-8fff-ffffffffffff',Q2='eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',Q3='dddddddd-dddd-4ddd-8ddd-dddddddddddd',Q4='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const b64=o=>Buffer.from(JSON.stringify(o)).toString('base64url');
 const p=b64({alg:'HS256',typ:'JWT'})+'.'+b64({role:'service_role',sub:U,exp:Math.floor(Date.now()/1000)+3600});
 const jwt=p+'.'+crypto.createHmac('sha256',SECRET).update(p).digest('base64url');
-const observed=[];let dropFailedReply=false;
+const observed=[];let dropFailedReply=false, connectionReply=[];
 const gateway=http.createServer(async(req,res)=>{
  try{
   const u=new URL(req.url,'http://127.0.0.1');
-  if(u.pathname==='/rest/v1/social_connections'&&req.method==='GET')return res.writeHead(200,{'content-type':'application/json'}).end('[]');
+  if(u.pathname==='/rest/v1/social_connections'&&req.method==='GET')return res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(connectionReply));
   if(u.pathname!=='/rest/v1/publish_queue'||req.method!=='PATCH')return res.writeHead(403).end();
   observed.push(u.searchParams);
   const chunks=[];for await(const c of req)chunks.push(c);
@@ -23,6 +23,9 @@ const gateway=http.createServer(async(req,res)=>{
 });
 (async()=>{
  await new Promise(r=>gateway.listen(0,'127.0.0.1',r));
+ const realFetch=global.fetch, gatewayOrigin='http://127.0.0.1:'+gateway.address().port;
+ let externalRequests=0;
+ global.fetch=(url,opts)=>{const origin=new URL(url).origin;if(origin!==UPSTREAM&&origin!==gatewayOrigin){externalRequests++;throw Error('external network blocked')}return realFetch(url,opts)};
  async function fixture(method,path,body){const r=await fetch(UPSTREAM+path,{method,headers:{authorization:'Bearer '+jwt,'content-type':'application/json',prefer:'return=representation'},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();assert(r.ok,JSON.stringify(d));return d}
  try{
   const [row]=await fixture('POST','/publish_queue',{id:Q,user_id:U,platform:'youtube',connection_id:B,status:'scheduled'});
@@ -41,6 +44,14 @@ const gateway=http.createServer(async(req,res)=>{
   const [draft]=await fixture('POST','/publish_queue',{id:Q3,user_id:U,platform:'youtube',connection_id:B,status:'draft'});
   const draftOutcome=await publishRow(draft);assert.match(draftOutcome.error,/لا يوجد ربط/);
   assert.equal((await fixture('GET','/publish_queue?id=eq.'+Q3))[0].status,'failed');
+  // Even an unexpected foreign row in the scoped connection response must not
+  // reach an external provider; the queue state is persisted through PostgREST.
+  process.env.TOKEN_ENC_KEY='fixture-only';
+  const {seal}=require('../lib/crypt');
+  connectionReply=[{id:B,user_id:'22222222-2222-4222-8222-222222222222',platform:'youtube',access_token:seal('fixture'),expires_at:Date.now()+3600000}];
+  const [foreign]=await fixture('POST','/publish_queue',{id:Q4,user_id:U,platform:'youtube',connection_id:B,status:'scheduled'});
+  const rejected=await publishRow(foreign);assert.equal(rejected.ok,false);assert.match(rejected.error,/تعذّر التحقق من القنوات/);assert.equal(externalRequests,0);
+  assert.equal((await fixture('GET','/publish_queue?id=eq.'+Q4))[0].status,'failed');
   assert(observed.some(s=>s.get('status')==='eq.draft'&&s.get('connection_id')==='eq.'+B));
   assert(observed.some(s=>s.get('platform')==='eq.youtube'&&s.get('connection_id')==='eq.'+A));
   assert(observed.some(s=>s.get('platform')==='eq.youtube'&&s.get('connection_id')==='is.null'));
@@ -50,6 +61,8 @@ const gateway=http.createServer(async(req,res)=>{
   await fixture('DELETE','/publish_queue?id=eq.'+Q).catch(()=>{});
   await fixture('DELETE','/publish_queue?id=eq.'+Q2).catch(()=>{});
   await fixture('DELETE','/publish_queue?id=eq.'+Q3).catch(()=>{});
+  await fixture('DELETE','/publish_queue?id=eq.'+Q4).catch(()=>{});
+  global.fetch=realFetch;
   await new Promise(r=>gateway.close(r));
  }
 })().catch(e=>{console.error(e);if(process.env.GITHUB_ACTIONS==='true')console.error('::error title=Publish claim integration::'+String(e?.stack||e).slice(0,3000).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A'));process.exitCode=1});
