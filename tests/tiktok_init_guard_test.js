@@ -2,14 +2,14 @@
 'use strict';
 const assert=require('node:assert/strict');
 process.env.SUPABASE_URL='https://fixture.invalid';
-let status,mode,calls,privacy,uploads;
+let status,mode,calls,privacy,uploads,savedError;
 const db=require.resolve('../lib/db');
 require.cache[db]={id:db,filename:db,loaded:true,exports:{
  q:async(sql,params)=>{
   if(/set status='publishing'/.test(sql)){status='publishing';return [{id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status,video_path:'video.mp4'}]}
   if(/from social_connections/.test(sql))return [{id:'channel',user_id:'owner',platform:'tiktok',access_token:'fixture-token',expires_at:Date.now()+3600000}];
   if(/set status='published'/.test(sql)){status='published';return [{id:'job',user_id:'owner',status,external_url:params[1]}]}
-  if(/set status='failed'/.test(sql)){status='failed';return [{id:'job',user_id:'owner',status}]}
+  if(/set status='failed'/.test(sql)){status='failed';savedError=params[1];return [{id:'job',user_id:'owner',status}]}
   throw Error('unexpected database query');
  },q1:async()=>{throw Error('unexpected database query')}
 }};
@@ -24,21 +24,41 @@ global.fetch=async(url,opts={})=>{
   if(mode==='malformed')return {ok:true,json:async()=>{throw Error('invalid json')}};
   if(mode==='empty')return {ok:true,json:async()=>({data:{}})};
   if(mode==='null')return {ok:true,json:async()=>null};
-  if(mode==='wrongtype')return {ok:true,json:async()=>({data:{upload_url:12}})};
+  if(mode==='wrongtype')return {ok:true,json:async()=>({data:{upload_url:12,publish_id:'fixture'},error:{code:'ok'}})};
   if(mode==='error-url')return {ok:false,json:async()=>({data:{upload_url:'https://open-upload.tiktokapis.com/video/?upload_id=fixture'}})};
   if(mode==='rejection')return {ok:false,json:async()=>({error:{message:'sensitive-fixture'},data:{}})};
-  return {ok:true,json:async()=>({data:{upload_url:'https://open-upload.tiktokapis.com/video/?upload_id=fixture',publish_id:'fixture'}})};
+  const data={upload_url:'https://open-upload.tiktokapis.com/video/?upload_id=fixture',publish_id:'v_pub_file~v2-1.fixture'};
+  const body={data,error:{code:'ok',message:'',log_id:'fixture-log'}};
+  if(mode==='error-code')body.error={code:'privacy_rejected',message:'sensitive-fixture'};
+  if(mode==='missing-error')delete body.error;
+  if(mode==='null-error')body.error=null;
+  if(mode==='string-error')body.error='ok';
+  if(mode==='missing-code')body.error={message:'sensitive-fixture'};
+  if(mode==='other-code')body.error={code:'OK'};
+  if(mode==='multiple-errors')body.errors=[{message:'sensitive-fixture'}];
+  if(mode==='bad-errors')body.errors={message:'sensitive-fixture'};
+  if(mode==='nested-error')body.data.error={message:'sensitive-fixture'};
+  if(mode==='nested-errors')body.data.errors=[{message:'sensitive-fixture'}];
+  if(mode==='missing-url')delete data.upload_url;
+  if(mode==='empty-url')data.upload_url='';
+  if(mode==='missing-id')delete data.publish_id;
+  if(mode==='numeric-id')data.publish_id=123;
+  if(mode==='empty-id')data.publish_id='';
+  if(mode==='blank-id')data.publish_id='  ';
+  if(mode==='empty-errors'){body.errors=[];data.errors=[];data.error=null;}
+  return {ok:true,json:async()=>body};
  }
  if(u.origin==='https://open-upload.tiktokapis.com'){uploads++;return {ok:mode!=='put-fail',status:mode==='put-fail'?500:200}}
  throw Error('unexpected network request');
 };
 const {publishRow}=require('../lib/publish');
-async function run(testMode){mode=testMode;status='scheduled';calls=0;privacy=[];uploads=0;const out=await publishRow({id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status:'scheduled',video_path:'video.mp4'});return out}
+async function run(testMode){mode=testMode;status='scheduled';savedError=null;calls=0;privacy=[];uploads=0;const out=await publishRow({id:'job',user_id:'owner',platform:'tiktok',connection_id:null,status:'scheduled',video_path:'video.mp4'});return out}
 (async()=>{
- for(const testMode of ['network','malformed','empty','null','wrongtype','error-url','rejection']){
-  const out=await run(testMode);assert.equal(out.ok,false,testMode);assert.equal(status,'failed',testMode);assert.equal(calls,1,testMode);assert.equal(uploads,0,testMode);assert.deepEqual(privacy,['SELF_ONLY_DISABLE']);assert.match(out.error,/راجع المنصة/);assert(!out.error.includes('sensitive-fixture'));
+ for(const testMode of ['network','malformed','empty','null','wrongtype','error-url','rejection','error-code','missing-error','null-error','string-error','missing-code','other-code','multiple-errors','bad-errors','nested-error','nested-errors','missing-url','empty-url','missing-id','numeric-id','empty-id','blank-id']){
+  const out=await run(testMode);assert.equal(out.ok,false,testMode);assert.equal(status,'failed',testMode);assert.equal(calls,1,testMode);assert.equal(uploads,0,testMode);assert.deepEqual(privacy,['SELF_ONLY_DISABLE']);assert.match(out.error,/راجع المنصة/);assert.match(savedError,/راجع المنصة/);assert(!out.error.includes('sensitive-fixture'));assert(!savedError.includes('sensitive-fixture'));
  }
  let out=await run('success');assert.equal(out.ok,true);assert.equal(status,'published');assert.equal(calls,1);assert.equal(uploads,1);assert.deepEqual(privacy,['SELF_ONLY_DISABLE']);
+ out=await run('empty-errors');assert.equal(out.ok,true);assert.equal(calls,1);assert.equal(uploads,1);assert.deepEqual(privacy,['SELF_ONLY_DISABLE']);
  out=await run('put-fail');assert.equal(out.ok,false);assert.equal(status,'failed');assert.equal(calls,1);assert.equal(uploads,1);
  console.log('PASS TikTok initialisation: no public fallback or upload on ambiguous/error reply; one simulated upload on success (mock only)');
 })().catch(e=>{console.error(e);process.exitCode=1});

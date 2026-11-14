@@ -35,7 +35,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.origin === 'https://www.googleapis.com' && opts.method === 'PUT') return json({ id: 'video_1' });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/media/upload') return json({ data: { id: 'media_1' } });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/tweets') return json({ data: { id: 'post_1' } });
-  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=fixture', publish_id: 'fixture' } });
+  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=fixture', publish_id: 'fixture' }, error: { code: 'ok' } });
   if (u.origin === 'https://open-upload.tiktokapis.com') return { ok: true, status: 200 };
   throw Error('unexpected network blocked');
 };
