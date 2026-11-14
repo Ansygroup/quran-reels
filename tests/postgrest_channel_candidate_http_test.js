@@ -18,6 +18,14 @@ async function ready(){for(let i=0;i<40;i++){try{if((await request('service_role
   const rows=ok(await request('authenticated','/social_connections?select=id,access_token&order=id'));assert.equal(rows.length,2);assert.deepEqual(rows.map(x=>x.id),[A,B]);assert(rows.every(x=>x.access_token==='fixture-ciphertext'));
   const other=ok(await request('authenticated','/social_connections?select=id',{sub:V}));assert.deepEqual(other.map(x=>x.id),[C]);
   const changed=ok(await request('authenticated',`/social_connections?id=eq.${C}&select=id`,{method:'PATCH',body:{is_default:false},prefer:'return=representation'}));assert.deepEqual(changed,[]);
+  // The disposable fixture's broad grants + owner RLS allow a direct owner
+  // transition from failed to scheduled, independent of the app retry guard.
+  // This shows a conditional capability, not the state of production ACLs.
+  try {
+   const created=ok(await request('service_role','/publish_queue?select=id,status',{method:'POST',prefer:'return=representation',body:{id:Q,user_id:U,platform:'youtube',status:'failed',connection_id:A}}));assert.equal(created.length,1);
+   const foreign=ok(await request('authenticated',`/publish_queue?id=eq.${Q}&select=id,status`,{sub:V,method:'PATCH',body:{status:'scheduled'},prefer:'return=representation'}));assert.deepEqual(foreign,[]);
+   const owner=ok(await request('authenticated',`/publish_queue?id=eq.${Q}&select=id,status`,{method:'PATCH',body:{status:'scheduled'},prefer:'return=representation'}));assert.deepEqual(owner,[{id:Q,status:'scheduled'}]);
+  } finally { ok(await request('service_role',`/publish_queue?id=eq.${Q}`,{method:'DELETE'})); }
   denied(await request('authenticated','/rpc/account_set_default_candidate',{method:'POST',body:{p_user_id:U,p_connection_id:B,p_expected_default:A}}));
   denied(await request('authenticated','/rpc/account_disconnect_candidate',{method:'POST',body:{p_user_id:U,p_connection_id:A}}));
  }else{

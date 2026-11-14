@@ -63,5 +63,17 @@ function reset() { row = { ...base }; uploads = 0; releases = []; listeners = []
   assert.equal(row.status, 'published'); assert.match(row.external_url, /first$/);
   releases[1](); const newResult = await newWorker;
   assert.equal(newResult.skipped, 'result-unconfirmed'); assert.equal(uploads, 2);
-  console.log('PASS reclaim stops ordinary retries; KNOWN ABA LIMIT reproduced with external reactivation (mock only)');
+
+  // A separate stale scheduled snapshot also becomes claimable again after
+  // an external writer reactivates the row: the claim compares status/target,
+  // not a revision from the initial read. No provider idempotency is assumed.
+  reset(); const staleSnapshot = { ...row };
+  const live = publishRow({ ...row }); await started(1);
+  assert.equal(await reclaimStalePublishing({ minutes: 20 }), 1);
+  row.status = 'scheduled'; // simulated independent writer, not current retry
+  const staleWorker = publishRow(staleSnapshot); await started(2);
+  releases[1](); assert.equal((await staleWorker).ok, true);
+  releases[0](); assert.equal((await live).skipped, 'result-unconfirmed');
+  assert.equal(uploads, 2, 'a previously read scheduled snapshot was claimable again');
+  console.log('PASS ordinary retry blocked; status-only ABA finalization and stale claim reproduced after external reactivation (mock only)');
 })().catch(e => { console.error(e); process.exitCode = 1; });

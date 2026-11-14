@@ -35,6 +35,8 @@ const ready = new Promise((resolve, reject) => {
   await admin.query("update public.publish_queue set status='failed' where id=1 and status='publishing'");
   assert.equal((await admin.query('select publish_attempt_id from public.publish_queue where id=1')).rows[0].publish_attempt_id, null);
   await admin.query("update public.publish_queue set status='scheduled' where id=1");
+  // claim() models an old scheduled snapshot too: without a row revision in
+  // its predicate it can claim this reactivated row and start a second send.
   const current = await claim(b); assert.ok(current); assert.notEqual(current, old);
   assert.equal(await finish(a, old), 0, 'old cooperating finalizer cannot write the new attempt');
   assert.equal(await finish(b, current), 1);
