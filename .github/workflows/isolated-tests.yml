@@ -72,11 +72,28 @@ jobs:
           node tests/account_channel_fixture_pg_test.js
       - name: Decode synthetic Telegram video fixtures
         run: |
-          export FFMPEG_BIN="$(command -v ffmpeg)"
-          export FFPROBE_BIN="$(command -v ffprobe)"
-          test -n "$FFMPEG_BIN" && test -n "$FFPROBE_BIN"
-          node tests/telegram_video_validation_candidate_test.js
-          node tests/telegram_candidate_e2e_test.js
+          set -euo pipefail
+          export FFMPEG_BIN="$(command -v ffmpeg || true)"
+          export FFPROBE_BIN="$(command -v ffprobe || true)"
+          if [[ -z "$FFMPEG_BIN" || -z "$FFPROBE_BIN" ]]; then
+            echo '::error::Synthetic media tests require ffmpeg and ffprobe on the runner.'
+            exit 1
+          fi
+          run_media_test() {
+            local log="$RUNNER_TEMP/qr-media-test.log" status=0 detail
+            node "$1" > "$log" 2>&1 || status=$?
+            cat "$log"
+            if (( status != 0 )); then
+              # These tests use synthetic files and mock network only. Surface a
+              # bounded diagnostic when Actions log downloads are unavailable.
+              detail=$(tail -c 3000 "$log")
+              detail=${detail//'%'/'%25'}; detail=${detail//$'\r'/'%0D'}; detail=${detail//$'\n'/'%0A'}
+              echo "::error::Synthetic media test $1 failed: $detail"
+              return "$status"
+            fi
+          }
+          run_media_test tests/telegram_video_validation_candidate_test.js
+          run_media_test tests/telegram_candidate_e2e_test.js
 
   account-browser:
     runs-on: ubuntu-24.04
