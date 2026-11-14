@@ -35,9 +35,9 @@ function reset() { inserts = []; dispatched = []; lookups = 0; }
   assert.equal(inserts.length, 0); assert.equal(dispatched.length, 0);
   reset(); assert.equal((await call({ platform: 'youtube', video_path: 'second/v.mp4', now: false, publish_at: new Date(Date.now() + 86400000).toISOString() })).statusCode, 200);
   assert.equal(inserts[0].status, 'scheduled'); assert.equal(dispatched.length, 0);
-  // Existing queue_id requests intentionally retain their old behavior: this
-  // narrow guard only applies to NEW manual jobs, not historical rows.
+  // The endpoint delegates queue_id rows to its publisher. This test uses a
+  // stub; the real publisher's separate claimed-row guard is tested elsewhere.
   uid = 'owner'; reset(); assert.equal((await call({ queue_id: 'old-row' })).statusCode, 200);
   assert.equal(dispatched[0].video_path, 'other/legacy.mp4'); assert.equal(inserts.length, 0);
-  console.log('PASS new manual paths use exact owner prefix; legacy queue_id not covered (mock only)');
+  console.log('PASS new manual paths use exact owner prefix; queue_id delegates to mocked publisher');
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -33,7 +33,7 @@ const originalTimeout = global.setTimeout;
 global.setTimeout = fn => { fn(); return 0; }; // Eliminate polling delays in this isolated test.
 async function run(input) {
   replies = input; requests = []; polls = 0;
-  row = { id: 'job', user_id: 'owner', platform: 'instagram', connection_id: null, status: 'scheduled', video_path: 'fixture.mp4' };
+  row = { id: 'job', user_id: 'owner', platform: 'instagram', connection_id: null, status: 'scheduled', video_path: 'owner/fixture.mp4' };
   const out = await publishRow({ ...row });
   return { out, saved: { ...row }, paths: [...requests], polls };
 }
