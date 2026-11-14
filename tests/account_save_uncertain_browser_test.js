@@ -52,6 +52,7 @@ const server = http.createServer((req, res) => {
       };
     });
     await page.locator('#acctCustomize > summary').click();
+    await page.locator('#acctAppearance > summary').click();
     await page.locator('#acctBackgroundFile').setInputFiles({name:'private.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0pQAAAAASUVORK5CYII=','base64')});
     await page.fill('#acctDed','مسودة لم تضِع');
     await page.locator('#autoSave').click();

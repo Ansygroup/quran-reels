@@ -1044,3 +1044,24 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
   #view-account .acct-draft-badge{white-space:normal;text-align:center;line-height:1.3}
 }
 #view-account .switch input:focus-visible+i{outline:2px solid var(--gold);outline-offset:4px}
+
+/* تفاصيل شكل الفيديو اختيارية، بينما عناصر المحتوى والحفظ تبقى قريبة. */
+#view-account #acctFixedRange{margin:16px 0}
+#view-account #acctFixedRange .hint{margin-top:8px}
+#view-account .acct-run-note{margin-top:9px;line-height:1.7}
+#view-account .acct-appearance{margin-top:20px;border:1px solid rgba(202,224,208,.12);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.02)}
+#view-account .acct-appearance>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 17px;list-style:none;cursor:pointer;color:var(--txt)}
+#view-account .acct-appearance>summary::-webkit-details-marker{display:none}
+#view-account .acct-appearance>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-4px}
+#view-account .acct-appearance>summary b,#view-account .acct-appearance>summary small{display:block}
+#view-account .acct-appearance>summary b{font-size:.92rem}
+#view-account .acct-appearance>summary small{color:var(--muted);font-size:.78rem;font-weight:400;margin-top:2px}
+#view-account .acct-appearance[open]>summary{border-bottom:1px solid rgba(255,255,255,.08)}
+#view-account .acct-appearance[open]>summary>span:last-child{transform:rotate(180deg)}
+#view-account .acct-appearance-body{padding:18px}
+#view-account .acct-appearance>summary small.warn{color:#ffcf8b}
+#view-account #acctAuto .acct-grid3 select,#view-account #acctAuto .acct-grid2 select,#view-account #acctFixedRange input{width:100%;min-width:0}
+#view-account #acctPlatforms{display:flex;flex-wrap:wrap;gap:8px}
+#view-account #acctPlatforms .chk{display:inline-flex;align-items:center;gap:8px;margin:0;padding:8px 12px;border:1px solid rgba(202,224,208,.12);border-radius:10px;background:rgba(255,255,255,.025)}
+#view-account #acctPlatforms .chk:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+#view-account #acctPlatforms input{accent-color:#26b98d}

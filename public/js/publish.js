@@ -492,6 +492,9 @@ window.PublishApp = {
     const reciters = Array.isArray(options.reciters) ? options.reciters : (Array.isArray(data.reciters) ? data.reciters : []);
     const suppliedBgs = Array.isArray(options.backgrounds) && options.backgrounds.length ? options.backgrounds : Object.keys(BGS);
     const bgs = [...new Set([...suppliedBgs, "custom"])];
+    // Preserve disclosure state across clean background refreshes.
+    const appearanceOpen = Boolean(wrap.querySelector("#acctAppearance")?.open);
+    const moreOpen = Boolean(wrap.querySelector(".acct-more")?.open);
 
     this._autoDirty = false;
     this._draftRevision = config.settings_revision;
@@ -513,16 +516,32 @@ window.PublishApp = {
           <select id="selBackground">${bgs.map((b) => `<option value="${this.esc(b)}" ${template.background === b ? "selected" : ""}>${this.esc(BGS[b] || b)}</option>`).join("")}</select>
         </div>
       </div>
-      <div class="f-group"><label for="acctBackgroundFile">صورة من الجهاز (JPEG أو PNG، حتى ١٠ ميجابايت)</label><input id="acctBackgroundFile" type="file" accept="image/jpeg,image/png"><p class="hint">تُعرض محليًا أولًا، وعند اختيار «صورة من جهازي» والضغط على حفظ تُصغّر وتُرفع إلى حسابك بشكل خاص لتعمل الأتمتة حتى والموقع مغلق. قد تظهر في الفيديو المنشور. عند حفظ خلفية أخرى تُحذف الصورة المحفوظة؛ قد يكون تشغيل بدأ بالفعل قد استخدمها.</p></div>
-      <div class="acct-reel-editor">
-        <div class="acct-preview"><div class="preview-label">معاينة الشكل <span>● مباشرة</span></div><div class="phone-screen" id="acctPreviewScreen"><canvas id="acctPreviewCanvas" width="405" height="720" aria-label="معاينة شكل الريل"></canvas></div><p class="hint" id="acctPreviewNote">المعاينة صورة تقريبية؛ الاختيارات التلقائية تتحدد وقت التشغيل.</p><div id="acctAudioPreview" hidden><label for="acctAudio">استمع لأول آية بالقارئ المختار</label><audio id="acctAudio" controls preload="none"></audio></div></div>
-        <div class="acct-reel-controls">
-          <div class="acct-grid3" id="acctFixedRange" ${template.content_mode === "fixed" ? "" : "hidden"}>
+          <div id="acctFixedRange" ${template.content_mode === "fixed" ? "" : "hidden"}>
+          <div class="acct-grid3">
             <div class="f-group"><label for="acctSurah">السورة</label><select id="acctSurah" data-value="${this.esc(template.surah || 112)}"></select></div>
             <div class="f-group"><label for="acctFrom">من آية</label><input type="number" id="acctFrom" min="1" value="${this.esc(template.from || 1)}"></div>
             <div class="f-group"><label for="acctTo">لآية</label><input type="number" id="acctTo" min="1" value="${this.esc(template.to || 4)}"></div>
           </div>
           <p class="hint">لو اخترت آيات بنفسك، نفس المقطع هيتكرر في التشغيل التلقائي. للمقاطع الطويلة ممكن يتوقف التشغيل بدل ما يقصّ آياتك.</p>
+      </div>
+      <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
+      ${multi ? `<div class="switch-row">
+        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل قد تختار المهمة بلا قناة محددة الافتراضية وقت النشر، أو أحدث اتصال إذا غابت؛ المهام الموجودة قد تختلف. القنوات الظاهرة: ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
+        <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
+      </div>` : ""}
+      <div class="row gap-lg acct-actions">
+        <button class="btn btn-gold" id="autoSave" data-act="save" ${this._settingsPending || this._settingsUncertain ? "disabled" : ""}>💾 حفظ التعديلات</button>
+        <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
+      </div>
+      <p class="acct-edit-state hint" id="acctEditState" role="status" aria-live="polite">لا توجد تعديلات غير محفوظة في هذه الصفحة.</p>
+      <p class="hint acct-run-note">«تشغيل الآن» ينشئ فيديو ويحاول نشره فورًا بالإعدادات المحفوظة (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>
+      <details class="acct-appearance" id="acctAppearance" ${appearanceOpen ? "open" : ""}>
+        <summary><span><b>المعاينة وتخصيص الشكل</b><small id="acctAppearanceSummary" aria-live="polite">صورة الخلفية، الترجمة، المقاس والألوان</small></span><span aria-hidden="true">⌄</span></summary>
+        <div class="acct-appearance-body">
+      <div class="f-group"><label for="acctBackgroundFile">صورة من الجهاز (JPEG أو PNG، حتى ١٠ ميجابايت)</label><input id="acctBackgroundFile" type="file" accept="image/jpeg,image/png"><p class="hint">تُعرض محليًا أولًا، وعند اختيار «صورة من جهازي» والضغط على حفظ تُصغّر وتُرفع إلى حسابك بشكل خاص لتعمل الأتمتة حتى والموقع مغلق. قد تظهر في الفيديو المنشور. عند حفظ خلفية أخرى تُحذف الصورة المحفوظة؛ قد يكون تشغيل بدأ بالفعل قد استخدمها.</p></div>
+      <div class="acct-reel-editor">
+        <div class="acct-preview"><div class="preview-label">معاينة الشكل <span>● مباشرة</span></div><div class="phone-screen" id="acctPreviewScreen"><canvas id="acctPreviewCanvas" width="405" height="720" aria-label="معاينة شكل الريل"></canvas></div><p class="hint" id="acctPreviewNote">المعاينة صورة تقريبية؛ الاختيارات التلقائية تتحدد وقت التشغيل.</p><div id="acctAudioPreview" hidden><label for="acctAudio">استمع لأول آية بالقارئ المختار</label><audio id="acctAudio" controls preload="none"></audio></div></div>
+        <div class="acct-reel-controls">
           <label class="chk"><input type="checkbox" id="acctDesignEnabled" ${template.design ? "checked" : ""}> استخدم تخصيص الشكل بدل الشكل التلقائي</label>
           <div class="acct-grid2">
             <div class="f-group"><label for="acctStyle">أسلوب النص</label><select id="acctStyle">${opt([["card","بطاقة كلاسيكية"],["minimal","أنيق بسيط"],["banner","بانر سينمائي"],["word","كلمة بكلمة"]],d.style)}</select></div>
@@ -537,24 +556,15 @@ window.PublishApp = {
 
         </div>
       </div>
-      <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
-      ${multi ? `<div class="switch-row">
-        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل قد تختار المهمة بلا قناة محددة الافتراضية وقت النشر، أو أحدث اتصال إذا غابت؛ المهام الموجودة قد تختلف. القنوات الظاهرة: ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
-        <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
-      </div>` : ""}
-      <div class="row gap-lg acct-actions">
-        <button class="btn btn-gold" id="autoSave" data-act="save" ${this._settingsPending || this._settingsUncertain ? "disabled" : ""}>💾 حفظ التعديلات</button>
-        <button class="btn btn-em" id="autoRun" data-act="run">▶️ تشغيل الآن</button>
-      </div>
-      <p class="acct-edit-state hint" id="acctEditState" role="status" aria-live="polite">لا توجد تعديلات غير محفوظة في هذه الصفحة.</p>
-      <details class="acct-more">
+        </div>
+      </details>
+      <details class="acct-more" ${moreOpen ? "open" : ""}>
         <summary>خيارات إضافية</summary>
         <div class="row gap-lg acct-actions">
           <button class="btn btn-ghost" id="autoRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
           <button class="btn btn-ghost" id="autoGenArticle" data-act="article_random">${articleLabel}</button>
         </div>
-      </details>
-      <p class="hint">«تشغيل الآن» يُنتج فيديو وينشره فورًا (بحد أقصى ٣ مرات يوميًا) — الأتمتة اليومية تعمل حتى لو لم تفتح الموقع.</p>`;
+      </details>`;
 
     this.renderPlatformChecks(data);
     this.initReelEditor(wrap);
@@ -563,16 +573,30 @@ window.PublishApp = {
 
   /* نرسم بمحرك الصانع نفسه، من غير إنشاء أو نشر أو تغيير إعداداته المحلية. */
   initReelEditor(wrap) {
+    const generation = (wrap._reelGeneration || 0) + 1;
+    wrap._reelGeneration = generation;
+    const syncSelection = e => {
+      if (e?.target?.id === "selContentMode") wrap.querySelector("#acctFixedRange").hidden = e.target.value !== "fixed";
+      if (e?.target?.id === "selBackground" && e.target.value === "custom") wrap.querySelector("#acctAppearance").open = true;
+    };
     if (typeof Quran === "undefined" || typeof ReelRenderer === "undefined" || typeof BACKGROUNDS === "undefined") {
       // The draft must remain protected even if preview dependencies fail to load.
-      const mark = () => { this._autoDirty = true; this._autoEditRevision = (this._autoEditRevision || 0) + 1; this.renderEditState(); };
+      const summary = wrap.querySelector("#acctAppearanceSummary");
+      if (summary) { summary.textContent = "المعاينة غير متاحة؛ افتح التفاصيل وراجع إعداداتك."; summary.classList.add("warn"); }
+      const note = wrap.querySelector("#acctPreviewNote");
+      if (note) note.textContent = "المعاينة غير متاحة؛ حدّث الصفحة وحاول مجددًا.";
+      const mark = e => { syncSelection(e); this._autoDirty = true; this._autoEditRevision = (this._autoEditRevision || 0) + 1; this.renderEditState(); };
       wrap.oninput = mark; wrap.onchange = mark;
       return;
     }
     const get = id => wrap.querySelector("#" + id);
+    const previewNote = (text, warning = false) => {
+      get("acctPreviewNote").textContent = text;
+      const summary = get("acctAppearanceSummary");
+      summary.textContent = warning ? text : "صورة الخلفية، الترجمة، المقاس والألوان";
+      summary.classList.toggle("warn", warning);
+    };
     let revision = 0;
-    const generation = (wrap._reelGeneration || 0) + 1;
-    wrap._reelGeneration = generation;
     const current = token => wrap.isConnected && wrap._reelGeneration === generation && token === revision;
     const update = async () => {
       const token = ++revision;
@@ -594,7 +618,7 @@ window.PublishApp = {
           const audio = get("acctAudio"); audio.pause(); audio.removeAttribute("src"); audio.load();
           get("acctAudioPreview").hidden = true;
           const cv = get("acctPreviewCanvas"); cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height);
-          get("acctPreviewNote").textContent = "اختار آيات صحيحة من السورة (حد أقصى ٤٠ آية)."; return;
+          previewNote("اختار آيات صحيحة من السورة (حد أقصى ٤٠ آية).", true); return;
         }
         const audioWrap = get("acctAudioPreview"), audio = get("acctAudio");
         const reader = get("acctReciter").value;
@@ -644,10 +668,11 @@ window.PublishApp = {
           showWatermark: enabled ? get("acctWatermark").checked : true, motion: enabled ? get("acctMotion").checked : true,
           dedMode: enabled && get("acctDed").value ? "custom" : "none", dedText: enabled ? get("acctDed").value : "" });
         renderer.draw();
-        get("acctPreviewNote").textContent = fixed && bg !== "rotate" && enabled && get("acctReciter").value ? "معاينة تقريبية لأول آية؛ التلاوة والحركة تظهر في الفيديو." : "دي عيّنة للشكل؛ السورة أو القارئ أو الخلفية أو الأسلوب التلقائي بيتحدد وقت التشغيل.";
-      } catch { if (current(token)) { const cv = get("acctPreviewCanvas"); cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height); get("acctPreviewNote").textContent = "تعذّر تحميل المعاينة أو الصورة أو الترجمة؛ جرّب تاني قبل الحفظ."; } }
+        previewNote(fixed && bg !== "rotate" && enabled && get("acctReciter").value ? "معاينة تقريبية لأول آية؛ التلاوة والحركة تظهر في الفيديو." : "دي عيّنة للشكل؛ السورة أو القارئ أو الخلفية أو الأسلوب التلقائي بيتحدد وقت التشغيل.");
+      } catch { if (current(token)) { const cv = get("acctPreviewCanvas"); cv.getContext("2d")?.clearRect(0, 0, cv.width, cv.height); previewNote("تعذّر تحميل المعاينة أو الصورة أو الترجمة؛ جرّب تاني قبل الحفظ.", true); } }
     };
     const changed = e => {
+      syncSelection(e);
       this._autoDirty = true;
       this._autoEditRevision = (this._autoEditRevision || 0) + 1;
       this.renderEditState();
@@ -1365,6 +1390,11 @@ window.PublishApp = {
     if (this._settingsPending || this._settingsUncertain) return { ok: false, error: "راجع حالة الأتمتة قبل الحفظ" };
     if (!this.validRevision(this._draftRevision)) return { ok: false, error: "تعذّر تأكيد إصدار المسودة؛ حدّث الصفحة" };
     const q2 = (id) => document.getElementById(id);
+    const revealField = (id, appearance = false) => {
+      const customize = q2("acctCustomize"); if (customize) customize.open = true;
+      const detail = q2("acctAppearance"); if (appearance && detail) detail.open = true;
+      q2(id)?.focus();
+    };
     const platforms = [...document.querySelectorAll("#acctPlatforms input[data-platform]:checked:not(:disabled)")].map((i) => i.dataset.platform);
     const reciter = q2("acctReciter") ? q2("acctReciter").value : "";
     const template = {
@@ -1379,12 +1409,13 @@ window.PublishApp = {
       // Keep the image selected when this draft began; a background refresh
       // must not silently substitute another tab's later image.
       template.background_image_id = this._draftBackgroundImageId;
-      if (!template.background_image_id) { if (typeof toast === "function") toast("اختار صورة من جهازك أولًا", "err"); return { ok:false, error:"اختار صورة من جهازك أولًا" }; }
+      if (!template.background_image_id) { revealField("acctBackgroundFile", true); if (typeof toast === "function") toast("اختار صورة من جهازك أولًا", "err"); return { ok:false, error:"اختار صورة من جهازك أولًا" }; }
     }
     if (template.content_mode === "fixed") {
       template.surah = Number(q2("acctSurah")?.value); template.from = Number(q2("acctFrom")?.value); template.to = Number(q2("acctTo")?.value);
       const count = typeof Quran !== "undefined" ? Quran.ayahCount(template.surah) : 0;
       if (!count || !Number.isInteger(template.from) || !Number.isInteger(template.to) || template.from < 1 || template.to < template.from || template.to > count || template.to - template.from >= 40) {
+        revealField(count ? "acctFrom" : "acctSurah");
         if (typeof toast === "function") toast("اختار آيات صحيحة من السورة (حد أقصى ٤٠ آية)", "err");
         return { ok: false, error: "آيات غير صالحة" };
       }
@@ -1410,7 +1441,10 @@ window.PublishApp = {
       if (imageFile) body.custom_image = await this.prepareAccountImage(imageFile);
       sent = true;
       out = await this.api("save", body, owner);
-    } catch (e) { out = { ok: false, uncertain: sent && !e?.beforeSend, beforeSend: Boolean(e?.beforeSend), error: e?.message || "تعذّر الاتصال بالخادم" }; }
+    } catch (e) {
+      if (!sent && imageFile && owner === this._accountOwner) revealField("acctBackgroundFile", true);
+      out = { ok: false, uncertain: sent && !e?.beforeSend, beforeSend: Boolean(e?.beforeSend), error: e?.message || "تعذّر الاتصال بالخادم" };
+    }
     const confirmed = out.ok && this.savedMatches(out.config, body);
     const uncertain = sent && !out.beforeSend && (out.uncertain || (out.ok && !confirmed) || (!out.ok && ![400, 401, 403, 409, 413, 422].includes(out.status)));
     if (uncertain) out = { ...out, ok: false, uncertain: true, error: "تعذّر تأكيد نتيجة الحفظ؛ تحقق من الخادم قبل المحاولة" };

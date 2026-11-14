@@ -55,12 +55,17 @@ const server = http.createServer((req, res) => {
     const failed = await page.evaluate(() => ({ data: Quran.data, loading: Quran._loading, options: document.querySelector('#acctSurah').options.length }));
     assert.equal(failed.data, null); assert.equal(failed.loading, null); assert.equal(failed.options, 0); assert.equal(requests, 1);
     await page.locator('#acctCustomize > summary').click();
-    await page.fill('#acctDed', 'تجربة محلية');
+    assert.equal(await page.locator('#acctAppearance').evaluate(e => e.open), false);
+    assert.match(await page.locator('#acctAppearanceSummary').innerText(), /تعذّر تحميل المعاينة/);
+    // Retry through a visible control while appearance stays folded.
+    await page.selectOption('#selContentMode', 'fixed');
     await page.waitForFunction(() => document.querySelector('#acctSurah')?.options.length === 114 &&
       !document.querySelector('#acctPreviewNote').textContent.includes('تعذّر'), null, { timeout: 15000 });
     const recovered = await page.evaluate(() => ({ n: Quran.surahs.length, text: Quran.ayah(1, 1), calls: window.testApiCalls,
       sameSelection: JSON.stringify({ s: Selection.surah, from: Selection.from, to: Selection.to }) === window.testSelection }));
     assert.equal(recovered.n, 114); assert(recovered.text.length > 0); assert.equal(recovered.calls, 0); assert(recovered.sameSelection);
+    assert.equal(await page.locator('#acctAppearance').evaluate(e => e.open), false);
+    assert.match(await page.locator('#acctAppearanceSummary').innerText(), /صورة الخلفية، الترجمة/);
     assert.equal(requests, 2); assert.deepEqual(pageErrors, []);
     console.log('Account preview PASS: local Quran fetch failure, visible warning, retry and recovery without saving or posting');
   } finally {
