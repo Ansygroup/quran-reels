@@ -70,6 +70,10 @@ jobs:
           node tests/connection_refresh_candidate_pg_test.js
           node tests/account_disconnect_candidate_pg_test.js
           node tests/account_channel_fixture_pg_test.js
+      - name: Install media tools for synthetic fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
       - name: Decode synthetic Telegram video fixtures
         run: |
           set -euo pipefail
