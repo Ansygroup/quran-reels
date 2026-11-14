@@ -4,6 +4,7 @@ const { getUserId } = require("../lib/sess");
 const crypto = require("node:crypto");
 const { q1, rest } = require("../lib/db");
 const { publishRow } = require("../lib/publish");
+const { normalizeVideoPath } = require("../lib/video_path");
 const { json } = require("../lib/oauth");
 
 const PLATFORMS = ["youtube", "facebook", "instagram", "tiktok", "x"];
@@ -24,6 +25,9 @@ module.exports = async (req, res) => {
   }
 
   if (!PLATFORMS.includes(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة" });
+  let videoPath;
+  try { videoPath = normalizeVideoPath(b.video_path); }
+  catch { return json(res, 400, { error: "مسار ملف الفيديو غير صالح — لم تُنشأ المهمة" }); }
   const requestedAt = b.publish_at ? new Date(b.publish_at) : new Date();
   if (isNaN(requestedAt.getTime())) return json(res, 400, { error: "وقت غير صالح" });
   const immediate = Boolean(b.now) || requestedAt.getTime() <= Date.now();
@@ -47,7 +51,7 @@ module.exports = async (req, res) => {
   // a lost reply may still leave a live schedule and must not be replayed blindly.
   const expected = {
     id: crypto.randomUUID(), user_id: uid, platform: b.platform,
-    video_path: b.video_path.replace(/^\/+/, ""), video_name: String(b.video_name || "").slice(0, 120),
+    video_path: videoPath, video_name: String(b.video_name || "").slice(0, 120),
     title: String(b.title || "ريلز قرآن").slice(0, 120), caption: String(b.caption || "").slice(0, 4000),
     hashtags: String(b.hashtags || "").slice(0, 500), status: immediate ? "draft" : "scheduled",
     publish_at: requestedAt.toISOString(), connection_id: connId,

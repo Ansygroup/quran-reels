@@ -42,6 +42,11 @@ function stub(rel,exports){const id=require.resolve(rel);require.cache[id]={id,f
    if(i===3)assert.match(result.body.error,/قد تكون المهمة مجدولة وستُنشر/);
   }
   mode='ok';
+  const beforeBadPaths=posts;
+  for(const video_path of ['fixture/../other.mp4','fixture/%2e%2e/other.mp4','fixture//other.mp4','fixture\\other.mp4']) {
+   const rejected=await call({platform:'youtube',video_path,now:true});
+   assert.equal(rejected.statusCode,400);assert.equal(posts,beforeBadPaths);assert.equal(dispatched.length,1);
+  }
   for(const row of [{id:FB,user_id:U,platform:'facebook'},{id:IG,user_id:U,platform:'instagram'},{id:FOREIGN,user_id:OTHER,platform:'instagram'}])await fixture('POST','/social_connections',row);
   const request={platform:'instagram',video_path:paths[4],publish_at:new Date(Date.now()+86400000).toISOString()};
   const before=posts;

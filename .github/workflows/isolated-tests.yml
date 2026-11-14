@@ -49,6 +49,7 @@ jobs:
           node tests/publish_provider_response_test.js
           node tests/publish_storage_guard_test.js
           node tests/publish_upload_url_guard_test.js
+          node tests/publish_video_path_guard_test.js
           node tests/instagram_processing_guard_test.js
           node tests/x_media_processing_guard_test.js
           node tests/publish_result_evidence_test.js
