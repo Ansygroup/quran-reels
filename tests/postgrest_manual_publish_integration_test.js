@@ -26,7 +26,7 @@ function stub(rel,exports){const id=require.resolve(rel);require.cache[id]={id,f
 (async()=>{
  await new Promise(r=>gateway.listen(0,'127.0.0.1',r));
  async function fixture(method,path,body){const r=await fetch(UPSTREAM+path,{method,headers:{authorization:'Bearer '+jwt,'content-type':'application/json',prefer:'return=representation'},...(body?{body:JSON.stringify(body)}:{})});const data=await r.json();assert(r.ok,JSON.stringify(data));return data}
- const paths=['fixture/manual-ok.mp4','fixture/manual-lost.mp4','fixture/manual-tamper.mp4','fixture/schedule-lost.mp4','fixture/manual-target.mp4'];
+ const paths=['manual-ok.mp4','manual-lost.mp4','manual-tamper.mp4','schedule-lost.mp4','manual-target.mp4'].map(name=>`${U}/${name}`);
  try{
   process.env.SUPABASE_URL='http://127.0.0.1:'+gateway.address().port;process.env.SUPABASE_SERVICE_KEY=jwt;process.env.CRON_SECRET='fixture';
   stub('../lib/sess',{getUserId:async()=>U});stub('../lib/publish',{publishRow:async row=>{dispatched.push(row);return {ok:true,url:'https://example.test'}}});stub('../lib/autopilot',{runDailyAutopilots:async()=>[],reclaimStalePublishing:async()=>0});
@@ -43,7 +43,7 @@ function stub(rel,exports){const id=require.resolve(rel);require.cache[id]={id,f
   }
   mode='ok';
   const beforeBadPaths=posts;
-  for(const video_path of ['fixture/../other.mp4','fixture/%2e%2e/other.mp4','fixture//other.mp4','fixture\\other.mp4']) {
+  for(const video_path of [`${U}/../other.mp4`,`${U}/%2e%2e/other.mp4`,`${U}//other.mp4`,`${U}\\other.mp4`,`${OTHER}/video.mp4`,`${U}extra/video.mp4`]) {
    const rejected=await call({platform:'youtube',video_path,now:true});
    assert.equal(rejected.statusCode,400);assert.equal(posts,beforeBadPaths);assert.equal(dispatched.length,1);
   }

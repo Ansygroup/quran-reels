@@ -4,7 +4,7 @@ const { getUserId } = require("../lib/sess");
 const crypto = require("node:crypto");
 const { q1, rest } = require("../lib/db");
 const { publishRow } = require("../lib/publish");
-const { normalizeVideoPath } = require("../lib/video_path");
+const { normalizeManualVideoPath } = require("../lib/video_path");
 const { json } = require("../lib/oauth");
 
 const PLATFORMS = ["youtube", "facebook", "instagram", "tiktok", "x"];
@@ -26,8 +26,10 @@ module.exports = async (req, res) => {
 
   if (!PLATFORMS.includes(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة" });
   let videoPath;
-  try { videoPath = normalizeVideoPath(b.video_path); }
-  catch { return json(res, 400, { error: "مسار ملف الفيديو غير صالح — لم تُنشأ المهمة" }); }
+  // New manual jobs must use the session user's exact storage-key prefix.
+  // This is not proof of object ownership and does not change old queue rows.
+  try { videoPath = normalizeManualVideoPath(b.video_path, uid); }
+  catch { return json(res, 400, { error: "مسار ملف الفيديو غير صالح أو خارج نطاق الحساب — لم تُنشأ المهمة" }); }
   const requestedAt = b.publish_at ? new Date(b.publish_at) : new Date();
   if (isNaN(requestedAt.getTime())) return json(res, 400, { error: "وقت غير صالح" });
   const immediate = Boolean(b.now) || requestedAt.getTime() <= Date.now();

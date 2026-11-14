@@ -57,6 +57,7 @@ jobs:
           node tests/autopilot_run_transition_test.js
           node tests/queue_draft_cron_guard_test.js
           node tests/manual_new_publish_guard_test.js
+          node tests/manual_video_owner_guard_test.js
           node tests/auth_session_race_test.js
           node tests/static_account_copy_test.js
           node tests/account_oauth_start_safe_test.js
