@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* اختبار عبر مترجم SQL الحقيقي: الأعمدة والاستجابة مثل PostgREST، لا بديل q. */
+/* اختبار تكامل HTTP مُحاكى لـ RPC؛ اختبار قاعدة بيانات فعلي منفصل. */
 const assert = require("assert");
 const Module = require("module");
 const load = Module._load;
@@ -16,13 +16,14 @@ global.fetch = async (url, opts = {}) => {
   const method = opts.method || "GET";
   const body = opts.body ? JSON.parse(opts.body) : null;
   calls.push({ u, method, body });
-  const selected = (u.searchParams.get("select") || "").split(",");
-  // schema.sql: جدول autopilot ليس فيه عمود id.
-  const bad = u.pathname.endsWith("/autopilot") && selected.includes("id");
-  if (!bad && u.pathname.endsWith("/autopilot") && method === "POST") row = body;
-  if (!bad && u.pathname.endsWith("/autopilot") && method === "PATCH") row = { ...row, ...body };
-  const data = u.pathname.endsWith("/autopilot") && row ? [row] : [];
-  return { ok: !bad, status: bad ? 400 : 200, headers: { get: () => "application/json" }, json: async () => data, text: async () => "unknown column" };
+  let data = [];
+  if (u.pathname.endsWith('/rpc/link_autopilot_platform_guarded')) {
+    if (!row) { row={user_id:body.p_user_id,enabled:true,at_utc:'04:15:00',platforms:[body.p_platform],template:body.p_template}; data='created'; }
+    else if (!row.platforms.includes(body.p_platform)) { row.platforms.push(body.p_platform); data='extended'; }
+    else data='unchanged';
+  }
+  return { ok:true, status:200, headers:{get:()=> 'application/json'}, json:async()=>data };
+
 };
 (async () => {
   const { enableDefaultAutomation } = require("../lib/autopilot");
@@ -34,6 +35,6 @@ global.fetch = async (url, opts = {}) => {
   assert.strictEqual(await enableDefaultAutomation("u1", "tiktok"), "extended");
   assert.strictEqual(row.enabled, false);
   assert.deepStrictEqual(row.platforms, ["youtube", "tiktok"]);
-  assert(calls.some((c) => c.u.searchParams.get("select") === "user_id, enabled, platforms"));
+  assert(calls.every((c) => c.u.pathname.endsWith("/rpc/link_autopilot_platform_guarded") && c.method === "POST"));
   console.log("ALL OK: مترجم قاعدة البيانات ينشئ الأتمتة ويحترم الإيقاف عند إضافة منصة");
 })().catch((e) => { console.error(e); process.exitCode = 1; });

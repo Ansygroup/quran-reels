@@ -8,13 +8,12 @@ const dbPath=require.resolve('../lib/db'), sessPath=require.resolve('../lib/sess
 require.cache[sessPath]={id:sessPath,filename:sessPath,loaded:true,exports:{getUserId:async()=>currentUser}};
 require.cache[dbPath]={id:dbPath,filename:dbPath,loaded:true,exports:{q:async()=>[],q1:async(sql,args)=>rows[args[0]]||null,rest:async(path,opts={})=>{
  if(path.includes('social_connections'))return [{platform:'youtube'}];
- if(path.includes('/rpc/save_custom_reel')){writes++;const a=JSON.parse(opts.body), u=a.p_config.user_id;if(a.p_jpeg_base64) images[u]={id:a.p_image_id,data:a.p_jpeg_base64};else if(images[u]?.id!==a.p_image_id)throw Error('background not found');rows[u]=a.p_config;return [a.p_config]}
- if(path.includes('/autopilot?on_conflict')){writes++;const a=JSON.parse(opts.body);rows[a.user_id]=a;delete images[a.user_id];return [a]}
+ if(path.includes('/rpc/save_autopilot_guarded')){const a=JSON.parse(opts.body),u=a.p_config.user_id;if((rows[u]?.settings_revision||null)!==a.p_expected_revision)return [];writes++;if(a.p_image_id){if(a.p_jpeg_base64) images[u]={id:a.p_image_id,data:a.p_jpeg_base64};else if(images[u]?.id!==a.p_image_id)throw Error('background not found')}else delete images[u];rows[u]={...a.p_config,settings_revision:require('node:crypto').randomUUID()};return [rows[u]]}
  if(path.includes('private_autopilot_backgrounds')){const url=new URL('https://x'+path);const u=url.searchParams.get('user_id').slice(3),id=url.searchParams.get('image_id').slice(3);return images[u]?.id===id?[{jpeg_base64:images[u].data}]:[]}
  throw Error('unexpected '+path)
 }}};
 const api=require('../api/autopilot');
-async function req(method,body,url='/api/autopilot'){const r=Readable.from(body?[JSON.stringify(body)]:[]);Object.assign(r,{method,url,headers:{}});const h={};const res={setHeader(k,v){h[k]=v},end(s){this.body=JSON.parse(s)}};await api(r,res);return {...res,h}}
+async function req(method,body,url='/api/autopilot'){if(body?.action==='save' && !('expected_revision' in body))body={...body,expected_revision:rows[currentUser]?.settings_revision||null};const r=Readable.from(body?[JSON.stringify(body)]:[]);Object.assign(r,{method,url,headers:{}});const h={};const res={setHeader(k,v){h[k]=v},end(s){this.body=JSON.parse(s)}};await api(r,res);return {...res,h}}
 const base={action:'save',enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'custom'}};
 (async()=>{
  currentUser=null;let r=await req('POST',{...base,custom_image:image});assert.equal(r.statusCode,401);assert.equal(writes,0);

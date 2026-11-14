@@ -1,0 +1,159 @@
+name: Isolated PostgREST account guard
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-channel-http:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: fixture-only
+          POSTGRES_DB: postgres
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Create disposable channel schema and candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          for file in tests/postgrest_channel_fixture.sql sql/operations/candidate_account_default.sql sql/operations/candidate_account_queue_target.sql sql/operations/candidate_account_disconnect.sql; do
+            docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file"
+          done
+      - name: Start isolated PostgREST
+        shell: bash
+        run: |
+          docker run -d --rm --network host --name qr-channel-postgrest \
+            -e PGRST_DB_URI='postgres://authenticator:fixture-only@127.0.0.1:5432/postgres' \
+            -e PGRST_DB_SCHEMAS='public' -e PGRST_DB_ANON_ROLE='anon' \
+            -e PGRST_SERVER_HOST='127.0.0.1' -e PGRST_SERVER_PORT='3102' \
+            -e PGRST_JWT_SECRET='LOCAL-ONLY-channel-fixture-secret-0123456789-abcdef' \
+            postgrest/postgrest:v12.2.3
+      - name: Inspect fixture access over HTTP before revocation
+        run: node tests/postgrest_channel_candidate_http_test.js foundation
+      - name: Exercise disconnect handler against disposable PostgREST
+        run: node tests/postgrest_disconnect_api_integration_test.js
+      - name: Exercise publish claim target guard against disposable PostgREST
+        run: node tests/postgrest_publish_claim_integration_test.js
+      - name: Apply candidate ACLs in disposable container only
+        shell: bash
+        run: |
+          pg='${{ job.services.postgres.id }}'
+          docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < sql/operations/candidate_account_table_acl.sql
+      - name: Exercise candidate RPC, triggers and ACLs over HTTP
+        run: node tests/postgrest_channel_candidate_http_test.js guarded
+      - name: Install experimental queue revision in disposable container only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < sql/operations/candidate_publish_queue_revision.sql
+          docker exec "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "notify pgrst, 'reload schema'"
+      - name: Exercise candidate revision through disposable PostgREST
+        run: node tests/postgrest_publish_queue_revision_candidate_test.js
+      - name: Local PostgREST log on failure
+        if: failure()
+        run: docker logs qr-channel-postgrest || true
+      - name: Stop local PostgREST
+        if: always()
+        run: docker stop qr-channel-postgrest || true
+
+  isolated-http:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-fixture-only
+          POSTGRES_DB: postgres
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Create isolated fixture and additive database functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          for file in \
+            tests/postgrest_fixture.sql \
+            sql/migrations/20261107_private_backgrounds.sql \
+            sql/migrations/20261113_guarded_autopilot_settings.sql \
+            sql/migrations/20261114_guarded_autopilot_actions.sql; do
+            docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file"
+          done
+      - name: Start local PostgREST
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --rm --network host --name qr-local-postgrest \
+            -e PGRST_DB_URI='postgres://authenticator:local-fixture-only@127.0.0.1:5432/postgres' \
+            -e PGRST_DB_SCHEMAS='public' \
+            -e PGRST_DB_ANON_ROLE='anon' \
+            -e PGRST_SERVER_HOST='127.0.0.1' \
+            -e PGRST_SERVER_PORT='3101' \
+            -e PGRST_JWT_SECRET='LOCAL-ONLY-postgrest-fixture-secret-0123456789-abcdef' \
+            postgrest/postgrest:v12.2.3
+      - name: Exercise foundation over HTTP
+        run: node tests/postgrest_guard_http_test.js foundation
+      - name: Apply candidate ACLs in disposable container only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          for file in \
+            sql/operations/candidate_autopilot_client_write_revoke.sql \
+            sql/operations/candidate_autopilot_service_guard.sql; do
+            docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file"
+          done
+      - name: Exercise guarded HTTP and concurrency
+        run: node tests/postgrest_guard_http_test.js guarded
+      - name: Exercise actual account API with local PostgREST
+        run: node tests/postgrest_account_api_integration_test.js
+      - name: Exercise run transition with disposable PostgREST
+        run: node tests/postgrest_run_transition_integration_test.js
+      - name: Exercise draft batch with disposable PostgREST
+        run: node tests/postgrest_draft_queue_integration_test.js
+      - name: Exercise manual publish with disposable PostgREST
+        run: node tests/postgrest_manual_publish_integration_test.js
+      - name: Extend disposable connection fixture for OAuth callback
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < tests/postgrest_connection_callback_fixture.sql
+      - name: Exercise YouTube and X callbacks with disposable PostgREST
+        run: node tests/postgrest_connection_callback_integration_test.js
+      - name: Local PostgREST log on failure
+        if: failure()
+        run: docker logs qr-local-postgrest || true
+      - name: Stop local PostgREST
+        if: always()
+        run: docker stop qr-local-postgrest || true

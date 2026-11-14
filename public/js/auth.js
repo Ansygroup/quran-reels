@@ -6,8 +6,12 @@ const QRAuth = (() => {
   const LS = "qr_session";
   const listeners = [];
   let cfg = null, loading = null;
-  let s = null;
-  try { s = JSON.parse(localStorage.getItem(LS) || "null"); } catch {}
+  let s = null, sessionRevision = 0, refreshInFlight = null;
+  let storedValue = null, storageKnown = false;
+  try {
+    storedValue = localStorage.getItem(LS); storageKnown = true;
+    s = JSON.parse(storedValue || "null");
+  } catch {}
 
   async function conf() {
     if (cfg) return cfg;
@@ -23,37 +27,81 @@ const QRAuth = (() => {
     return { apikey: c.anon, "Content-Type": "application/json", ...(extra || {}) };
   };
   function save(v) {
-    s = v;
-    try { v ? localStorage.setItem(LS, JSON.stringify(v)) : localStorage.removeItem(LS); } catch {}
+    s = v; sessionRevision++;
+    let persisted = true;
+    try {
+      const value = v ? JSON.stringify(v) : null;
+      v ? localStorage.setItem(LS, value) : localStorage.removeItem(LS);
+      storedValue = value; storageKnown = true;
+    } catch { persisted = false; }
     emit();
+    return persisted;
   }
-  function emit() { listeners.forEach(cb => { try { cb(user()); } catch {} }); }
+  function emit() { listeners.forEach(cb => { try { cb(s?.user || null); } catch {} }); }
+  function adoptStored(value) {
+    storedValue = value; storageKnown = true;
+    try { s = JSON.parse(value || "null"); } catch { s = null; }
+    sessionRevision++; emit();
+  }
+  // Storage events can be queued behind async completions. Observe an already
+  // committed change before returning a token or applying an old response.
+  // This read and a later write are NOT an atomic cross-tab compare-and-swap.
+  function storageUnchanged() {
+    try {
+      const value = localStorage.getItem(LS);
+      if (!storageKnown) { storedValue = value; storageKnown = true; return true; }
+      if (value !== storedValue) { adoptStored(value); return false; }
+    } catch { /* unavailable storage: retain the in-memory revision guard */ }
+    return true;
+  }
 
   async function refresh() {
-    if (!s?.refresh_token) return false;
-    try {
-      const r = await fetch(await base("/auth/v1/token?grant_type=refresh_token"), {
-        method: "POST", headers: await authHeaders(),
-        body: JSON.stringify({ refresh_token: s.refresh_token }),
-      });
-      if (!r.ok) { save(null); return false; }
-      const j = await r.json();
-      save({
-        access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token,
-        expires_at: Date.now() + (j.expires_in || 3600) * 1000 - 45000,
-        user: { id: j.user?.id || s.user?.id, email: j.user?.email || s.user?.email, name: j.user?.user_metadata?.full_name || "" },
-      });
-      return true;
-    } catch { return false; }
+    const snapshot = s, revision = sessionRevision;
+    if (!snapshot?.refresh_token) return null;
+    if (refreshInFlight?.revision === revision) return refreshInFlight.task;
+    const current = () => revision === sessionRevision && s === snapshot && storageUnchanged();
+    const task = (async () => {
+      try {
+        const c = await conf();
+        if (!current()) return null;
+        const r = await fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
+          method: "POST", headers: { apikey: c.anon, "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: snapshot.refresh_token }),
+        });
+        if (!current()) return null;
+        if (!r.ok) {
+          // A temporary outage or rate limit is not proof that the session was revoked.
+          if ([400, 401, 403].includes(r.status)) save(null);
+          return null;
+        }
+        const j = await r.json();
+        if (!current() || typeof j.access_token !== "string" || !j.access_token || (snapshot.user?.id && j.user?.id && snapshot.user.id !== j.user.id)) return null;
+        const next = {
+          access_token: j.access_token, refresh_token: j.refresh_token || snapshot.refresh_token,
+          expires_at: Date.now() + (j.expires_in || 3600) * 1000 - 45000,
+          user: { id: j.user?.id || snapshot.user?.id, email: j.user?.email || snapshot.user?.email, name: j.user?.user_metadata?.full_name || "" },
+        };
+        save(next);
+        return next;
+      } catch { return null; }
+    })();
+    refreshInFlight = { revision, task };
+    try { return await task; }
+    finally { if (refreshInFlight?.task === task) refreshInFlight = null; }
   }
   async function ensure() {
-    if (!s) return null;
-    if (s.expires_at && s.expires_at < Date.now()) await refresh();
-    return s;
+    if (!storageUnchanged()) return null;
+    const snapshot = s;
+    if (!snapshot) return null;
+    if (snapshot.expires_at && snapshot.expires_at < Date.now()) {
+      const next = await refresh();
+      return next && s === next ? next : null;
+    }
+    return snapshot;
   }
 
-  function user() { return s?.user || null; }
-  async function token() { const x = await ensure(); return x?.access_token || null; }
+  function user() { storageUnchanged(); return s?.user || null; }
+  async function token() { const x = await ensure(); return x && s === x && storageUnchanged() ? x.access_token || null : null; }
 
   async function magicLink(email, redirect) {
     const r = await fetch(await base("/auth/v1/otp"), {
@@ -86,10 +134,31 @@ const QRAuth = (() => {
   }
 
   async function signOut() {
-    try {
-      if (s?.access_token) await fetch(await base("/auth/v1/logout"), { method: "POST", headers: await authHeaders({ Authorization: "Bearer " + s.access_token }) });
-    } catch {}
-    save(null);
+    if (!storageUnchanged()) return { local_cleared: false, remote: "not_attempted", session_changed: true, current_user: s?.user || null };
+    const snapshot = s, logoutRevision = sessionRevision + 1;
+    // Clear locally first; a stalled or late network response cannot restore it
+    // or erase a different account signed in while the request was pending.
+    const local_cleared = save(null);
+    if (!snapshot?.access_token) return { local_cleared, remote: "not_attempted" };
+    const controller = new AbortController();
+    let timer;
+    const deadline = new Promise(resolve => { timer = setTimeout(() => { controller.abort(); resolve("unknown"); }, 12000); });
+    const request = (async () => {
+      try {
+        const c = await conf();
+        if (controller.signal.aborted || !c.url || !c.anon || sessionRevision !== logoutRevision || s !== null || !storageUnchanged()) return "unknown";
+        // Scope local avoids intentionally signing out other devices. A request
+        // already sent may still revoke a newly restored copy of the same session.
+        const r = await fetch(c.url + "/auth/v1/logout?scope=local", {
+          method: "POST", signal: controller.signal,
+          headers: { apikey: c.anon, "Content-Type": "application/json", Authorization: "Bearer " + snapshot.access_token },
+        });
+        return r.ok ? "confirmed" : "unknown";
+      } catch { return "unknown"; }
+    })();
+    const remote = await Promise.race([request, deadline]);
+    clearTimeout(timer);
+    return { local_cleared, remote };
   }
 
   /* تحليل رموز الجلسة من أي شكل رابط يعيده المزوّد:
@@ -129,18 +198,33 @@ const QRAuth = (() => {
   }
 
   async function hydrateFromToken() {
-    if (!s?.access_token) return;
+    const snapshot = s, revision = sessionRevision;
+    if (!snapshot?.access_token) return;
+    const current = () => revision === sessionRevision && s === snapshot && storageUnchanged();
     try {
-      const r = await fetch(await base("/auth/v1/user"), { headers: await authHeaders({ Authorization: "Bearer " + s.access_token }) });
+      const c = await conf();
+      if (!current()) return;
+      const r = await fetch(c.url + "/auth/v1/user", { headers: { apikey: c.anon, "Content-Type": "application/json", Authorization: "Bearer " + snapshot.access_token } });
+      if (!current()) return;
       if (r.ok) {
         const u = await r.json();
-        save({ ...s, user: { id: u.id, email: u.email, name: u.user_metadata?.full_name || u.email?.split("@")[0] || "" } });
-      } else if (r.status === 401 || r.status === 403) { if (await refresh()) hydrateFromToken(); }
+        if (!current() || !u?.id || (snapshot.user?.id && snapshot.user.id !== u.id)) return;
+        save({ ...snapshot, user: { id: u.id, email: u.email, name: u.user_metadata?.full_name || u.email?.split("@")[0] || "" } });
+      } else if (r.status === 401 || r.status === 403) {
+        const next = await refresh();
+        if (next && s === next) hydrateFromToken();
+      }
     } catch {}
   }
 
   window.addEventListener("storage", e => {
-    if (e.key === LS) { try { s = JSON.parse(e.newValue || "null"); } catch { s = null; } emit(); }
+    if (e.key !== LS && e.key !== null) return;
+    // The event may be queued behind another tab's later write: prefer the
+    // current stored value over an older event payload when storage is readable.
+    let value;
+    try { value = localStorage.getItem(LS); } catch { value = e.key === LS ? e.newValue : null; }
+    if (storageKnown && value === storedValue) return;
+    adoptStored(value);
   });
 
   return {
@@ -149,7 +233,7 @@ const QRAuth = (() => {
     boot() {
       const had = consumeHash();
       if (had) hydrateFromToken();
-      else if (s) { ensure().then(() => hydrateFromToken()); }
+      else if (s) { ensure().then(current => { if (current && s === current) hydrateFromToken(); }); }
       emit();
     },
   };

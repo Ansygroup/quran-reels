@@ -79,21 +79,21 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   setDb({
     q: async (sql) => {
       pq.push(sql);
-      if (/set status='publishing'/i.test(sql)) return [{ id: "q1", user_id: "user-7", platform: "youtube", status: "publishing" }];
-      if (/from social_connections/i.test(sql)) return [{ ...older, is_default: true }, newer];
+      if (/set status='publishing'/i.test(sql)) return [{ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "publishing" }];
+      if (/from social_connections/i.test(sql)) return [{ ...older, user_id: 'user-7', is_default: true }, { ...newer, user_id: 'user-7' }];
       return [];
     },
     q1: async () => null,
   });
   const realFetch = global.fetch;
   global.fetch = async () => ({ ok: false, status: 500, headers: { get: () => "0" }, json: async () => ({}), text: async () => "" });
-  try { await pub.publishRow({ id: "q1", user_id: "user-7", platform: "youtube", title: "t", status: "scheduled" }); } catch (e) { rowErr = e; }
+  try { await pub.publishRow({ id: "q1", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", title: "t", status: "scheduled" }); } catch (e) { rowErr = e; }
   global.fetch = realFetch;
   chk("publishRow يقرأ كل قنوات المنصة (لا limit 1 في الاستعلام)",
     pq.some((sql) => /from social_connections/i.test(sql) && !/limit 1/i.test(sql)), pq.filter((sql) => /social_connections/i.test(sql)).join(" | ").slice(0, 160));
 
-  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube" }] : []), q1: async () => null });
-  const noConn = await pub.publishRow({ id: "q2", user_id: "user-7", platform: "youtube", status: "scheduled" });
+  setDb({ q: async (sql) => (/set status='publishing'/i.test(sql) ? [{ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "publishing" }] : /set status='failed'/i.test(sql) ? [{ id: "q2", user_id: "user-7", status: "failed" }] : []), q1: async () => null });
+  const noConn = await pub.publishRow({ id: "q2", user_id: "user-7", platform: "youtube", connection_id: null, video_path: "user-7/video.mp4", status: "scheduled" });
   chk("بلا أي قناة مرتبطة ⇒ رسالة واضحة", noConn.ok === false && /لا يوجد ربط/.test(String(noConn.error)), String(noConn.error));
 
   /* 3) تعيين القناة الافتراضية عبر /api/gw?op=default */
@@ -136,22 +136,28 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("القائمة تعرض القناتين", Array.isArray(list.connections) && list.connections.length === 2, String(list.connections && list.connections.length));
   chk("القائمة تحدد الافتراضية", list.connections?.find((c) => c.id === "y1")?.is_default === true && list.connections?.find((c) => c.id === "y2")?.is_default === false);
   chk("القائمة لا تُسرّب التوكنات", !/access_token|refresh_token|sealed/.test(res5.body));
+  setDb({ q: async () => [conn("missing"), conn("null", { is_default: null }), conn("t", { is_default: "t" }), conn("f", { is_default: "f" })] });
+  const resMissing = mkRes(); await LIST(mkGet(), resMissing);
+  const listed = JSON.parse(resMissing.body).connections;
+  chk("القائمة تحفظ المجهول ولا تحوله إلى لا", listed[0].is_default === null && listed[1].is_default === null);
+  chk("القائمة تفهم تمثيل PostgreSQL للمنطقي", listed[2].is_default === true && listed[3].is_default === false);
 
   /* 5) مسار النشر يقبل connection_id ويتحقق من الملكية */
   const gw = fs.readFileSync(path.join(ROOT, "api", "_publish.js"), "utf8");
-  chk("insert publish_queue يحفظ connection_id", /connection_id\)/.test(gw) && /\$10/.test(gw));
+  // السلوك الفعلي مع إدراج PostgREST والوجهة المثبتة يُختبر في manual_new_publish_guard_test.
+  chk("تمثيل المهمة يتضمن connection_id", /connection_id:\s*connId/.test(gw) && /JSON\.stringify\(expected\)/.test(gw));
   chk("يتحقق من ملكية القناة قبل القبول", /select id, platform from social_connections where id=\$1 and user_id=\$2/.test(gw));
   chk("يرفض قناة من منصة أخرى", /قناة غير مرتبطة بهذه المنصة/.test(gw));
 
   /* 6) الواجهة: شارة افتراضية + إضافة قناة + ربط المعالج */
   const ui = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("بطاقة القنوات تعرض شارة ⭐ افتراضية", /⭐ افتراضية/.test(ui));
-  chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
+  chk("تغيير الافتراضية معطّل لحين المسار الذري الآمن", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"\s+disabled/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
-  chk("تلميح أن النشر على القناة الافتراضية", /اختيارك الحالي: النشر على القناة الافتراضية/.test(ui) && /اختيارك الحالي: النشر على كل القنوات المرتبطة/.test(ui));
-  chk("الكاش مكسور (v=37 / qr-v58) في الماركب والخدمة",
-    /publish\.js\?v=37/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v58/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("تلميح الاختيار المتأخر والبديل وكل القنوات", /أحدث اتصال إذا غابت/.test(ui) && /التخطيط لكل القنوات المرتبطة/.test(ui) && /غير المحفوظة/.test(ui));
+  chk("الكاش مكسور (v=64 / qr-v87) في الماركب والخدمة",
+    /publish\.js\?v=64/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v87/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");

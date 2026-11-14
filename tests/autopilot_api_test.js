@@ -80,7 +80,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   setDb({ rest: async () => { throw new Error("boom"); } });
   let threw = false;
   try { out = await T.loadRuns("u1"); } catch { threw = true; }
-  chk("فشل كل القراءات يعطي قائمة فارغة بلا استثناء", !threw && Array.isArray(out.rows) && out.rows.length === 0);
+  chk("فشل كل القراءات يعطي قائمة فارغة بعلامة تعذّر القراءة", !threw && Array.isArray(out.rows) && out.rows.length === 0 && out.unavailable === true);
+  setDb({q1:async()=>null, rest:async p=>{ if (/social_connections/.test(p)) return []; throw new Error('unavailable'); }});
+  const unavailableData = await T.accountData('u1');
+  chk("فشل السجل والإحصاءات لا يظهر كبيانات فارغة أو صفرية", unavailableData.runs_available === false && unavailableData.stats === null);
 
   /* 4) accountData: العقد الكامل */
   setDb({
@@ -96,9 +99,12 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("accountData يعيد كل مفاتيح العقد", keys.every((k) => k in data), Object.keys(data).join(","));
   chk("config افتراضي عند عدم وجود صف", Boolean(data.config) && data.config.enabled === false, JSON.stringify(data.config));
   chk("connected/platforms من social_connections", data.connected === true && data.platforms.includes("youtube"), JSON.stringify(data.platforms));
-  chk("available = 8 منصات (5 قابلة للنشر)",
-    Array.isArray(data.available) && data.available.length === 8 && data.available.filter((p) => p.publish).length === 5,
+  chk("available = 8 منصات (2 قابلة للنشر)",
+    Array.isArray(data.available) && data.available.length === 8 && data.available.filter((p) => p.publish).length === 2,
     JSON.stringify(data.available.map((p) => p.key + ":" + p.publish)));
+  chk("Meta وتيك توك متوقفة للعرض فقط", ["facebook", "instagram", "tiktok"].every(key => {
+    const p = data.available.find(x => x.key === key); return p && p.publish === false && p.connect === null && p.ready === false;
+  }));
   chk("channel يحتوي اسم القناة", /يوتيوب/.test(data.channel) && /قناة قرآن/.test(data.channel), data.channel);
 
   /* 5) المقال العشوائي: احتياطي من المستودع عند غياب الجدول */
@@ -120,7 +126,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const missing = libPlatforms.PUBLISHABLE.filter((p) => !dispatchable.includes(p));
   const extra = dispatchable.filter((p) => !libPlatforms.PUBLISHABLE.includes(p));
   chk("كل منصة publish:true لها حالة نشر في lib/publish", missing.length === 0, missing.join(","));
-  chk("لا منصة تُنشر بلا إعلانها في lib/platforms", extra.length === 0, extra.join(","));
+  chk("مسارات Meta القديمة محجوبة بسياسة النشر رغم بقائها في المصدر", extra.every(p => ["facebook", "instagram"].includes(p)) && /if \(!canPublish\(conn.platform\)\)/.test(publishSrc) && /if \(!canPublish\(p\)\)/.test(publishSrc) && !libPlatforms.canPublish("facebook") && !libPlatforms.canPublish("instagram"), extra.join(","));
 
   /* 7) مطابقة أسماء المنصات في العميل مع المصدر الواحد */
   const clientSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
@@ -436,7 +442,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=37/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=64/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -505,10 +511,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("جلب التلاوة له مهلة وميزانية إرشادية للوسيط",
     /_fetchAudio\(url, ms = 20000, signal\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v37 / sw qr-v58)",
+  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v64 / sw qr-v87)",
     /reel\.js\?v=10/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=15/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v58/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v87/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
@@ -609,9 +615,9 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     Array.isArray(acctRe3.reauth) && acctRe3.reauth.length === 0, JSON.stringify(acctRe3.reauth));
 
   const pubSrc4 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
-  chk("اللوحة تشرح المحاولة التلقائية بعد إعادة الربط",
-    /acctReauth/.test(pubSrc4) && /هيحاول ينشر الفيديو الجاهز بعد الربط/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
-  chk("اللوحة فيها زر «انشر الفيديو الجاهز» بإجراء retry_publish",
+  chk("اللوحة توضح ضرورة المراجعة بعد إعادة الربط",
+    /acctReauth/.test(pubSrc4) && /لا تُعاد المحاولات الفاشلة تلقائيًا/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
+  chk("اللوحة فيها زر فحص الفيديو الجاهز بإجراء retry_publish",
     /btnRetryPublish/.test(pubSrc4) && /retry_publish/.test(pubSrc4) && /retry_publish/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);

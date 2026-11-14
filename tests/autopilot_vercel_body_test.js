@@ -4,13 +4,13 @@ const assert = require('node:assert/strict');
 const { Readable, PassThrough } = require('node:stream');
 const dbPath = require.resolve('../lib/db'), sessPath = require.resolve('../lib/sess');
 const uid = '31767a76-47ae-4487-9026-852ee258c808';
+const revision='11111111-1111-4111-8111-111111111111';
 let saves = [], updates = [];
 require.cache[sessPath] = { id:sessPath,filename:sessPath,loaded:true,exports:{getUserId:async()=>uid} };
 require.cache[dbPath] = { id:dbPath,filename:dbPath,loaded:true,exports:{q:async()=>[],q1:async()=>({user_id:uid,enabled:true,platforms:['youtube'],updated_at:'2026-01-01T00:00:00Z'}),rest:async(path,opts={})=>{
   if(path.includes('social_connections'))return [{platform:'youtube'}];
-  if(path.includes('/autopilot?on_conflict')) {const b=JSON.parse(opts.body);saves.push(b);return [b];}
-  if(path.includes('/rpc/save_custom_reel')) {const b=JSON.parse(opts.body);saves.push(b.p_config);return [b.p_config];}
-  if(path.includes('/autopilot?user_id=')&&opts.method==='PATCH'){updates.push(JSON.parse(opts.body));return [{enabled:updates.at(-1).enabled}];}
+  if(path.includes('/rpc/save_autopilot_guarded')) {const b=JSON.parse(opts.body);saves.push(b.p_config);return [{...b.p_config,settings_revision:revision}];}
+  if(path.includes('/rpc/set_autopilot_enabled_guarded')){const b=JSON.parse(opts.body);updates.push({enabled:b.p_enabled});return {outcome:'updated',stale:true,config:{user_id:uid,enabled:b.p_enabled,settings_revision:revision,template:{}}};}
   throw Error('unexpected '+path);
 }}};
 const api=require('../api/autopilot');
@@ -26,7 +26,7 @@ async function invoke(data, mode='vercel') {
   }
   let res={setHeader(){},end(s){this.body=JSON.parse(s)}};await api(req,res);return res;
 }
-const settings={action:'save',enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'grad-gold'}};
+const settings={action:'save',expected_revision:null,enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'grad-gold'}};
 const jpeg='data:image/jpeg;base64,'+Buffer.from('ffd8ffc00011080002000303011100021101031101ffd9','hex').toString('base64');
 (async()=>{
   let res=await invoke(settings);assert.equal(res.statusCode,200);assert.equal(saves.at(-1).template.background,'grad-gold');assert.equal(saves.at(-1).all_channels,true);

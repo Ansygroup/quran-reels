@@ -1,9 +1,9 @@
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v58";
+const CACHE = "qr-v87";
 const SHELL = [
   "/",
-  "/css/style.css?v=16",
-  "/js/data.js?v=5",
+  "/css/style.css?v=18",
+  "/js/data.js?v=6",
   "/js/core.js?v=5",
   "/js/quran.js?v=5",
   "/js/reel.js?v=10",
@@ -12,9 +12,9 @@ const SHELL = [
   "/js/tools-a.js?v=5",
   "/js/tools-b.js?v=3",
     "/js/tools-c.js?v=3",
-    "/js/auth.js?v=3",
-    "/js/publish.js?v=37",
-    "/js/app.js?v=8",
+    "/js/auth.js?v=5",
+    "/js/publish.js?v=64",
+    "/js/app.js?v=9",
   "/data/quran-uthmani.json",
   "/data/adhkar.json",
   "/data/names.json",
@@ -24,12 +24,26 @@ const SHELL = [
   "/img/icon.svg",
 ];
 
+// Never store redirects, errors, non-HTML, query-string responses or other
+// pages as the shared offline app shell. The app itself is served from '/'.
+function isAppShellResponse(r) {
+  if (!r || r.status !== 200 || r.type !== "basic" || r.redirected || !/^text\/html(?:\s*;|\s*$)/i.test(r.headers.get("content-type") || "")) return false;
+  try { const u = new URL(r.url); return u.origin === self.location.origin && u.pathname === "/" && !u.search; }
+  catch { return false; }
+}
+
 self.addEventListener("install", e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    // كل ملف على حدة — فشل واحد لا يمنع تثبيت البقية
-    // تجاهل كاش المتصفح عند تجهيز النسخة الجديدة حتى لا نحتفظ بصفحة قديمة.
-    await Promise.all(SHELL.map(u => c.add(new Request(u, { cache: "reload" })).catch(() => {})));
+    // Fetch each asset independently; one failure must not block installation.
+    // A failed or redirected home response must never become the offline shell.
+    await Promise.all(SHELL.map(async u => {
+      try {
+        const r = await fetch(new Request(u, { cache: "reload" }));
+        if (u === "/" ? isAppShellResponse(r) : (r.ok && r.type === "basic")) await c.put(u, r);
+        else if (r.body) await r.body.cancel();
+      } catch { /* offline installation may lack individual assets */ }
+    }));
     await self.skipWaiting();
   })());
 });
@@ -59,17 +73,25 @@ self.addEventListener("fetch", e => {
   if (url.pathname.startsWith("/proxy") || url.pathname.startsWith("/api/")) return;
   if (/\.(mp3|mp4|m4a|webm|blob)$/i.test(url.pathname)) return;
 
-  // Navigations: network first, fall back to cached shell (offline SPA works).
+  // The SPA's routes use fragments (not sent to the server), so only '/'
+  // may update or fall back to the shared shell. An offline article is not
+  // silently replaced with an unrelated homepage.
   if (req.mode === "navigate") {
-    e.respondWith(
-      fetch(req)
-        .then(r => {
-          const cp = r.clone();
-          caches.open(CACHE).then(c => c.put("/", cp)).catch(() => {});
-          return r;
-        })
-        .catch(() => caches.match("/").then(r => r || Response.error()))
-    );
+    const isRoot = url.pathname === "/";
+    const network = fetch(req);
+    if (isRoot && !url.search) {
+      e.waitUntil(network.then(async r => {
+        if (isAppShellResponse(r)) {
+          const copy = r.clone(); // Clone before awaiting, while the response body is unused.
+          await (await caches.open(CACHE)).put("/", copy);
+        }
+      }).catch(() => {}));
+    }
+    e.respondWith(network.catch(async () => {
+      if (!isRoot) return Response.error();
+      const c = await caches.open(CACHE);
+      return (await c.match("/")) || Response.error();
+    }));
     return;
   }
 

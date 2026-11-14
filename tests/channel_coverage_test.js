@@ -56,7 +56,7 @@ global.fetch = async (url, opts = {}) => {
   assert.equal(run.ok, false); assert.match(run.error, /503/); assert(patches.some(p => p.status === "failed" && /503/.test(p.error))); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
   mode = "normal"; requests = []; patches = [];
   const missing = await A.generateAndPublish("u1", { runType: "daily", config: { platforms: ["youtube", "tiktok"], all_channels: true } });
-  assert.equal(missing.ok, false); assert.match(missing.error, /tiktok/); assert(patches.some(p => p.status === "failed")); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
+  assert.equal(missing.ok, false); assert.match(missing.error, /تيك توك/); assert(patches.some(p => p.status === "failed")); assert.equal(storageWrites, 0); assert.equal(calls.length, 0);
   // الإعداد التالف يتوقف قبل قراءة القنوات أو رفع/إدراج فيديو، ولا يُسقط هدفًا بصمت.
   for (const platforms of [[], ['youtube', 'telegram'], ['youtube', 'youtube'], null, 'youtube']) {
     requests = []; patches = [];
