@@ -35,8 +35,6 @@ global.fetch = async (url, opts = {}) => {
   if (u.origin === 'https://www.googleapis.com' && opts.method === 'PUT') return json({ id: 'video_1' });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/media/upload') return json({ data: { id: 'media_1' } });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/tweets') return json({ data: { id: 'post_1' } });
-  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://open-upload.tiktokapis.com/video/?upload_id=fixture', publish_id: 'fixture' }, error: { code: 'ok' } });
-  if (u.origin === 'https://open-upload.tiktokapis.com') return { ok: true, status: 200 };
   throw Error('unexpected network blocked');
 };
 const { publishRow } = require('../lib/publish');
@@ -47,7 +45,7 @@ async function run(p, m) {
   return { out, saved: { ...row }, calls: [...calls] };
 }
 (async () => {
-  for (const p of ['youtube', 'x', 'tiktok']) {
+  for (const p of ['youtube', 'x']) {
     for (const m of ['network', '404', '500', 'partial', 'other-2xx', 'empty', 'wrong-body', 'body-error']) {
       const result = await run(p, m);
       assert.equal(result.out.ok, false, `${p}/${m}`);
@@ -71,12 +69,7 @@ async function run(p, m) {
       const upload = ok.calls.find(c => c.origin === 'https://api.x.com' && c.opts.body instanceof FormData);
       assert.deepEqual([...new Uint8Array(await upload.opts.body.get('media').arrayBuffer())], [1, 2, 3, 4]);
     }
-    if (p === 'tiktok') {
-      const start = ok.calls.find(c => c.origin === 'https://open.tiktokapis.com');
-      assert.equal(JSON.parse(start.opts.body).post_info.privacy_level, 'SELF_ONLY_DISABLE');
-      assert.equal(ok.calls.filter(c => c.origin === 'https://open.tiktokapis.com').length, 1);
-      assert.deepEqual([...ok.calls.find(c => c.origin === 'https://open-upload.tiktokapis.com').opts.body], [1, 2, 3, 4]);
-    }
+
   }
-  console.log('PASS storage failure blocks provider upload/init for YouTube, X and TikTok (synthetic only)');
+  console.log('PASS storage failure blocks provider upload/init for YouTube and X (synthetic only)');
 })().catch(e => { console.error(e); process.exitCode = 1; });

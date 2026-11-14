@@ -461,11 +461,12 @@ window.PublishApp = {
     if (!wrap) return;
     const platforms = Array.isArray(data.config?.platforms) ? data.config.platforms : [];
     wrap.innerHTML = this.available.map((p) => `
-      <label class="chk" title="${p.publish ? "" : "لا يوجد ربط/نشر لهذه المنصة بعد"}">
+      <label class="chk" title="${p.publish ? "" : "لا يوجد ربط/نشر لهذه المنصة حاليًا"}">
         <input type="checkbox" id="plat-${p.key}" data-platform="${p.key}" ${platforms.includes(p.key) ? "checked" : ""}
           ${p.publish ? "" : "disabled"}>
         ${this.esc(p.name)}${p.publish ? "" : " <small>(قريبًا)</small>"}
-      </label>`).join("");
+      </label>`).join("") + (platforms.some(key => this.available.some(p => p.key === key && !p.publish))
+      ? '<p class="hint warn">إعداداتك المحفوظة تتضمن منصة غير متاحة؛ التشغيل يتوقف حتى تراجعها. حفظ التعديلات يزيل المنصات غير المتاحة من الاختيار.</p>' : "");
   },
 
   /* ---------- لوحة التخصيص ---------- */
@@ -962,7 +963,7 @@ window.PublishApp = {
 
     const block = (p) => {
       const mine = conns.filter((c) => c.platform === p.key);
-      const prov = p.connect || CONNECT_PLATFORM[p.key];
+      const prov = p.publish ? (p.connect || CONNECT_PLATFORM[p.key]) : null;
       const ready = p.ready !== false;
       const head = `<div class="chan-head"><span class="chan-ic">${ICONS[p.key] || "🔗"}</span><b>${this.esc(p.name)}</b></div>`;
       const missing = !mine.length && selected.includes(p.key)
@@ -998,6 +999,7 @@ window.PublishApp = {
         };
         return `<div class="chan-group" data-soc="${this.esc(p.key)}">
           ${head}
+          ${!p.publish ? '<small class="hint warn">قريبًا — الربط والنشر متوقفان حاليًا. القنوات المسجّلة لم تُحذف؛ المهام المستحقة تتوقف للمراجعة.</small>' : ""}
           ${reauthList.includes(p.key) ? '<small class="hint warn">⚠️ فشل تجديد سابق لهذه المنصة؛ لا يحدد القناة أو يثبت حالة الربط الحالية.</small>' : ""}
           <div class="chan-list">${mine.map(one).join("")}</div>
           <div class="chan-foot">
@@ -1074,6 +1076,7 @@ window.PublishApp = {
           no_code: "لم يصل رمز التفويض؛ ابدأ الربط من المتصفح نفسه.",
           state: "تعذّر التحقق من جلسة التفويض؛ ابدأ الربط من المتصفح نفسه.",
           token: "تعذّر تبادل رمز التفويض.",
+          unavailable: "الربط متوقف حاليًا وسيكون متاحًا قريبًا.",
           identity: "تعذّر التحقق من هوية الحساب لدى المزوّد؛ راجع الحساب والصلاحيات قبل المحاولة مجددًا.",
           pages: "لا يدعم الربط اختيار صفحة من عدة صفحات أو قائمة غير مكتملة بعد؛ راجع الصفحات والصلاحيات قبل المحاولة.",
           channel: "لم تصل قناة يوتيوب صالحة من المزوّد.",

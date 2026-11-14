@@ -13,6 +13,7 @@ module.exports = async (req, res) => {
   /* facebook وinstagram يتشاركان تطبيق Meta — نقبل الاسمين حتى لا يفشل
    * الرابط القادم من الواجهة أو من رابط قديم محفوظ في الـService Worker. */
   const prov = p === "facebook" || p === "instagram" ? "meta" : p;
+  if (prov === "tiktok") return json(res, 403, { error: "تيك توك قريبًا — الربط غير متاح حاليًا" });
   if (!["youtube", "meta", "tiktok", "x"].includes(prov)) return json(res, 404, { error: "unknown platform", platforms: ["youtube", "facebook", "instagram", "meta", "tiktok", "x"] });
   return handleStart(req, res, prov);
 };

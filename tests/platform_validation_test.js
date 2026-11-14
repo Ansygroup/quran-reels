@@ -22,7 +22,7 @@ async function save(body) {
   const res = {setHeader(){}, end(v){this.body=JSON.parse(v)}}; await api(req, res); return res;
 }
 (async () => {
-  assert.equal(validatePlatforms(['youtube','tiktok']), null);
+  assert.match(validatePlatforms(['youtube','tiktok']), /تيك توك/);
   assert.equal(validatePlatforms([], {allowEmpty:true}), null);
   for (const invalid of [undefined, null, 'youtube', {}, ['youtube','telegram'], ['youtube','youtube'], ['__proto__'], [null]]) {
     writes=[]; reads=[];
@@ -36,7 +36,9 @@ async function save(body) {
   assert.equal(r.statusCode,200); assert.deepEqual(writes[0].platforms,[]); assert.equal(writes[0].enabled,false); assert.equal(writes[0].all_channels,true);
   for (const all_channels of [true,false]) {
     writes=[]; r=await save({enabled:true, platforms:['youtube','tiktok'], all_channels});
-    assert.equal(r.statusCode,200); assert.deepEqual(writes[0].platforms,['youtube','tiktok']); assert.equal(writes[0].all_channels,all_channels); assert.equal(writes[0].enabled,true);
+    assert.equal(r.statusCode,400); assert.match(r.body.error,/تيك توك/); assert.equal(writes.length,0);
+    r=await save({enabled:true, platforms:['youtube'], all_channels});
+    assert.equal(r.statusCode,200); assert.deepEqual(writes[0].platforms,['youtube']); assert.equal(writes[0].all_channels,all_channels); assert.equal(writes[0].enabled,true);
   }
   console.log('ALL OK: API rejects invalid or duplicate platforms, preserves empty paused and valid selected targets (mock database)');
 })().catch(e => {console.error(e);process.exitCode=1});

@@ -274,8 +274,8 @@ async function accountData(uid) {
      * وهل مفاتيحه مضبوطة الآن (ready) — الواجهة لا تَعِد بما لا يعمل */
     available: PLATFORM_LIST.map(p => ({
       ...p,
-      connect: CONNECT_PROVIDER[p.key] || null,
-      ready: CONNECT_PROVIDER[p.key] ? Boolean(ready[p.key]) : false,
+      connect: p.publish ? CONNECT_PROVIDER[p.key] || null : null,
+      ready: p.publish && CONNECT_PROVIDER[p.key] ? Boolean(ready[p.key]) : false,
     })),
     // العدد الحقيقي المتاح لمقال عشوائي (الواجهة كانت تَعِد بـ10,000)
     articles: { count: repoArticles().length },

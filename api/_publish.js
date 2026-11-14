@@ -6,8 +6,7 @@ const { q1, rest } = require("../lib/db");
 const { publishRow } = require("../lib/publish");
 const { normalizeUserVideoPath } = require("../lib/video_path");
 const { json } = require("../lib/oauth");
-
-const PLATFORMS = ["youtube", "facebook", "instagram", "tiktok", "x"];
+const { canPublish } = require("../lib/platforms");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return json(res, 405, { error: "method" });
@@ -24,7 +23,8 @@ module.exports = async (req, res) => {
     return json(res, out.ok ? 200 : out.skipped === "review-required" ? 409 : 502, out);
   }
 
-  if (!PLATFORMS.includes(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة" });
+  if (b.platform === "tiktok") return json(res, 400, { error: "تيك توك قريبًا — النشر والجدولة غير متاحين حاليًا" });
+  if (!canPublish(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة أو منصة غير متاحة" });
   let videoPath;
   // New manual jobs must use the session user's exact storage-key prefix.
   // This is not proof of object ownership and does not change old queue rows.

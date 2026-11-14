@@ -35,7 +35,7 @@ function setup() { row=structuredClone(initial); writes=[]; queries=[]; connecti
   assert.deepEqual({...row,enabled:true,updated_at:initial.updated_at},initial); assert.equal(queries.length,1); assert.equal(writes.length,1);
   setup(); row.platforms=['youtube','telegram']; out=await request({enabled:false}); assert.equal(out.statusCode,200); assert.equal(row.enabled,false); assert.deepEqual(row.platforms,['youtube','telegram']);
   setup(); row.enabled=false; out=await request({enabled:true}); assert.equal(out.statusCode,200); assert.equal(row.enabled,true); assert.equal(row.all_channels,true); assert.deepEqual(row.platforms,['youtube']); assert(queries.some(q=>q.includes('/rpc/set_autopilot_enabled_guarded')));
-  setup(); row.enabled=false; row.platforms=['youtube','tiktok']; out=await request({enabled:true}); assert.equal(out.statusCode,409); assert.match(out.body.error,/tiktok/); assert.equal(writes.length,0);
+  setup(); row.enabled=false; row.platforms=['youtube','tiktok']; out=await request({enabled:true}); assert.equal(out.statusCode,400); assert.match(out.body.error,/تيك توك/); assert.equal(writes.length,0);
   for(const platforms of [[],['telegram'],['youtube','youtube'],null]) {setup(); row.platforms=platforms; out=await request({enabled:true}); assert.equal(out.statusCode,400); assert.equal(writes.length,0);}
   setup(); row=null; out=await request({enabled:true}); assert.equal(out.statusCode,409); assert.equal(writes.length,0);
   setup(); row.settings_revision=null; out=await request({enabled:true}); assert.equal(out.statusCode,409); assert.equal(writes.length,0);

@@ -2,6 +2,8 @@
 
 Scope: account dashboard UI and its account API, connection controls, manual scheduling link, OAuth start, run history and status. This is a code and mocked-interaction review; it is **not** a complete production audit or a real user/provider test. The branch preview can use production Supabase and must not be used for destructive tests.
 
+**TikTok update:** The owner subsequently chose to show TikTok as coming soon. In this branch the upload dispatch has been removed; new OAuth start and routed callback, new manual jobs and saved automation targeting TikTok are blocked. Previously scheduled or manually requested draft jobs are claimed and marked failed for review before connection or network access. Existing connections are retained and may still be disconnected; provider authorization is not revoked. A saved selection containing TikTok blocks the whole automated run until edited and saved, and the UI explains that saving removes unavailable selections. A lost finalization response is uncertain. `tests/tiktok_unavailable_test.js` and `tests/tiktok_unavailable_browser_test.js` use fake data and network. Already-running old deployments can still send, and the change is not deployed. The older descriptions below of the TikTok sender/decision are historical, not the current branch behavior.
+
 ## Changes in this review
 
 - Show queued runs as pending instead of failed; show multiple destination URLs separately, safely; clarify that an upload accepted by a platform does not prove processing or playback.

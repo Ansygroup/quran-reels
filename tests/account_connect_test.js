@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=61)", /publish\.js\?v=61/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=62)", /publish\.js\?v=62/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -82,7 +82,7 @@ if (!JSDOM) {
         return json({ config: {settings_revision:null, enabled:false, platforms:[], template:{}}, runs: [], connected: true, platforms: ["youtube"], channel: "يوتيوب · Psychology World",
           reciters: [], available: [
             { key: "youtube", name: "يوتيوب", publish: true, connect: "youtube", ready: true },
-            { key: "tiktok", name: "تيك توك", publish: true, connect: "tiktok", ready: true },
+            { key: "tiktok", name: "تيك توك", publish: false, connect: null, ready: false },
             { key: "facebook", name: "فيسبوك", publish: true, connect: "meta", ready: false },
             { key: "linkedin", name: "لينكد إن", publish: false, connect: null, ready: false },
           ], articles: { count: 7993 } });
@@ -105,8 +105,8 @@ if (!JSDOM) {
     chk("يوتيوب يظهر «مرتبط» باسم القناة", Boolean(yt && /Psychology World/.test(yt.textContent)));
     chk("يوتيوب به زر «فك الربط» يحمل معرّف الاتصال",
       Boolean(window.document.querySelector('[data-soc="youtube"] [data-unlink="conn-1"]')));
-    const tt = window.document.querySelector('[data-soc="tiktok"] [data-connect="tiktok"]');
-    chk("تيك توك (غير مرتبط) يظهر له زر «اربط»", Boolean(tt && /اربط/.test(tt.textContent)));
+    const tt = window.document.querySelector('[data-soc="tiktok"]');
+    chk("تيك توك يظهر قريبًا بلا زر ربط", Boolean(tt && /قريبًا/.test(tt.textContent) && !tt.querySelector("[data-connect]")));
     const li = window.document.querySelector('[data-soc="linkedin"]');
     chk("لينكد إن يظهر «قريبًا» بلا زر ربط", Boolean(li && /قريبًا/.test(li.textContent)));
 

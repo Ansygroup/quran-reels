@@ -12,7 +12,7 @@ function response(){return {headers:{},setHeader(k,v){this.headers[k.toLowerCase
 function cookie(name,body){const payload=Buffer.from(JSON.stringify(body)).toString('base64url');return `qr_${name}_st=${payload}.${sign(payload)}`}
 async function callCallback(state,cookieValue){const r=response();await callback({url:`/api/oauth/callback?code=fixture-code&state=${encodeURIComponent(state)}`,headers:{cookie:cookieValue}},r);return r}
 (async()=>{
- for(const name of ['youtube','meta','tiktok','x']){
+ for(const name of ['youtube','meta','x']){
   const r=response();await start({method:'POST',url:`/api/gw?op=start&p=${name}`,headers:{authorization:'Bearer fixture'}},r);assert.equal(r.statusCode,200);assert.match(r.headers['set-cookie'],/Max-Age=900/);
   const value=JSON.parse(r.body),state=new URL(value.url).searchParams.get('state');const original=r.headers['set-cookie'].split(';')[0];
   const saved=oauth.readStCookie({headers:{cookie:original}},name);assert.equal(saved.t,now);assert.equal(saved.r,state);assert.equal(saved.u,'fixture-owner');
@@ -34,5 +34,5 @@ async function callCallback(state,cookieValue){const r=response();await callback
  check(now,false,{u:''});check(now,false,{u:123});check(now,false,{r:''});check(now,false,{r:123});check(now,false,{n:'meta'});
  // A signed value with no timestamp is legacy malformed state, not a perpetual grant.
  const noTime=cookie(name,{n:name,u:'fixture-owner',r:state,m:{}}),req={headers:{cookie:noTime}};assert.equal(oauth.stCookieValid(req,name,oauth.readStCookie(req,name)),false);
- assert.equal(dbCalls,0);console.log('ALL OK: OAuth signed state age, clock-skew boundaries and callback fail-closed for all providers (mocked)');
+ assert.equal(dbCalls,0);console.log('ALL OK: OAuth signed state age, clock-skew boundaries and callback fail-closed for available providers (mocked)');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{Date.now=realNow});

@@ -17,7 +17,6 @@ const crypt = require.resolve('../lib/crypt');
 require.cache[crypt] = { id: crypt, filename: crypt, loaded: true, exports: { open: x => x, seal: x => x } };
 const good = {
   youtube: 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&upload_id=secret-fixture',
-  tiktok: 'https://open-upload.tiktokapis.com/video/?upload_id=123&upload_token=secret-fixture',
 };
 const json = data => ({ ok: true, status: 200, json: async () => data });
 global.fetch = async (url, opts = {}) => {
@@ -25,14 +24,13 @@ global.fetch = async (url, opts = {}) => {
   calls.push({ url: String(url), method, opts });
   if (u.origin === 'https://storage.fixture') return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer };
   if (u.origin === 'https://www.googleapis.com' && method === 'POST') return { ok: true, headers: { get: () => sessionUrl } };
-  if (u.origin === 'https://open.tiktokapis.com' && method === 'POST') return json({ data: { upload_url: sessionUrl, publish_id: 'fixture' }, error: { code: 'ok' } });
   if (method === 'PUT') {
     if (mode === 'redirect') {
       if (opts.redirect !== 'error') { calls.push({ url: 'https://attacker.fixture/redirected', method: 'PUT' }); return json({ id: 'video' }); }
       throw Error('redirect to https://attacker.fixture/?secret-fixture');
     }
     if (url !== good[platform]) throw Error('unexpected PUT blocked by test');
-    return platform === 'youtube' ? json({ id: 'video_1' }) : { ok: true, status: 200 };
+    return json({ id: 'video_1' });
   }
   throw Error('unexpected network blocked');
 };
@@ -44,16 +42,16 @@ async function run(p, url, m = 'normal') {
   return { out, saved: { ...row }, calls: [...calls] };
 }
 (async () => {
-  for (const p of ['youtube', 'tiktok']) {
-    const host = p === 'youtube' ? 'www.googleapis.com' : 'open-upload.tiktokapis.com';
-    const path = p === 'youtube' ? '/upload/youtube/v3/videos' : '/video/';
+  for (const p of ['youtube']) {
+    const host = 'www.googleapis.com';
+    const path = '/upload/youtube/v3/videos';
     const invalid = [null, '', 123, 'invalid', '/relative', `http://${host}${path}?secret-fixture`,
       `https://${host}.attacker.fixture${path}?secret-fixture`, `https://${host}@attacker.fixture${path}?secret-fixture`,
       `https://user:password@${host}${path}?secret-fixture`, `https://${host}:8443${path}?secret-fixture`,
       `https://${host}${path}?secret-fixture#fragment`, `https://${host}${path}?secret-fixture#`,
       `https://${host}${path}?secret-\nfixture`, ` https://${host}${path}?secret-fixture`,
       'https://127.0.0.1/private?secret-fixture', 'https://169.254.169.254/latest/meta-data?secret-fixture'];
-    if (p === 'youtube') invalid.push('https://www.googleapis.com/other?secret-fixture');
+    invalid.push('https://www.googleapis.com/other?secret-fixture');
     for (const url of invalid) {
       const r = await run(p, url);
       assert.equal(r.out.ok, false, `${p}: ${url}`); assert.equal(r.saved.status, 'failed');
@@ -71,5 +69,5 @@ async function run(p, url, m = 'normal') {
     assert(!redir.calls.some(c => c.url.startsWith('https://attacker.fixture')));
     assert.match(redir.out.error, /راجع المنصة/); assert(!redir.saved.error.includes('secret-fixture'));
   }
-  console.log('PASS unsafe upload session URLs and redirects blocked for YouTube and TikTok (mock only)');
+  console.log('PASS unsafe upload session URLs and redirects blocked for YouTube (mock only)');
 })().catch(e => { console.error(e); process.exitCode = 1; });

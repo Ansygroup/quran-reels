@@ -31,8 +31,6 @@ global.fetch = async (url, opts = {}) => {
   if (u.origin === 'https://www.googleapis.com' && opts.method === 'PUT') return json({ id: 'video' });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/media/upload') return json({ data: { id: 'media' } });
   if (u.origin === 'https://api.x.com' && u.pathname === '/2/tweets') return json({ data: { id: 'post' } });
-  if (u.origin === 'https://open.tiktokapis.com') return json({ data: { upload_url: 'https://open-upload.tiktokapis.com/upload?fixture=1', publish_id: 'id' }, error: { code: 'ok' } });
-  if (u.origin === 'https://open-upload.tiktokapis.com' && opts.method === 'PUT') return { ok: true, status: 200 };
   throw Error('unexpected external request blocked');
 };
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve('http://127.0.0.1:' + server.address().port)));
@@ -40,7 +38,7 @@ const close = server => new Promise(resolve => server.close(resolve));
 (async () => { try {
   targetOrigin = await listen(target); storageOrigin = await listen(storage); process.env.SUPABASE_URL = storageOrigin;
   const { publishRow } = require('../lib/publish');
-  for (const p of ['youtube', 'x', 'tiktok']) {
+  for (const p of ['youtube', 'x']) {
     for (const code of [301, 302, 303, 307, 308]) for (const same of [false, true]) {
       platform = p; mode = code; sameOriginTarget = same; redirects = 0; sameRedirects = 0; providerCalls = 0;
       row = { id: 'job', user_id: 'owner', platform, connection_id: null, status: 'scheduled', video_path: 'owner/video.mp4' };
@@ -55,7 +53,7 @@ const close = server => new Promise(resolve => server.close(resolve));
     row = { id: 'job', user_id: 'owner', platform, connection_id: null, status: 'scheduled', video_path: 'owner/video.mp4' };
     assert.equal((await publishRow({ ...row })).ok, true); assert.equal(row.status, 'published'); assert(providerCalls > 0);
   }
-  console.log('PASS storage redirects blocked for YouTube, X and TikTok with real loopback fetch; providers mocked');
+  console.log('PASS storage redirects blocked for YouTube and X with real loopback fetch; providers mocked');
 } finally {
   global.fetch = realFetch;
   if (storage.listening) await close(storage);
