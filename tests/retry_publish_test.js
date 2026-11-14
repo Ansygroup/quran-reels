@@ -3,8 +3,8 @@
  * اختبار «أعد نشر الفيديو الجاهز» — منع النشر المكرر
  * ------------------------------------------------------------
  * الدرس (2026-11-12): تشغيل واحد أنشأ صفَّين فاشلين ليوتيوب لنفس الملف.
- * لو أعاد المستخدم الربط ونشرنا كل الصفوف، صار عندنا فيديوان متطابقان على
- * القناة. هنا نُثبت أننا ننشر الأول فقط ونحوّل الباقي إلى draft.
+ * لو أُعيد نشر هذه الصفوف قد يتكرر الفيديو. نتحقق من حجب الفاشل وعدم
+ * تحويله إلى مجدول أو محاولة رفعه تلقائيًا.
  *
  * التشغيل: node tests/retry_publish_test.js
  * ============================================================ */
@@ -115,9 +115,25 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; publishe
     if (/publish_queue$/.test(p) && opts.method === "POST") { posts.push(p); return []; }
     return [];
   };
+  let failedBlocked = false;
+  let failedWrites = 0;
+  const previousRest = impl.rest;
+  impl.rest = async (p, opts = {}) => { if (opts.method) failedWrites++; return previousRest(p, opts); };
+  try { await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/x.mp4", videoName: "v.mp4", meta: { title: "t", caption: "c", hashtags: "#a" } }); } catch { failedBlocked = true; }
+  chk("الصف الفاشل لا يتحول لمجدول ولا يُنشأ بديل", failedBlocked && failedWrites === 0 && posts.length === 0);
+
+  let normalWrites = 0;
+  impl.rest = async (p, opts = {}) => {
+    if (!opts.method) return [{ id: "q1", status: "draft" }];
+    normalWrites++; return [{ id: "q1", status: "scheduled" }];
+  };
   const reused = await T.ensureQueueRow({ userId: "u1", platform: "youtube", connectionId: null, storagePath: "u/autopilot/x.mp4", videoName: "v.mp4", meta: { title: "t", caption: "c", hashtags: "#a" } });
-  chk("صفّ قائم يُعاد استخدامه بلا إدراج جديد",
-    reused && reused.id === "q1" && reused.status === "scheduled" && posts.length === 0, JSON.stringify({ reused, posts: posts.length }));
+  chk("إعادة استخدام المسودة مشروطة بحالتها", reused && reused.id === "q1" && normalWrites === 1);
+
+  impl.rest = async () => ({ error: "not an array" });
+  let invalidBlocked = false;
+  try { await T.ensureQueueRow({ userId: "u1", platform: "youtube", storagePath: "u/autopilot/x.mp4", meta: {} }); } catch { invalidBlocked = true; }
+  chk("رد قراءة غير صالح لا يسمح بإدراج صف", invalidBlocked);
 
   reset();
   let conflictInserts = 0;
@@ -195,8 +211,8 @@ const reset = () => { sql.length = 0; pub.calls.length = 0; qRows = []; publishe
   /* 5) publishReadyToday تستخدم نفس المسار وتُعلن السبب */
   reset();
   const ready = await A.publishReadyToday("u1");
-  chk("publishReadyToday بلا فيديو جاهز تعيد سببًا واضحًا",
-    ready && ready.ok === false && /لا يوجد فيديو جاهز/.test(ready.error), JSON.stringify(ready));
+  chk("الفحص يصف نطاقه ولا يستنتج أن الفيديو لم يُولّد",
+    ready && ready.ok === false && /محاولات نشر فاشلة/.test(ready.error) && !/لم يُولَّد/.test(ready.error), JSON.stringify(ready));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

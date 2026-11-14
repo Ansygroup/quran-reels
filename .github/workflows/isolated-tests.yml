@@ -22,7 +22,8 @@ jobs:
       - name: Install locked application dependencies and isolated test dependencies
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-          npm install --prefix "$RUNNER_TEMP/qr-test-deps" --no-save --ignore-scripts --no-audit --no-fund jsdom@24.1.3 @electric-sql/pglite@0.5.16
+          npm install --prefix "$RUNNER_TEMP/qr-test-deps" --no-save --ignore-scripts --no-audit --no-fund jsdom@24.1.3 @electric-sql/pglite@0.5.16 @embedded-postgres/linux-x64@17.11.0-beta.19
+          node "$RUNNER_TEMP/qr-test-deps/node_modules/@embedded-postgres/linux-x64/scripts/hydrate-symlinks.js"
       - name: Run mocked application tests
         env:
           NODE_PATH: ${{ runner.temp }}/qr-test-deps/node_modules
@@ -32,8 +33,50 @@ jobs:
           NODE_PATH: ${{ runner.temp }}/qr-test-deps/node_modules
         run: |
           node tests/publish_client_dom.js
+          node tests/multichannel_test.js
+          node tests/account_dashboard_review_test.js
+          node tests/account_connection_session_race_test.js
+          node tests/account_connect_timeout_test.js
+          node tests/account_reconnect_intent_test.js
+          node tests/account_oauth_return_test.js
+          node tests/account_disconnect_timeout_test.js
+          node tests/auth_session_race_test.js
+          node tests/static_account_copy_test.js
+          node tests/account_oauth_start_safe_test.js
+          node tests/oauth_state_test.js
+          node tests/oauth_state_deadline_test.js
+          node tests/oauth_identity_guard_test.js
+          node tests/oauth_meta_identity_test.js
+          node tests/oauth_refresh_preservation_test.js
+          node tests/oauth_refresh_sql_test.js
+          node tests/reauth_stale_failure_test.js
+          node tests/account_failed_review_api_test.js
+          node tests/manual_failed_publish_guard_test.js
           node tests/account_concurrency_draft_test.js
           node tests/autopilot_settings_guard_db_test.js
+      - name: Run candidate Telegram and channel-target tests with isolated databases
+        env:
+          NODE_PATH: ${{ runner.temp }}/qr-test-deps/node_modules
+          PG_BIN_DIR: ${{ runner.temp }}/qr-test-deps/node_modules/@embedded-postgres/linux-x64/native/bin
+          PG_LIB_DIR: ${{ runner.temp }}/qr-test-deps/node_modules/@embedded-postgres/linux-x64/native/lib
+        run: |
+          node tests/telegram_candidate_test.js
+          node tests/telegram_connect_candidate_test.js
+          node tests/telegram_media_candidate_test.js
+          node tests/telegram_outbox_candidate_test.js
+          node tests/telegram_delivery_candidate_integration_test.js
+          node tests/telegram_outbox_candidate_pg_test.js
+          node tests/account_default_candidate_pg_test.js
+          node tests/connection_refresh_candidate_pg_test.js
+          node tests/account_disconnect_candidate_pg_test.js
+          node tests/account_channel_fixture_pg_test.js
+      - name: Decode synthetic Telegram video fixtures
+        run: |
+          export FFMPEG_BIN="$(command -v ffmpeg)"
+          export FFPROBE_BIN="$(command -v ffprobe)"
+          test -n "$FFMPEG_BIN" && test -n "$FFPROBE_BIN"
+          node tests/telegram_video_validation_candidate_test.js
+          node tests/telegram_candidate_e2e_test.js
 
   account-browser:
     runs-on: ubuntu-24.04
@@ -57,3 +100,11 @@ jobs:
         run: |
           node tests/account_save_uncertain_browser_test.js
           node tests/account_reel_browser_test.js
+          node tests/account_quran_recovery_browser_test.js
+          node tests/account_oauth_browser_test.js
+          node tests/reauth_warning_browser_test.js
+          node tests/account_auth_events_browser_test.js
+          node tests/account_disconnect_timeout_browser_test.js
+          node tests/auth_cross_tab_browser_test.js
+          node tests/static_account_copy_browser_test.js
+          node tests/sw_navigation_browser_test.js

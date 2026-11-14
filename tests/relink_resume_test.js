@@ -80,21 +80,21 @@ async function link() {
 }
 (async () => {
   reset(); const linkResult = await link();
-  assert.match(linkResult, /auto_resume=published/); assert.equal(uploads, 1); assert.equal(tables.publish_queue[0].status, "published"); assert.equal(tables.autopilot_runs[0].status, "published");
-  assert(requests.some(x => x.url.searchParams.get("user_id") === "eq.u1" && x.url.searchParams.get("status") === "eq.failed" && x.method === "PATCH"));
-  reset(); tables.autopilot[0].platforms = ["youtube", "tiktok"]; await link(); assert.equal(uploads, 1); assert.equal(tables.autopilot_runs[0].status, "failed");
-  reset(); tables.autopilot[0].all_channels = true; await link(); assert.equal(uploads, 1); assert.equal(tables.autopilot_runs[0].status, "failed");
+  assert.match(linkResult, /linked=youtube/); assert.doesNotMatch(linkResult, /auto_resume/); assert.equal(uploads, 0); assert.equal(tables.publish_queue[0].status, "failed"); assert.equal(tables.autopilot_runs[0].status, "failed");
+  assert(!requests.some(x => x.url.pathname.endsWith('/publish_queue') && x.method === 'PATCH'), 'relink must not claim old jobs');
+  reset(); tables.autopilot[0].platforms = ["youtube", "tiktok"]; await link(); assert.equal(uploads, 0); assert.equal(tables.autopilot_runs[0].status, "failed");
+  reset(); tables.autopilot[0].all_channels = true; await link(); assert.equal(uploads, 0); assert.equal(tables.autopilot_runs[0].status, "failed");
   reset(); tables.autopilot[0].enabled = false; await link(); assert.equal(uploads, 0); assert.equal(tables.autopilot[0].enabled, false);
   reset(); tables.publish_queue[0].error = "network timeout invalid_grant"; await link(); assert.equal(uploads, 0);
   reset(); tables.system_checks = []; await link(); assert.equal(uploads, 0);
   reset(); tables.publish_queue.push({ ...tables.publish_queue[0], id: "q2", status: "published" }); await link(); assert.equal(uploads, 0);
   reset(); tables.publish_queue.push({ ...tables.publish_queue[0], id: "q2" }); await link(); assert.equal(uploads, 0);
-  reset(); switchDefaultAtClaim = true; assert.match(await link(), /auto_resume=failed/); assert.equal(uploads, 0);
+  reset(); switchDefaultAtClaim = true; assert.match(await link(), /linked=youtube/); assert.equal(uploads, 0);
   reset(); tables.publish_queue.push({ ...tables.publish_queue[0], id: "q2", error: "network timeout" }); await link(); assert.equal(uploads, 0);
   reset(); tables.publish_queue[0].user_id = "other"; await link(); assert.equal(uploads, 0);
   reset(); tables.publish_queue[0].connection_id = "other-channel"; await link(); assert.equal(uploads, 0);
-  reset(); tables.autopilot[0].platforms = ["tiktok"]; assert.equal((await resumeAfterRelink("u1", "youtube", "UC1")).status, "skipped"); assert.equal(uploads, 0);
-  reset(); failReads = true; assert.match(await link(), /auto_resume=failed/); assert.equal(uploads, 0);
+  reset(); tables.autopilot[0].platforms = ["tiktok"]; assert.equal((await resumeAfterRelink("u1", "youtube", "UC1")).status, "review_required"); assert.equal(uploads, 0);
+  reset(); failReads = true; assert.match(await link(), /linked=youtube/); assert.equal(uploads, 0);
   // جوجل قد تحذف refresh_token من الرد؛ يبقى توكن نفس القناة ولا تُحذف صلاحيته.
   reset(); tables.autopilot[0].enabled = false; grantRefresh = undefined;
   const oldToken = tables.social_connections[0].refresh_token;
@@ -108,7 +108,7 @@ async function link() {
   tables.social_connections.push({ ...tables.social_connections[0], id: "c2", account_id: "UC2", is_default: false });
   assert.match(await link(), /channel=nondefault/); assert.equal(tables.social_connections[0].is_default, true); assert.equal(tables.social_connections[1].is_default, false);
 
-  reset(); const vals = await Promise.all([resumeAfterRelink("u1", "youtube", "UC1"), resumeAfterRelink("u1", "youtube", "UC1")]);
-  assert.equal(uploads, 1); assert.equal(vals.filter(v => v.status === "published").length, 1);
-  console.log("ALL OK: OAuth والرفع المحاكى، حفظ توكن التجديد، صلاحية الوصول، وتوضيح القناة غير الافتراضية");
+  reset(); requests=[]; const vals = await Promise.all([resumeAfterRelink("u1", "youtube", "UC1"), resumeAfterRelink("u1", "youtube", "UC1")]);
+  assert.equal(uploads, 0); assert(vals.every(v => v.status === "review_required")); assert.equal(requests.length,0,'legacy entry point performs no network calls');
+  console.log("ALL OK: mock OAuth relink preserves credentials and never retries failed jobs");
 })().catch(e => { console.error(e); process.exitCode = 1; });

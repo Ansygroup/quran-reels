@@ -136,6 +136,11 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   chk("القائمة تعرض القناتين", Array.isArray(list.connections) && list.connections.length === 2, String(list.connections && list.connections.length));
   chk("القائمة تحدد الافتراضية", list.connections?.find((c) => c.id === "y1")?.is_default === true && list.connections?.find((c) => c.id === "y2")?.is_default === false);
   chk("القائمة لا تُسرّب التوكنات", !/access_token|refresh_token|sealed/.test(res5.body));
+  setDb({ q: async () => [conn("missing"), conn("null", { is_default: null }), conn("t", { is_default: "t" }), conn("f", { is_default: "f" })] });
+  const resMissing = mkRes(); await LIST(mkGet(), resMissing);
+  const listed = JSON.parse(resMissing.body).connections;
+  chk("القائمة تحفظ المجهول ولا تحوله إلى لا", listed[0].is_default === null && listed[1].is_default === null);
+  chk("القائمة تفهم تمثيل PostgreSQL للمنطقي", listed[2].is_default === true && listed[3].is_default === false);
 
   /* 5) مسار النشر يقبل connection_id ويتحقق من الملكية */
   const gw = fs.readFileSync(path.join(ROOT, "api", "_publish.js"), "utf8");
@@ -146,12 +151,12 @@ const conn = (id, extra = {}) => ({ id, platform: "youtube", account_name: "قن
   /* 6) الواجهة: شارة افتراضية + إضافة قناة + ربط المعالج */
   const ui = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("بطاقة القنوات تعرض شارة ⭐ افتراضية", /⭐ افتراضية/.test(ui));
-  chk("زر «اجعلها الافتراضية» موجود ومربوط", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"/.test(ui) && /op=default/.test(ui));
+  chk("تغيير الافتراضية معطّل لحين المسار الذري الآمن", /data-default="\$\{(?:this\.)?esc\(c\.id\)\}"\s+disabled/.test(ui));
   chk("زر «➕ إضافة قناة» لمستخدم عنده قناة بالفعل", /➕ إضافة قناة/.test(ui));
-  chk("تلميح أن النشر على القناة الافتراضية", /اختيارك الحالي: النشر على القناة الافتراضية/.test(ui) && /اختيارك الحالي: النشر على كل القنوات المرتبطة/.test(ui));
-  chk("الكاش مكسور (v=38 / qr-v59) في الماركب والخدمة",
-    /publish\.js\?v=38/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v59/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+  chk("تلميح الاختيار المتأخر والبديل وكل القنوات", /أحدث اتصال إذا غابت/.test(ui) && /التخطيط لكل القنوات المرتبطة/.test(ui) && /غير المحفوظة/.test(ui));
+  chk("الكاش مكسور (v=55 / qr-v78) في الماركب والخدمة",
+    /publish\.js\?v=55/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
+    /qr-v78/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 7) ملف الترحيل */
   const mig = path.join(ROOT, "sql", "migrations", "20261112_multi_channel.sql");

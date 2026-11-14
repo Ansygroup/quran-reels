@@ -281,19 +281,19 @@ window.fetch = async (url, opts = {}) => {
   if (!audioLine || !/التلاوة غير متاحة من الخادم/.test(audioLine.textContent)) fail("فشل الصوت لا يُسمّى في سطر آخر فحص");
   else ok("فشل تحميل التلاوة يُسمّى صريحًا في اللوحة");
 
-  // العودة من OAuth تميّز نجاح الرفع عن فشل المحاولة، ولا تطلب ضغط زر.
+  // روابط العودة القديمة ليست إثباتًا للنشر؛ تطلب التحقق من السجل والقناة.
   window.history.replaceState(null, "", "/#/account?linked=youtube&auto_resume=published");
   window.PublishApp.reportLinkedFlag();
-  if (!/نشر الفيديو الجاهز تلقائيًا/.test(d.getElementById("acctNotice").textContent)) fail("لا تظهر نتيجة المحاولة التلقائية الناجحة");
-  else ok("نتيجة المحاولة التلقائية الناجحة تظهر في اللوحة");
+  if (!/رابط عودة قديم/.test(d.getElementById("acctNotice").textContent) || /نشر الفيديو الجاهز تلقائيًا/.test(d.getElementById("acctNotice").textContent)) fail("رابط العودة القديم يدّعي نشرًا غير متحقق");
+  else ok("رابط النجاح القديم يطلب التحقق ولا يؤكد النشر");
   window.history.replaceState(null, "", "/#/account?linked=youtube&channel=nondefault");
   window.PublishApp.reportLinkedFlag();
   if (!/مش الافتراضية/.test(d.getElementById("acctNotice").textContent)) fail("لم يُشرح أن القناة المربوطة ليست الافتراضية");
   else ok("القناة غير الافتراضية يُشرح وضعها دون تعديل اختيار المستخدم");
   window.history.replaceState(null, "", "/#/account?linked=youtube&auto_resume=failed");
   window.PublishApp.reportLinkedFlag();
-  if (!/لم تكتمل/.test(d.getElementById("acctNotice").textContent)) fail("لا يظهر فشل المحاولة التلقائية");
-  else ok("فشل المحاولة التلقائية يظهر في اللوحة");
+  if (!/رابط عودة قديم/.test(d.getElementById("acctNotice").textContent)) fail("رابط الفشل القديم لا يطلب التحقق");
+  else ok("رابط الفشل القديم يطلب التحقق من السجل والقناة");
 
   // صفّ قديم يحمل invalid_grant بلا حقل reauth ⇒ يُترجم ويظهر الزر
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: undefined, last_daily: { run_date: "2026-11-12", status: "failed", error: "فشل في 1 منصات: youtube: تجديد التوكن فشل (youtube): invalid_grant", external_url: null } });
@@ -313,8 +313,8 @@ window.fetch = async (url, opts = {}) => {
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
   const re = d.getElementById("acctReauth");
   if (!re) fail("لا تنبيه عند انتهاء ربط القناة (invalid_grant)");
-  else if (!/إعادة الربط/.test(re.textContent) || !/هيحاول ينشر الفيديو الجاهز بعد الربط/.test(re.textContent)) fail("تنبيه انتهاء الربط لا يشرح الخطوة التالية");
-  else ok("تنبيه انتهاء الربط يشرح إعادة الربط والنشر التلقائي");
+  else if (!/إعادة الربط/.test(re.textContent) || !/لا تُعاد المحاولات الفاشلة تلقائيًا/.test(re.textContent)) fail("تنبيه انتهاء الربط لا يوضح ضرورة المراجعة");
+  else ok("تنبيه انتهاء الربط يشرح ضرورة مراجعة الفيديو قبل إعادة النشر");
   // زر «انشر الفيديو الجاهز» يرسل الإجراء الصحيح
   const retryBtn = d.getElementById("btnRetryPublish");
   if (!retryBtn) fail("لا زر نشر للفيديو الجاهز مع ربط منتهٍ");
@@ -355,12 +355,47 @@ window.fetch = async (url, opts = {}) => {
   ] }) });
   window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, all_channels: true } });
   await window.PublishApp.renderConnections("test-token");
-  if (d.querySelectorAll('#acctAccountsList [data-channel]').length !== 2 || !/النشر على كل القنوات المرتبطة/.test(d.getElementById("acctAccountsList").textContent) || !d.getElementById("chkAllChannels").checked) fail("وضع القناتين لا يعكس اختيار كل القنوات");
+  if (d.querySelectorAll('#acctAccountsList [data-channel]').length !== 2 || !/التخطيط لكل القنوات المرتبطة/.test(d.getElementById("acctAccountsList").textContent) || !d.getElementById("chkAllChannels").checked) fail("وضع القناتين لا يعكس اختيار كل القنوات");
   else ok("القناتان وتلميح كل القنوات والمفتاح تظهر حسب الإعداد المحفوظ");
   window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, all_channels: false } });
   await window.PublishApp.renderConnections("test-token");
-  if (!/النشر على القناة الافتراضية/.test(d.getElementById("acctAccountsList").textContent) || d.getElementById("chkAllChannels").checked) fail("وضع القناة الافتراضية لا يعكس الإعداد المحفوظ");
-  else ok("تلميح القناة الافتراضية يعكس الإعداد عند إيقاف كل القنوات");
+  if (!/مهمة جديدة لكل منصة دون تثبيت قناة/.test(d.getElementById("acctAccountsList").textContent) || !/أحدث اتصال إذا غابت/.test(d.getElementById("acctAccountsList").textContent) || d.getElementById("chkAllChannels").checked) fail("وضع القناة الواحدة لا يعكس الإعداد واختيار وقت التنفيذ");
+  else ok("تلميح القناة الواحدة يشرح الاختيار المتأخر والبديل");
+
+  const targetRows = async (rows, config = ACCOUNT.config) => {
+    window.fetch = async () => ({ ok: true, json: async () => ({ connections: rows }) });
+    window.PublishApp.renderAccount({ ...ACCOUNT, config });
+    await window.PublishApp.renderConnections("test-token");
+    return d.querySelector('.chan-group[data-soc="youtube"]').textContent;
+  };
+  const a = { id: "a", platform: "youtube", account_name: "قناة أ", has_refresh: true };
+  const b = { id: "b", platform: "youtube", account_name: "قناة ب", has_refresh: true };
+  let text = await targetRows([{ ...a, is_default: false }, { ...b, is_default: false }]);
+  if (!/لا تظهر قناة افتراضية/.test(text) || !/قد تتغير الوجهة/.test(text) || !/راجع القناة الافتراضية/.test(d.getElementById("acctStateLabel").textContent)) fail("غياب الافتراضية لا يحذر من الوجهة");
+  else ok("غياب الافتراضية يحذر دون تحديد قناة بعينها");
+  text = await targetRows([{ ...a, is_default: true }, { ...b, is_default: false }]);
+  if (!/تظهر قناة افتراضية واحدة/.test(text) || !/غير المحفوظة/.test(text) || /راجع القناة الافتراضية/.test(d.getElementById("acctStateLabel").textContent)) fail("الافتراضية الواحدة أو الفرق بين المسودة والخادم غير واضح");
+  else ok("افتراضية واحدة في لقطة الخادم مع فصل المسودة");
+  d.getElementById("chkAllChannels").checked = true;
+  await window.PublishApp.renderConnections("test-token");
+  if (!/مهمة جديدة لكل منصة دون تثبيت قناة/.test(d.getElementById("acctAccountsList").textContent)) fail("تعديل المسودة غير المحفوظ غيّر وصف إعداد الخادم");
+  else ok("تعديل المسودة لا يغيّر وصف إعداد الخادم");
+  text = await targetRows([{ ...a, is_default: true }, { ...b, is_default: true }]);
+  if (!/أكثر من قناة افتراضية/.test(text) || !/راجع القناة الافتراضية/.test(d.getElementById("acctStateLabel").textContent)) fail("الافتراضيات المتعددة لم تعرض التحذير");
+  else ok("الافتراضيات المتعددة لا تحدد وجهة");
+  text = await targetRows([{ ...a, is_default: true }, b]);
+  if (!/حالة الافتراضية في القائمة غير معروفة/.test(text) || !/حالة الافتراضية غير معروفة/.test(d.querySelector('[data-channel="b"]').textContent)) fail("بيانات افتراضية ناقصة عوملت كأنها لا");
+  else ok("قيمة افتراضية ناقصة تُعرض كمجهولة");
+  text = await targetRows([{ ...a, is_default: false }]);
+  if (!/لا تظهر قناة افتراضية/.test(text) || !/أحدث اتصال إذا غابت/.test(text)) fail("القناة الوحيدة بلا افتراضية لا توضح البديل");
+  else ok("قناة وحيدة بلا افتراضية لا تخفي البديل");
+  text = await targetRows([{ ...a, is_default: false }, { ...b, is_default: false }], { ...ACCOUNT.config, all_channels: true });
+  if (!/التخطيط لكل القنوات المرتبطة/.test(text) || /راجع القناة الافتراضية/.test(d.getElementById("acctStateLabel").textContent)) fail("وضع كل القنوات لا يعكس التخطيط المحفوظ");
+  else ok("وضع كل القنوات يختلف عن اختيار قناة واحدة");
+  text = await targetRows([{ ...a, is_default: true }], { ...ACCOUNT.config, all_channels: undefined });
+  if (!/إعداد النشر على كل القنوات غير معروف/.test(text) || !/إعداد القنوات غير واضح/.test(d.getElementById("acctStateLabel").textContent)) fail("إعداد مجهول عومل كاختيار محفوظ");
+  else ok("الإعداد غير المعروف لا يعرض كاختيار محفوظ");
+  await targetRows([{ ...a, is_default: true }, { ...b, is_default: false }]);
 
   // القنوات المختارة أو التي تحتاج ربطًا لا تُدفن داخل قائمة المنصات الأخرى.
   const groups = d.getElementById("acctAccountsList");
@@ -379,8 +414,9 @@ window.fetch = async (url, opts = {}) => {
   window.PublishApp.renderAccount({ ...ACCOUNT, reauth: ["youtube"] });
   await window.PublishApp.renderConnections("test-token");
   const warningChannel = groups.querySelector('[data-channel="a"]');
-  if (!warningChannel || warningChannel.closest('#acctMorePlatforms') || !/أعد ربط القناة/.test(warningChannel.textContent)) fail("تحذير القناة المرتبطة لم يبق ظاهرًا");
-  else ok("تحذير إعادة ربط القناة يظل ظاهرًا");
+  const ytGroup = groups.querySelector('.chan-group[data-soc="youtube"]');
+  if (!warningChannel || warningChannel.closest('#acctMorePlatforms') || !/فشل تجديد سابق لهذه المنصة/.test(ytGroup.textContent) || !/لا يحدد القناة/.test(ytGroup.textContent) || /انتهت صلاحية الربط/.test(warningChannel.textContent)) fail("تحذير المنصة لم يبق ظاهرًا أو نُسب خطأً لقناة محددة");
+  else ok("تحذير المنصة يظل ظاهرًا دون الجزم بقناة محددة");
   window.fetch = async () => ({ ok: true, json: async () => ({ connections: [] }) });
   window.PublishApp.renderAccount({ ...ACCOUNT, config: { ...ACCOUNT.config, platforms: [] } });
   await window.PublishApp.renderConnections("test-token");

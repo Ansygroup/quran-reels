@@ -39,7 +39,7 @@ chk("الواجهة تبدأ الربط (op=start)", /op=start&p=/.test(publish)
 chk("الواجهة تقرأ الحسابات المرتبطة (op=list)", /op=list/.test(publish));
 chk("الواجهة تفك الربط (op=disconnect)", /op=disconnect/.test(publish));
 chk("بطاقة الحسابات المرتبطة موجودة في الماركب (#acctAccounts)", /id="acctAccounts"/.test(index) && /id="acctAccountsList"/.test(index));
-chk("نسخة publish.js مرفوعة في الماركب (?v=38)", /publish\.js\?v=38/.test(index));
+chk("نسخة publish.js مرفوعة في الماركب (?v=55)", /publish\.js\?v=55/.test(index));
 
 /* ---------- 2) QRPublish موجودة بدوالها (نداءات app.js/creator.js) ---------- */
 chk("window.QRPublish مُعرَّف (كان undefined فتُهمل كل النداءات)", /window\.QRPublish\s*=\s*window\.PublishApp/.test(publish));
@@ -111,7 +111,7 @@ if (!JSDOM) {
     chk("لينكد إن يظهر «قريبًا» بلا زر ربط", Boolean(li && /قريبًا/.test(li.textContent)));
 
     /* جلسة منتهية: البطاقة كانت تعرض «مرتبط» بلا تحذير رغم أن النشر يفشل بـinvalid_grant */
-    chk("اتصال بلا توكن تجديد يُنبّه بغياب تصريح التجديد", Boolean(yt && /تصريح التجديد غير متاح/.test(yt.textContent)), yt && yt.textContent.slice(0, 80));
+    chk("اتصال بلا توكن تجديد يُنبّه بغياب تصريح صالح محفوظ", Boolean(yt && /تعذّر التحقق من وجود تصريح تجديد صالح/.test(yt.textContent)), yt && yt.textContent.slice(0, 100));
     chk("الخادم يبلّغ has_refresh منطقيًا (بلا توكن)", /has_refresh/.test(fs.readFileSync(path.join(ROOT, "lib", "soc_list.js"), "utf8")));
     chk("التحذير لا يعتمد على انتهاء access_token وحده", /has_refresh === false/.test(fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8")));
     chk("يوتيوب المنتهي يعرض «إعادة الربط»", Boolean(window.document.querySelector('[data-soc="youtube"] [data-connect="youtube"]')));
@@ -124,8 +124,8 @@ if (!JSDOM) {
 
     chk("زر «🎬 اختبار توليد فيديو» يُعرض في الإجراءات السريعة",
       Boolean(window.document.getElementById("quickRenderTest")));
-    chk("connectPath صحيح ليوتيوب", P.connectPath("youtube", "T") === "/api/gw?op=start&p=youtube&t=T", P.connectPath("youtube", "T"));
-    chk("connectPath يحوّل instagram إلى meta", P.connectPath("instagram", "T") === "/api/gw?op=start&p=meta&t=T", P.connectPath("instagram", "T"));
+    chk("connectPath صحيح ليوتيوب بلا توكن في الرابط", P.connectPath("youtube", "T") === "/api/gw?op=start&p=youtube", P.connectPath("youtube", "T"));
+    chk("connectPath يحووّل instagram إلى meta بلا توكن في الرابط", P.connectPath("instagram", "T") === "/api/gw?op=start&p=meta", P.connectPath("instagram", "T"));
     chk("connectPath يعيد null لمنصة بلا ربط", P.connectPath("linkedin", "T") === null);
     chk("connectPath يعيد null بلا توكن", P.connectPath("youtube", "") === null);
 
@@ -144,7 +144,7 @@ if (!JSDOM) {
     const notice2 = w2.document.getElementById("acctNotice");
     chk("init() مع ?setup=meta لا يرمي", !e2, e2 && String(e2.message).slice(0, 80));
     chk("رسالة ?setup تشرح المفاتيح الناقصة", Boolean(notice2 && /غير مهيأ/.test(notice2.textContent)), notice2 && notice2.textContent.slice(0, 90));
-    chk("رسالة ?setup تذكر الربط المتاح (يوتيوب)", Boolean(notice2 && /يوتيوب/.test(notice2.textContent)));
+    chk("رسالة ?setup لا تفترض توفر منصة أخرى", Boolean(notice2 && /الرابط وحده لا يؤكد/.test(notice2.textContent) && !/الربط متاح الآن/.test(notice2.textContent)));
 
     console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
     if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));

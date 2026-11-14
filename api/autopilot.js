@@ -31,7 +31,7 @@ const PLATFORMS = PLATFORM_NAMES;
 const DEFAULTS = {
   enabled: false,
   settings_revision: null, // null means no persisted settings row
-  at_utc: "04:15:00", // 06:15 القاهرة (UTC+2)
+  at_utc: "04:15:00", // الساعة المحلية في القاهرة تعتمد على التاريخ والتوقيت الصيفي
   platforms: ["youtube"],
   template: { content_mode: "mix", reciter_mode: "rotate", background: "rotate", privacy: "public" }
 };
@@ -131,13 +131,15 @@ async function loadRuns(uid) {
   const order = "&order=created_at.desc&limit=12";
   try {
     const rows = await rest(`${base}&select=${RUN_COLS_ARTICLES}${order}`);
-    return { rows: Array.isArray(rows) ? rows : [], articlesColumns: true };
+    if (!Array.isArray(rows)) throw new Error("invalid runs response");
+    return { rows, articlesColumns: true };
   } catch {
     try {
       const rows = await rest(`${base}&select=${RUN_COLS}${order}`);
-      return { rows: Array.isArray(rows) ? rows : [], articlesColumns: false };
+      if (!Array.isArray(rows)) throw new Error("invalid runs response");
+      return { rows, articlesColumns: false };
     } catch {
-      return { rows: [], articlesColumns: false };
+      return { rows: [], articlesColumns: false, unavailable: true };
     }
   }
 }
@@ -197,7 +199,8 @@ async function accountStats(uid) {
   const out = { published: 0, failed: 0, scheduled: 0, last_url: null, last_published_at: null };
   try {
     const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&select=status,external_url,updated_at&order=updated_at.desc&limit=200`);
-    for (const r of Array.isArray(rows) ? rows : []) {
+    if (!Array.isArray(rows)) throw new Error("invalid stats response");
+    for (const r of rows) {
       const st = String((r && r.status) || "");
       if (st === "published") {
         out.published++;
@@ -205,15 +208,55 @@ async function accountStats(uid) {
       } else if (st === "failed") out.failed++;
       else if (st === "scheduled" || st === "publishing") out.scheduled++;
     }
-  } catch { /* لا نُسقط اللوحة بسبب الإحصاء */ }
+  } catch { return null; /* تعذّر القراءة ليس دليلًا على أن الأرقام صفر */ }
   return out;
+}
+
+/* A missing target field is not the same as an explicit SQL NULL. Refuse a
+ * malformed snapshot instead of claiming that no target was recorded. */
+function validReviewRow(r, uid, statuses) {
+  return !!r && r.user_id === uid && statuses.includes(r.status) &&
+    typeof r.id === 'string' && !!r.id.trim() && typeof r.platform === 'string' && !!r.platform.trim() &&
+    Object.prototype.hasOwnProperty.call(r, 'connection_id') &&
+    (r.connection_id === null || (typeof r.connection_id === 'string' && !!r.connection_id.trim()));
+}
+
+/* Queue failures are review-only: no retry or implicit destination inference. */
+async function failedQueueReview(uid, connections) {
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=eq.failed&select=id,user_id,platform,connection_id,status,title,video_name,created_at&order=created_at.desc,id.desc&limit=21`);
+    if (!Array.isArray(rows) || rows.some(r => !validReviewRow(r, uid, ['failed']))) throw new Error('invalid review response');
+    const list = Array.isArray(connections) ? connections : [];
+    return { available: true, truncated: rows.length > 20, items: rows.slice(0,20).map(r => {
+      const channel = r.connection_id && list.find(c => c && c.id === r.connection_id && c.user_id === uid && c.platform === r.platform);
+      return { id:r.id, platform:r.platform, title:String(r.title || r.video_name || '').slice(0,120),
+        created_at:r.created_at || null, channel:channel?.account_name ? String(channel.account_name).slice(0,100) : null,
+        target_recorded: Boolean(r.connection_id) };
+    }) };
+  } catch { return { available:false, truncated:false, items:[] }; }
+}
+
+/* Read-only visibility of upcoming/in-flight queue rows. It does not cancel,
+ * pin targets or prove whether a provider has already accepted an upload. */
+async function pendingQueueReview(uid, connections) {
+  try {
+    const rows = await rest(`/rest/v1/publish_queue?user_id=eq.${encodeURIComponent(uid)}&status=in.(scheduled,publishing,draft)&select=id,user_id,platform,connection_id,status,title,video_name,publish_at&order=publish_at.asc,id.asc&limit=21`);
+    if (!Array.isArray(rows) || rows.some(r => !validReviewRow(r, uid, ['scheduled','publishing','draft']))) throw new Error('invalid queue response');
+    const list = Array.isArray(connections) ? connections : [];
+    return { available: true, truncated: rows.length > 20, items: rows.slice(0, 20).map(r => {
+      const channel = r.connection_id && list.find(c => c && c.id === r.connection_id && c.user_id === uid && c.platform === r.platform);
+      return { id:r.id, platform:r.platform, status:r.status, title:String(r.title || r.video_name || '').slice(0,120),
+        publish_at:r.publish_at || null, channel:channel?.account_name ? String(channel.account_name).slice(0,100) : null,
+        target_recorded: Boolean(r.connection_id) };
+    }) };
+  } catch { return { available:false, truncated:false, items:[] }; }
 }
 
 async function accountData(uid) {
   const config = await q1(`select * from autopilot where user_id=$1 limit 1`, [uid]);
-  const { rows: runs } = await loadRuns(uid);
+  const { rows: runs, unavailable: runsUnavailable = false } = await loadRuns(uid);
   // دعم تعدد القنوات
-  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,platform,account_name,updated_at`);
+  const connections = await rest(`/rest/v1/social_connections?user_id=eq.${encodeURIComponent(uid)}&select=id,user_id,platform,account_name,updated_at`);
   const connectedPlatforms = Array.isArray(connections) ? connections.map(c => c.platform) : [];
   const channelNames = Array.isArray(connections) ? connections.map(c => `${PLATFORMS[c.platform] || c.platform} · ${c.account_name}`).join(" | ") : "";
 
@@ -222,6 +265,7 @@ async function accountData(uid) {
   return {
     config: config ? { ...config, template: parseTemplate(config.template), all_channels: config.all_channels === true } : DEFAULTS,
     runs: Array.isArray(runs) ? runs : [],
+    runs_available: !runsUnavailable,
     connected: connectedPlatforms.length > 0,
     platforms: connectedPlatforms,
     channel: channelNames || "لا توجد قنوات مرتبطة",
@@ -243,6 +287,8 @@ async function accountData(uid) {
     reauth: await reauthPlatforms(uid, connections),
     // حصيلة الأتمتة (منشور/فاشل/مجدول + آخر رابط) لبطاقة الحالة
     stats: await accountStats(uid),
+    failed_review: await failedQueueReview(uid, connections),
+    pending_review: await pendingQueueReview(uid, connections),
     // تفضيلات قابلة للتحرير: الأنماط والخلفيات والقُرّاء المتاحون
     options: {
       content_modes: [...CONTENT_MODES],
@@ -440,4 +486,4 @@ const handler = async (req, res) => {
 
 module.exports = handler;
 /* للاختبارات فقط — Vercel لا يستخدم هذه الخصائص */
-module.exports.__test = { readBody, accountData, latestProgress, loadRuns, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };
+module.exports.__test = { readBody, accountData, latestProgress, loadRuns, failedQueueReview, pendingQueueReview, articleRandom, repoArticles, PLATFORM_LIST, renderSelfTest, providerReady, CONNECT_PROVIDER, lastSelfTest, lastDaily };

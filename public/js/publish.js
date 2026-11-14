@@ -34,16 +34,16 @@ const CONNECT_PLATFORM = { youtube: "youtube", facebook: "meta", instagram: "met
 function connectPath(platform, token) {
   const prov = CONNECT_PLATFORM[String(platform || "").toLowerCase()];
   if (!prov || !token) return null;
-  return `/api/gw?op=start&p=${prov}&t=${encodeURIComponent(token)}`;
+  return `/api/gw?op=start&p=${prov}`;
 }
 
-/* توقيت القاهرة — يقبل تاريخًا/وقتًا كاملًا أو "HH:MM(:SS)" ويُعيد نصًا عربيًا */
+/* وقت UTC دون تاريخ لا يحدد إزاحة القاهرة الصيفية؛ لا نخمنها بتاريخ وهمي. */
 function cairoClockLabel(v) {
   try {
     if (typeof v === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(v.trim())) {
-      const [h, m] = v.trim().split(":");
-      const d = new Date(Date.UTC(2000, 0, 1, Number(h), Number(m)));
-      return d.toLocaleTimeString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" }) + " (القاهرة)";
+      const [h, m, s = "0"] = v.trim().split(":").map(Number);
+      if (h > 23 || m > 59 || s > 59) return "وقت غير صالح";
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} UTC`;
     }
     const d = v instanceof Date ? v : new Date(v);
     if (isNaN(d.getTime())) return String(v || "");
@@ -137,7 +137,7 @@ window.PublishApp = {
       if (!res.ok || !this.validAccountConfig(data.config)) throw new Error("invalid response");
       this.data = data;
       const c = data.config, t = c.template;
-      const summary = { "الأتمتة": c.enabled ? "مفعّلة" : "موقوفة", "المنصات": c.platforms, "كل القنوات": c.all_channels === true ? "نعم" : "لا", "محتوى الفيديو": t.content_mode, "السورة": t.surah ?? "تلقائي", "من آية": t.from ?? "تلقائي", "إلى آية": t.to ?? "تلقائي", "القارئ": t.reciter || "تلقائي", "الخلفية": t.background, "معرّف الصورة": t.background_image_id || "لا يوجد", "تصميم الفيديو": t.design || "تلقائي" };
+      const summary = { "الأتمتة": c.enabled ? "مفعّلة" : "موقوفة", "المنصات": c.platforms, "كل القنوات": c.all_channels === true ? "نعم" : c.all_channels === false ? "لا" : "غير معروف", "محتوى الفيديو": t.content_mode, "السورة": t.surah ?? "تلقائي", "من آية": t.from ?? "تلقائي", "إلى آية": t.to ?? "تلقائي", "القارئ": t.reciter || "تلقائي", "الخلفية": t.background, "معرّف الصورة": t.background_image_id || "لا يوجد", "تصميم الفيديو": t.design || "تلقائي" };
       const output = document.getElementById("acctSavedReviewText"); if (output) output.textContent = JSON.stringify(summary, null, 2);
       this._reviewedUncertain = true;
       this.showUncertainty();
@@ -157,27 +157,45 @@ window.PublishApp = {
     this.renderStatus(this.data || {}); this.renderSteps(this.data || {});
   },
 
+  clearAccountData(uid) {
+    this._accountOwner = uid;
+    this._disconnectAttempts = new Map(); // invalidate delayed notices on identity changes
+    this._connectAttempt = null; // invalidate pending OAuth-start results on identity changes
+    this._autoDirty = false; this._draftRevision = undefined; this._draftBackgroundImageId = null; this._draftAllChannels = false;
+    const editor = document.getElementById("acctAuto"); if (editor) editor._reelGeneration = (editor._reelGeneration || 0) + 1;
+    if (this._progressTimer) clearTimeout(this._progressTimer);
+    this._progressWaiting = false; this._lastProgressRunId = null;
+    this.data = null; this.connections = []; this._connectionsState = "loading"; this._connectionsSeq = (this._connectionsSeq || 0) + 1; this._bgPreviewCache = null;
+    this.lastDailyLine = ""; this.lastReauthLine = ""; this.lastCheckLine = ""; this.lastDiagBox = "";
+    for (const id of ["acctAuto", "acctAccountsList", "acctSteps", "acctKpis", "acctAlerts", "queueList", "acctPendingReviewList", "acctFailedReviewList", "acctQuickActions", "acctProgress", "acctSavedReviewText"]) {
+      const node = document.getElementById(id); if (node) node.innerHTML = "";
+    }
+    const notice = document.getElementById("acctNotice");
+    if (notice) { notice.textContent = ""; notice.hidden = true; notice.style.display = "none"; notice.style.color = ""; delete notice.dataset.loadError; }
+    const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
+    this.reauth = []; this._settingsUncertain = false; this._reviewedUncertain = false; this.showUncertainty();
+    const toggle = document.getElementById("acctEnabled"); if (toggle) { toggle.checked = false; toggle.disabled = true; }
+    const label = document.getElementById("acctStateLabel"); if (label) label.textContent = "جارٍ التحقق…";
+    const next = document.getElementById("acctNextRun"); if (next) next.textContent = "—";
+    const dot = document.getElementById("acctDot"); if (dot) dot.className = "acct-dot";
+  },
+  authIdentityChanged(uid) {
+    uid = typeof uid === "string" && uid ? uid : null;
+    if (this._accountOwner === uid) return;
+    // Invalidate old reads immediately, before awaiting token or user lookups.
+    this._initSeq = (this._initSeq || 0) + 1;
+    this.clearAccountData(uid);
+    if (!uid) {
+      const notice = document.getElementById("acctNotice");
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "سجّل الدخول لعرض لوحة النشر والأتمتة."; }
+    }
+  },
+
   async init() {
     const seq = this._initSeq = (this._initSeq || 0) + 1;
     const uid = await window.AuthApp.getUserId();
     if (seq !== this._initSeq) return;
-    if (this._accountOwner !== uid) {
-      this._accountOwner = uid;
-      this._autoDirty = false; this._draftRevision = undefined; this._draftBackgroundImageId = null; this._draftAllChannels = false;
-      const editor = document.getElementById("acctAuto"); if (editor) editor._reelGeneration = (editor._reelGeneration || 0) + 1;
-      if (this._progressTimer) clearTimeout(this._progressTimer);
-      this._progressWaiting = false; this._lastProgressRunId = null;
-      this.data = null; this.connections = []; this._bgPreviewCache = null;
-      for (const id of ["acctAuto", "acctAccountsList", "acctSteps", "acctKpis", "acctAlerts", "queueList", "acctQuickActions", "acctProgress"]) {
-        const node = document.getElementById(id); if (node) node.innerHTML = "";
-      }
-      const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
-      this.reauth = []; this._settingsUncertain = false; this._reviewedUncertain = false; this.showUncertainty();
-      const toggle = document.getElementById("acctEnabled"); if (toggle) { toggle.checked = false; toggle.disabled = true; }
-      const label = document.getElementById("acctStateLabel"); if (label) label.textContent = "جارٍ التحقق…";
-      const next = document.getElementById("acctNextRun"); if (next) next.textContent = "—";
-      const dot = document.getElementById("acctDot"); if (dot) dot.className = "acct-dot";
-    }
+    if (this._accountOwner !== uid) this.clearAccountData(uid);
     if (!uid) {
       // لا نُخرج المستخدم من الصفحة: نفتح نافذة الدخول ونوضّح المطلوب.
       window.QRAuthUI?.open();
@@ -202,24 +220,25 @@ window.PublishApp = {
     } catch {
       if (seq === this._initSeq) {
         const notice = document.getElementById("acctNotice");
-        if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "تعذّر الاتصال لتحميل الحساب؛ حاول مرة أخرى. تعديلاتك غير المحفوظة باقية في الصفحة."; }
+        if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "تعذّر الاتصال لتحميل الحساب؛ قد تكون الحالة والسجل والمهام المعروضة قديمة. حاول مرة أخرى؛ تعديلاتك غير المحفوظة باقية في الصفحة."; }
       }
       return;
     }
     if (seq !== this._initSeq || this._settingsPending) return;
     if (!res.ok) {
-      if (res.status === 401) {
-        const notice = document.getElementById("acctNotice");
-        if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "سجّل الدخول (من زر الحساب بالأعلى) لعرض لوحة النشر والأتمتة."; }
-        return;
+      const notice = document.getElementById("acctNotice");
+      if (notice) {
+        notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1";
+        notice.textContent = res.status === 401
+          ? "سجّل الدخول مجددًا؛ قد تكون الحالة والسجل والمهام المعروضة قديمة."
+          : "تعذّر تحديث الحساب؛ قد تكون الحالة والسجل والمهام المعروضة قديمة. حاول مرة أخرى؛ تعديلاتك غير المحفوظة باقية.";
       }
-      alert(data.error || "خطأ في تحميل البيانات");
       return;
     }
     
     if (!this.validAccountConfig(data.config)) {
       const notice = document.getElementById("acctNotice");
-      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "بيانات الحساب غير مكتملة؛ لم نغيّر الإعدادات. حاول تحميل الصفحة مرة أخرى."; }
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "بيانات الحساب غير مكتملة؛ قد تكون الحالة والسجل والمهام المعروضة قديمة. لم نغيّر الإعدادات؛ حاول مرة أخرى."; }
       return;
     }
     if (this._settingsUncertain) { this._reviewedUncertain = false; this.showUncertainty(); }
@@ -255,14 +274,15 @@ window.PublishApp = {
   /* ترجمة الأسباب الخام (صفوف كُتبت قبل G44) إلى جملة مفهومة */
   friendly(v) {
     const t = String(v || "");
-    if (/invalid_grant|expired or revoked|unauthorized_client/i.test(t)) {
-      return "انتهت صلاحية ربط " + (/tiktok/i.test(t) ? "تيك توك" : /\bx\b|twitter/i.test(t) ? "X" : "يوتيوب") + " — أعد الربط من بطاقة القنوات";
+    if (/invalid_grant|invalid_client|expired or revoked|unauthorized_client|انتهت صلاحية ربط/i.test(t)) {
+      const platform = /tiktok|تيك توك/i.test(t) ? "تيك توك" : /\bx\b|twitter/i.test(t) ? "X" : /youtube|يوتيوب/i.test(t) ? "يوتيوب" : "المنصة";
+      return "فشل تجديد ربط " + platform + " في هذه المحاولة — تحقق من حالة القنوات؛ قد تحتاج إعادة الربط";
     }
     if (/quotaExceeded|exceeded your quota/i.test(t)) return "تجاوز الحد اليومي للرفع على يوتيوب — راجع النتيجة قبل إعادة المحاولة";
     return t;
   },
 
-  /* موعد التشغيل القادم: 04:15 UTC = 06:15 القاهرة، كل يوم */
+  /* موعد تشغيل الكرون القادم 04:15 UTC؛ الساعة المحلية تتغير صيفًا. */
   nextRunInfo(now = Date.now()) {
     const d = new Date(now);
     const at = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 4, 15, 0, 0));
@@ -288,11 +308,11 @@ window.PublishApp = {
     if (!d || !d.run_date) return "";
     const day = String(d.run_date).slice(0, 10);
     const published = d.status === "published";
-    const running = d.status === "rendering";
-    const state = published ? "✅ منشور" : running ? "⏳ قيد التوليد" : "⚠️ فشل";
-    const why = !published && !running && d.error ? " — " + this.friendly(String(d.error).slice(0, 140)) : "";
-    const link = published && this.safeUrl(d.external_url)
-      ? ` · <a href="${this.esc(this.safeUrl(d.external_url))}" target="_blank" rel="noopener">رابط المنشور</a>` : "";
+    const running = d.status === "rendering" || d.status === "queued";
+    const state = published ? "✅ أُرسل للمنصة" : d.status === "rendering" ? "⏳ قيد التوليد" : d.status === "queued" ? "⏳ في الطابور أو قيد النشر" : d.status === "failed" ? "⚠️ فشل أو نتيجة تحتاج مراجعة" : "حالة غير معروفة";
+    const why = d.status === "failed" && d.error ? " — " + this.friendly(String(d.error).slice(0, 140)) : "";
+    const links = published ? String(d.external_url || "").split(" | ").map(v => this.safeUrl(v.trim())).filter(Boolean) : [];
+    const link = links.map((url, i) => ` · <a href="${this.esc(url)}" target="_blank" rel="noopener noreferrer">رابط المنشور${links.length > 1 ? " " + (i + 1) : ""}</a>`).join("");
     return `<p class="hint ${published ? "ok" : running ? "" : "warn"}" id="acctLastDaily">آخر تشغيل آلي (${this.esc(day)}): ${state}${this.esc(why)}${link} · تُجدول محاولة يومية 04:15 UTC</p>`;
   },
 
@@ -341,14 +361,14 @@ window.PublishApp = {
     const arr = (Array.isArray(list) ? list : []).filter((p) => typeof p === "string" && p);
     if (!Array.isArray(list)) {
       const raw = `${(this.data && this.data.last_daily && this.data.last_daily.error) || ""} ${(this.data && this.data.last_check && this.data.last_check.detail && this.data.last_check.detail.error) || ""}`;
-      if (/invalid_grant|expired or revoked|unauthorized_client/i.test(raw)) {
-        arr.push(/tiktok/i.test(raw) ? "tiktok" : /youtube/i.test(raw) ? "youtube" : "youtube");
+      if (/invalid_grant|invalid_client|expired or revoked|unauthorized_client|انتهت صلاحية ربط/i.test(raw)) {
+        arr.push(/tiktok|تيك توك/i.test(raw) ? "tiktok" : /youtube|يوتيوب/i.test(raw) ? "youtube" : /\bx\b|twitter/i.test(raw) ? "x" : "المنصة غير المحددة");
       }
     }
     if (!arr.length) return "";
     const names = arr.map((p) => this.esc(PLATFORMS[p] || p)).join("، ");
-    return `<div class="auto-warning" id="acctReauth">⚠️ ${names}: انتهى ربط القناة — اضغط «🔄 إعادة الربط» في بطاقة القنوات. لو المشكلة انتهاء تصريح يوتيوب، النظام هيحاول ينشر الفيديو الجاهز بعد الربط لو قدر يتحقق إنه آمن.
-      <div class="row gap-lg" style="margin-top:10px"><button class="btn btn-gold" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button></div></div>`;
+    return `<div class="auto-warning" id="acctReauth">⚠️ فشل تجديد سابق: ${names}. لا يثبت ذلك حالة الربط الحالية أو يحدد القناة؛ راجع القنوات والسجل، وقد تحتاج «🔄 محاولة إعادة الربط». لا تُعاد المحاولات الفاشلة تلقائيًا؛ راجع القناة والسجل قبل أي إعادة نشر.
+      <div class="row gap-lg" style="margin-top:10px"><button class="btn btn-gold" id="btnRetryPublish" data-act="retry_publish">🔍 افحص محاولات أتمتة اليوم الفاشلة</button></div></div>`;
   },
 
   /* ---------- بطاقة الحالة (أعلى الصفحة) ---------- */
@@ -374,8 +394,17 @@ window.PublishApp = {
     const nextTxt = `الموعد المجدول بعد ${this.humanGap(next.inMs)} · ${this.cairoClockLabel(next.at)} القاهرة`;
 
     let state = "idle", title = "الأتمتة موقوفة", hint = "اضغط الزر لتفعيل النشر اليومي التلقائي";
-    if (!conns.length) { state = "idle"; title = "اربط قناة للبدء"; hint = "ما فيش قناة مرتبطة — الأتمتة لا تعمل قبل الربط"; }
-    else if (reauth.length) { state = "warn"; title = "يحتاج إعادة ربط: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "أعد الربط من بطاقة القنوات، وراجع حالة المحاولة الآلية"; }
+    if (this._connectionsState === "loading") { state = "idle"; title = enabled ? "الأتمتة مفعّلة" : "الأتمتة موقوفة"; hint = "جارٍ التحقق من القنوات المرتبطة"; }
+    else if (this._connectionsState === "error") { state = "warn"; title = enabled ? "الأتمتة مفعّلة — حالة القنوات غير معروفة" : "الأتمتة موقوفة — حالة القنوات غير معروفة"; hint = "تعذّر تحميل القنوات؛ حدّث الصفحة للتحقق"; }
+    else if (!conns.length) { state = "idle"; title = enabled ? "الأتمتة مفعّلة، لكن لا توجد قناة مرتبطة" : "اربط قناة للبدء"; hint = "لا توجد قناة مرتبطة حاليًا — لا يمكن النشر قبل الربط"; }
+    else if (reauth.length) { state = "warn"; title = "فشل تجديد سابق: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "راجع القنوات والسجل؛ التحذير لا يؤكد حالة الربط الحالية"; }
+    else if (enabled && (!Array.isArray(config.platforms) || !config.platforms.length || config.platforms.some(p => !conns.some(c => c.platform === p)))) { state = "warn"; title = "الأتمتة مفعّلة — تحقق من وجهات النشر"; hint = "اختر منصة واربط قناة لكل منصة مختارة"; }
+    else if (enabled && conns.some(c => config.platforms?.includes(c.platform) && c.has_refresh === false)) { state = "warn"; title = "الأتمتة مفعّلة — قد تحتاج إعادة ربط"; hint = "تعذّر التحقق من تصريح التجديد لبعض القنوات؛ راجع بطاقة القنوات"; }
+    else if (enabled && typeof config.all_channels !== "boolean") { state = "warn"; title = "الأتمتة مفعّلة — إعداد القنوات غير واضح"; hint = "راجع إعدادات الخادم قبل الاعتماد على الوجهة"; }
+    else if (enabled && config.all_channels === false && config.platforms.some(p => {
+      const rows = conns.filter(c => c.platform === p);
+      return rows.some(c => typeof c.is_default !== "boolean") || rows.filter(c => c.is_default === true).length !== 1;
+    })) { state = "warn"; title = "الأتمتة مفعّلة — راجع القناة الافتراضية"; hint = "الافتراضية غير واضحة في القائمة المحمّلة؛ قد تُختار وجهة أخرى وقت النشر"; }
     else if (enabled) { state = "on"; title = "الأتمتة مفعّلة — محاولة نشر يومية"; hint = nextTxt; }
 
     if (dot) { dot.className = "acct-dot " + state; }
@@ -391,7 +420,7 @@ window.PublishApp = {
     const conns = Array.isArray(this.connections) ? this.connections : [];
     const platforms = Array.isArray(config.platforms) ? config.platforms : [];
     const steps = [
-      { n: 1, t: "اربط قناة", d: "يوتيوب / فيسبوك / إنستغرام / تيك توك / X", done: conns.length > 0 },
+      { n: 1, t: "اربط قناة", d: this._connectionsState === "error" ? "تعذّر التحقق من القنوات" : this._connectionsState === "loading" ? "جارٍ التحقق من القنوات…" : "يوتيوب / فيسبوك / إنستغرام / تيك توك / X", done: this._connectionsState !== "error" && this._connectionsState !== "loading" && conns.length > 0 },
       { n: 2, t: "اختر المنصات والمحتوى", d: platforms.length ? platforms.map((p) => PLATFORMS[p] || p).join(" · ") : "لم تُختَر منصة بعد", done: platforms.length > 0 },
       { n: 3, t: "فعّل الأتمتة", d: config.enabled ? "محاولة تلقائية كل يوم 04:15 UTC" : "موقوفة — فعّلها من الزر بالأعلى", done: config.enabled === true },
     ];
@@ -406,7 +435,11 @@ window.PublishApp = {
   renderKpis(data = {}) {
     const wrap = document.getElementById("acctKpis");
     if (!wrap) return;
-    const st = data.stats || {};
+    const st = data.stats && typeof data.stats === "object" ? data.stats : null;
+    if (!st) {
+      wrap.innerHTML = ["منشور", "في الطابور", "فشل", "آخر نشر"].map(label => `<div class="kpi"><b>—</b><span>${label}</span></div>`).join("") + '<p class="hint warn">تعذّر تحميل إحصاءات النشر. حاول تحديث الصفحة.</p>';
+      return;
+    }
     const last = st.last_published_at ? new Date(st.last_published_at) : null;
     const lastTxt = last && !Number.isNaN(last.getTime()) ? this.cairoClockLabel(last) : "—";
     const kpi = (v, l, cls = "") => `<div class="kpi ${cls}"><b>${this.esc(v)}</b><span>${this.esc(l)}</span></div>`;
@@ -505,7 +538,7 @@ window.PublishApp = {
       </div>
       <div class="f-group"><label>المنصات التي يُنشر عليها</label><div class="plat-checks" id="acctPlatforms"></div></div>
       ${multi ? `<div class="switch-row">
-        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل يُنشر على القناة الافتراضية (⭐) فقط · عندك ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
+        <div class="t">انشر على كل القنوات المرتبطة<small>عند التعطيل قد تختار المهمة بلا قناة محددة الافتراضية وقت النشر، أو أحدث اتصال إذا غابت؛ المهام الموجودة قد تختلف. القنوات الظاهرة: ${[...chanCount.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${this.esc(PLATFORMS[k] || k)}: ${n}`).join(" · ")}</small></div>
         <label class="switch"><input type="checkbox" id="chkAllChannels" ${config.all_channels ? "checked" : ""}><i></i></label>
       </div>` : ""}
       <div class="row gap-lg acct-actions">
@@ -689,16 +722,18 @@ window.PublishApp = {
   },
 
   /* ---------- سجل التشغيل ---------- */
-  renderHistory(runs) {
+  renderHistory(runs, available = true) {
     const list = document.getElementById("queueList");
     if (!list) return;
+    if (!available) { list.innerHTML = '<p class="hint warn">تعذّر تحميل السجل. حاول تحديث الصفحة؛ هذا لا يعني عدم وجود تشغيلات.</p>'; return; }
     const rows = Array.isArray(runs) ? runs : [];
     if (!rows.length) {
       list.innerHTML = `<p class="hint">لا يوجد سجل بعد — أول تشغيل سيظهر هنا تلقائيًا.</p>`;
       return;
     }
     list.innerHTML = rows.map((r) => {
-      const state = r.status === "published" ? "✅ منشور" : r.status === "rendering" ? "⏳ قيد الإنشاء" : "❌ فشل";
+      const state = ({ published: "✅ أُرسل للمنصة", rendering: "⏳ قيد الإنشاء", queued: "⏳ في الطابور أو قيد النشر", failed: "⚠️ لم تكتمل المحاولة" })[r.status] || "حالة غير معروفة";
+      const links = String(r.external_url || "").split(" | ").map(v => this.safeUrl(v.trim())).filter(Boolean);
       return `<div class="auto-run ${this.esc(r.status || "")}">
         <div class="auto-run-head">
           <span class="auto-run-title">${this.esc(r.title || `سورة ${String(r.recipe_key || "").split(":")[0] || "—"}`)}</span>
@@ -709,10 +744,51 @@ window.PublishApp = {
           <span class="auto-run-status">${state}</span>
           ${r.article_title ? `<span class="auto-run-article">📚 ${this.esc(r.article_title)}</span>` : ""}
         </div>
-        ${this.safeUrl(r.external_url) ? `<div class="auto-run-url"><a href="${this.esc(this.safeUrl(r.external_url))}" target="_blank" rel="noopener">🔗 رابط النشر</a></div>` : ""}
+        ${links.length ? `<div class="auto-run-url">${links.map((url, i) => `<a href="${this.esc(url)}" target="_blank" rel="noopener noreferrer">🔗 رابط النشر ${links.length > 1 ? i + 1 : ""}</a>`).join(" · ")}</div>` : ""}
         ${r.error ? `<div class="auto-run-error">⚠️ ${this.esc(this.friendly(r.error))}</div>` : ""}
       </div>`;
     }).join("");
+  },
+
+  validReviewItems(review, statuses = null) {
+    return Boolean(review && review.available === true && Array.isArray(review.items) && review.items.every(item =>
+      item && typeof item.id === "string" && item.id.trim() && typeof item.platform === "string" && item.platform.trim() &&
+      typeof item.target_recorded === "boolean" && (item.channel == null || typeof item.channel === "string") &&
+      (item.target_recorded || !item.channel) && (!statuses || statuses.includes(item.status))));
+  },
+
+  reviewTimestamp(value) {
+    // Queue timestamps need a date and explicit zone; otherwise Cairo is ambiguous.
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) || Number.isNaN(Date.parse(value))) return "وقت غير متاح";
+    return this.cairoClockLabel(value) + " (القاهرة)";
+  },
+
+  renderPendingReview(review) {
+    const list = document.getElementById("acctPendingReviewList");
+    if (!list) return;
+    if (!this.validReviewItems(review, ["scheduled", "publishing", "draft"])) {
+      list.innerHTML = '<p class="hint warn">تعذّر تحميل مهام النشر أو التحقق من بياناتها؛ هذا لا يعني عدم وجود مهام.</p>'; return;
+    }
+    if (!review.items.length) { list.innerHTML = '<p class="hint">لم تظهر مهام مجدولة أو مسودات أو مهام قيد النشر في هذه القراءة؛ لا يثبت ذلك خلو الطابور.</p>'; return; }
+    const states = {scheduled: "مجدولة", publishing: "قيد النشر", draft: "مسودة"};
+    list.innerHTML = review.items.map(item => {
+      const target = item.channel ? `القناة المرتبطة حاليًا بالمعرّف المسجّل: ${item.channel}` : item.target_recorded ? "تعذّر معرفة اسم القناة المسجّلة من القائمة المحمّلة؛ راجع المهمة" : "الوجهة غير محددة في المهمة؛ قد تُختار قناة أخرى عند النشر";
+      const when = this.reviewTimestamp(item.publish_at);
+      return `<div class="auto-run"><div class="auto-run-head"><span class="auto-run-title">${this.esc(item.title || "فيديو بلا عنوان")}</span><span class="auto-run-date">${this.esc(when)}</span></div><div class="auto-run-body"><span>${this.esc(PLATFORMS[item.platform] || item.platform || "منصة غير معروفة")}</span><span>${this.esc(states[item.status] || "حالة غير معروفة")}</span><span>${this.esc(target)}</span></div><small class="hint">معرّف المهمة: ${this.esc(item.id || "غير متاح")}</small></div>`;
+    }).join("") + (review.truncated ? '<p class="hint warn">تظهر أول ٢٠ مهمة حسب موعد النشر؛ قد توجد مهام أخرى.</p>' : "");
+  },
+
+  renderFailedReview(review) {
+    const list = document.getElementById("acctFailedReviewList");
+    if (!list) return;
+    if (!this.validReviewItems(review)) {
+      list.innerHTML = '<p class="hint warn">تعذّر تحميل قائمة المحاولات أو التحقق من بياناتها؛ هذا لا يعني عدم وجودها.</p>'; return;
+    }
+    if (!review.items.length) { list.innerHTML = '<p class="hint">لم تظهر محاولات فاشلة في هذه القراءة؛ لا يثبت ذلك خلو السجل.</p>'; return; }
+    list.innerHTML = review.items.map(item => {
+      const target = item.channel ? `القناة المرتبطة حاليًا بالمعرّف المسجّل: ${item.channel}` : item.target_recorded ? "تعذّر معرفة اسم القناة المسجّلة من القائمة المحمّلة" : "الوجهة الأصلية غير محددة في السجل";
+      return `<div class="auto-run"><div class="auto-run-head"><span class="auto-run-title">${this.esc(item.title || "فيديو بلا عنوان")}</span><span class="auto-run-date">${this.esc(this.reviewTimestamp(item.created_at))}</span></div><div class="auto-run-body"><span>${this.esc(PLATFORMS[item.platform] || item.platform || "منصة غير معروفة")}</span><span>${this.esc(target)}</span></div><small class="hint">معرّف المحاولة: ${this.esc(item.id || "غير متاح")}</small></div>`;
+    }).join("") + (review.truncated ? '<p class="hint warn">تظهر أحدث ٢٠ محاولة فقط؛ قد توجد محاولات أقدم.</p>' : "");
   },
 
   /* ---------- بطاقة التشخيص ---------- */
@@ -725,7 +801,7 @@ window.PublishApp = {
         <button class="btn btn-ghost" id="quickSelfTest" data-act="selftest">🔍 فحص محرّك التوليد</button>
         <button class="btn btn-ghost" id="quickRenderTest" data-act="selftest_deep">🎬 اختبار توليد فيديو</button>
         <button class="btn btn-ghost" id="quickRunAll" data-act="run_all">⚡ تشغيل حسب الإعدادات المحفوظة</button>
-        ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔁 انشر الفيديو الجاهز</button>'}
+        ${this.lastReauthLine ? "" : '<button class="btn btn-ghost" id="btnRetryPublish" data-act="retry_publish">🔍 افحص محاولات أتمتة اليوم الفاشلة</button>'}
       </div>`;
     // نتائج التشغيل والفحص والتنبيهات لا تختفي داخل التشخيص المغلق.
     const alerts = document.getElementById("acctAlerts");
@@ -737,7 +813,7 @@ window.PublishApp = {
     const runs = Array.isArray(data.runs) ? data.runs : [];
     this.available = Array.isArray(data.available) && data.available.length
       ? data.available
-      : ALL_PLATFORMS.map((k) => ({ key: k, name: PLATFORMS[k] || k, publish: true }));
+      : ALL_PLATFORMS.map((k) => ({ key: k, name: PLATFORMS[k] || k, publish: false, ready: false }));
     this.reauth = Array.isArray(data.reauth) ? data.reauth.slice() : [];
     this.lastDailyLine = this.dailyLine(data.last_daily);
     this.lastCheckLine = this.checkLine(data.last_check);
@@ -748,16 +824,33 @@ window.PublishApp = {
     this.renderSteps(data);
     this.renderKpis(data);
     if (!this._autoDirty && !this._settingsPending) this.renderAutoPanel(data);
-    this.renderHistory(runs);
+    this.renderHistory(runs, data.runs_available !== false);
+    this.renderPendingReview(data.pending_review);
+    this.renderFailedReview(data.failed_review);
     this.renderTools(data);
+  },
+
+  /* A token/response captured for one account must not update or redirect a
+   * different account, even if the auth-change event has not arrived yet. */
+  async accountStillCurrent(owner) {
+    if (!owner || owner !== this._accountOwner) return false;
+    let uid = null;
+    try { uid = await window.AuthApp.getUserId(); } catch { /* unknown is not current */ }
+    if (owner !== this._accountOwner) return false;
+    if (uid === owner) return true;
+    // Clear stale account data even when the authentication event is delayed.
+    this.init().catch(() => {});
+    return false;
   },
 
   /* قائمة الحسابات المرتبطة + أزرار ربط/فك ربط لكل منصة */
   async renderConnections(token, initSeq = null) {
     const owner = this._accountOwner;
+    const connectionSeq = this._connectionsSeq = (this._connectionsSeq || 0) + 1;
     const card = document.getElementById("acctAccounts");
     const wrap = document.getElementById("acctAccountsList");
-    if (!card || !wrap) return;
+    if (!card || !wrap || !(await this.accountStillCurrent(owner))) return;
+    if (connectionSeq !== this._connectionsSeq || (initSeq !== null && initSeq !== this._initSeq)) return;
     card.hidden = false;
     // نحافظ على القسم المفتوح عند تحديث القنوات بعد ربط أو فك ربط.
     const moreWasOpen = Boolean(wrap.querySelector("#acctMorePlatforms")?.open);
@@ -767,21 +860,26 @@ window.PublishApp = {
     try {
       const res = await fetch("/api/gw?op=list", { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => ({}));
-      conns = Array.isArray(data.connections) ? data.connections : [];
-      if (!res.ok) throw new Error("connections unavailable");
+      if (!res.ok || !Array.isArray(data.connections)) throw new Error("connections unavailable");
+      conns = data.connections;
     } catch {
-      if (owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq)) return;
+      if (connectionSeq !== this._connectionsSeq || owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq) || !(await this.accountStillCurrent(owner))) return;
+      if (connectionSeq !== this._connectionsSeq || (initSeq !== null && initSeq !== this._initSeq)) return;
+      this._connectionsState = "error";
       wrap.innerHTML = '<p class="hint warn">تعذّر تحميل الحسابات المرتبطة. حدّث الصفحة وحاول تاني.</p>';
+      this.renderStatus(this.data || {}); this.renderSteps(this.data || {});
       return;
     }
-    if (owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq)) return;
+    if (connectionSeq !== this._connectionsSeq || owner !== this._accountOwner || (initSeq !== null && initSeq !== this._initSeq) || !(await this.accountStillCurrent(owner))) return;
+    if (connectionSeq !== this._connectionsSeq || (initSeq !== null && initSeq !== this._initSeq)) return;
     this.connections = conns;
+    this._connectionsState = "loaded";
 
     const ICONS = { youtube: "▶️", facebook: "📘", instagram: "📸", tiktok: "🎵", x: "✖️", linkedin: "💼", telegram: "✈️", whatsapp: "💬" };
     const reauthList = Array.isArray(this.reauth) ? this.reauth : [];
-    /* التحذير للحالات الحقيقية فقط: منصة تحتاج إعادة ربط أو اتصال بلا توكن
-     * تجديد. صلاحية access_token تنتهي كل ساعة وتُجدَّد تلقائيًا. */
-    const expired = (c) => reauthList.includes(c.platform) || c.has_refresh === false;
+    // reauth is platform-level historical evidence, not a per-channel result.
+    // A missing usable stored refresh credential is a separate channel-level warning.
+    const missingRefresh = (c) => c.has_refresh === false;
     const selected = Array.isArray(this.data?.config?.platforms) ? this.data.config.platforms : [];
 
     const block = (p) => {
@@ -793,27 +891,41 @@ window.PublishApp = {
         ? '<small class="hint warn">المنصة مختارة للنشر، لكن مفيش قناة مرتبطة بيها.</small>' : "";
 
       if (mine.length) {
+        const defaultsKnown = mine.every(c => typeof c.is_default === "boolean");
+        const defaultCount = mine.filter(c => c.is_default === true).length;
+        const mode = this.data?.config?.all_channels;
+        const savedMode = mode === true
+          ? "إعداد الأتمتة المعروض من الخادم: التخطيط لكل القنوات المرتبطة عند التشغيل."
+          : mode === false ? "إعداد الأتمتة المعروض من الخادم: مهمة جديدة لكل منصة دون تثبيت قناة فيها."
+          : "إعداد النشر على كل القنوات غير معروف؛ راجع إعدادات الخادم.";
+        const defaultHint = !defaultsKnown
+          ? "حالة الافتراضية في القائمة غير معروفة."
+          : defaultCount > 1 ? "تظهر أكثر من قناة افتراضية؛ لا يمكن الجزم بأيّها ستُختار."
+          : defaultCount === 0 ? "لا تظهر قناة افتراضية في القائمة المحمّلة."
+          : "تظهر قناة افتراضية واحدة في القائمة المحمّلة.";
         const one = (c) => {
-          const bad = expired(c);
+          const bad = missingRefresh(c);
           return `<div class="chan-card ${bad ? "off" : "on"}" data-soc="${this.esc(p.key)}" data-channel="${this.esc(c.id)}">
             <span class="chan-ic">${ICONS[p.key] || "🔗"}</span>
             <span class="chan-info">
               <b>${this.esc(String(c.account_name || "مرتبط").slice(0, 40))}</b>
-              <small class="${bad ? "warn" : "ok"}">${bad ? (reauthList.includes(c.platform) ? "⚠️ انتهت صلاحية الربط — أعد ربط القناة" : "⚠️ تصريح التجديد غير متاح — أعد ربط القناة") : "✅ الحساب مرتبط"}</small>
+              <small class="${bad ? "warn" : "ok"}">${bad ? "⚠️ تعذّر التحقق من وجود تصريح تجديد صالح — قد تحتاج إعادة الربط" : "القناة مسجّلة؛ صلاحيتها الحالية غير مؤكدة"}</small>
             </span>
             <span class="chan-acts">
-              ${c.is_default ? '<span class="hint ok">⭐ افتراضية</span>' : `<button class="btn btn-ghost btn-sm" data-default="${this.esc(c.id)}">⭐ اجعلها الافتراضية</button>`}
-              ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}">🔄 إعادة الربط</button>` : ""}
-              <button class="btn btn-ghost btn-sm" data-unlink="${this.esc(c.id)}" data-platform="${this.esc(p.key)}">فك الربط</button>
+              ${c.is_default === true ? '<span class="hint ok">⭐ افتراضية</span>' : typeof c.is_default === "boolean" ? `<button class="btn btn-ghost btn-sm" data-default="${this.esc(c.id)}" disabled title="تغيير القناة الافتراضية متوقف مؤقتًا لحماية وجهة النشر">⭐ تغيير الافتراضية غير متاح حاليًا</button>` : '<span class="hint warn">حالة الافتراضية غير معروفة</span>'}
+              ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}" data-connect-intent="relink" ${this._connectPending ? "disabled" : ""}>🔄 محاولة إعادة الربط</button>` : ""}
+              <button class="btn btn-ghost btn-sm" data-unlink="${this.esc(c.id)}" data-platform="${this.esc(p.key)}" ${this._disconnectPending?.has(JSON.stringify([owner, c.id])) ? "disabled" : ""}>فك الربط</button>
             </span>
           </div>`;
         };
         return `<div class="chan-group" data-soc="${this.esc(p.key)}">
           ${head}
+          ${reauthList.includes(p.key) ? '<small class="hint warn">⚠️ فشل تجديد سابق لهذه المنصة؛ لا يحدد القناة أو يثبت حالة الربط الحالية.</small>' : ""}
           <div class="chan-list">${mine.map(one).join("")}</div>
           <div class="chan-foot">
-            ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}">➕ إضافة قناة</button>` : ""}
-            <small class="hint">${this.data?.config?.all_channels ? "اختيارك الحالي: النشر على كل القنوات المرتبطة." : "اختيارك الحالي: النشر على القناة الافتراضية (⭐)."} أضف قناة ثانية بحساب صاحبها.</small>
+            ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}" data-connect-intent="add" ${this._connectPending ? "disabled" : ""}>➕ إضافة قناة</button>` : ""}
+            <small class="hint">${savedMode} هذا عرض للخادم وليس لتعديلات المسودة غير المحفوظة. ${defaultHint} عند النشر بلا قناة محددة قد يختار النظام الافتراضية وقت التنفيذ، أو أحدث اتصال إذا غابت؛ عند تساوي أوقات التحديث أو نقصها لا يمكن الجزم بالاختيار. وقد تتغير الوجهة. القائمة لقطة قد تكون غير مكتملة ولا تحدد وجهات المهام الموجودة.</small>
+            <small class="hint">الحساب يُختار لدى المنصة؛ محاولة إعادة الربط لا تضمن تحديث القناة المقصودة، والإضافة قد تحدّث حسابًا موجودًا. راجع القنوات والأتمتة بعد العودة.</small>
           </div>
         </div>`;
       }
@@ -827,8 +939,8 @@ window.PublishApp = {
           <button class="btn btn-ghost btn-sm" disabled title="أضف مفاتيح التطبيق في Vercel ثم أعد النشر">⚙️ غير مهيأ</button></div>`;
       }
       return `<div class="chan-group" data-soc="${this.esc(p.key)}">${head}${missing}
-        <div class="chan-foot"><button class="btn btn-em btn-sm" data-connect="${this.esc(p.key)}">🔗 اربط من ${this.esc(p.name)}</button>
-        <small class="hint">بعد الربط تُضبط الأتمتة تلقائيًا؛ وقد تحتاج لإعادة الربط لو انتهت الصلاحية</small></div></div>`;
+        <div class="chan-foot"><button class="btn btn-em btn-sm" data-connect="${this.esc(p.key)}" ${this._connectPending ? "disabled" : ""}>🔗 اربط من ${this.esc(p.name)}</button>
+        <small class="hint">قد يؤدي الربط إلى تفعيل الأتمتة أو إضافة المنصة؛ راجع الإعدادات بعد العودة.</small></div></div>`;
     };
 
     // القنوات المرتبطة والمنصات المختارة بلا ربط تبقى ظاهرة؛ الباقي للفتح عند الحاجة.
@@ -850,52 +962,58 @@ window.PublishApp = {
     return conns;
   },
 
-  /* رسالة العودة من المزوّد: /#/account?linked=youtube | linked=youtube_err | linked=err */
+  /* معلمات العودة ليست إثباتًا للربط أو لهوية الحساب: يمكن فتح رابط قديم أو معدّل. */
   reportLinkedFlag() {
     try {
       const raw = String(window.location.hash || "");
-      /* ?setup=<provider> تعني أن الخادم لا يملك مفاتيح المزوّد بعد */
-      const setup = raw.match(/[?&]setup=([a-z_]+)/i);
-      if (setup) {
-        const prov = setup[1].toLowerCase();
-        const label = prov === "meta" ? "فيسبوك/إنستغرام" : (PLATFORMS[prov] || prov);
-        const notice0 = document.getElementById("acctNotice");
-        const msg0 = `⚙️ ربط ${label} غير مهيأ بعد: مفاتيح التطبيق (${prov === "meta" ? "META_APP_ID وMETA_APP_SECRET" : prov.toUpperCase() + "_CLIENT_*"}) غير مضبوطة في Vercel. الربط متاح الآن ليوتيوب وتيك توك وX.`;
-        if (notice0) { notice0.hidden = false; notice0.style.display = "block"; notice0.textContent = msg0; notice0.style.color = "#ffcf8b"; }
-        if (typeof toast === "function") toast(msg0);
-        try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
-        return;
+      const mark = raw.indexOf("?");
+      if (mark < 0 || raw.slice(0, mark) !== "#/account") return;
+      const params = new URLSearchParams(raw.slice(mark + 1));
+      const setup = params.get("setup"), flag = params.get("linked");
+      if (setup === null && flag === null) return;
+      const labels = {youtube:"يوتيوب", meta:"فيسبوك/إنستغرام", facebook:"فيسبوك", instagram:"إنستغرام", tiktok:"تيك توك", x:"X"};
+      const lookup = key => Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : "المنصة";
+      const duplicate = params.getAll("setup").length > 1 || params.getAll("linked").length > 1 || (setup !== null && flag !== null);
+      let msg;
+      if (duplicate) {
+        msg = "⚠️ رابط العودة غير واضح؛ راجع القنوات المرتبطة وحالة الأتمتة للحساب الحالي قبل المحاولة مجددًا.";
+      } else if (setup !== null) {
+        const provider = String(setup).toLowerCase();
+        msg = `⚙️ يشير رابط العودة إلى أن ربط ${lookup(provider)} غير مهيأ على الخادم. راجع حالة المنصات أو تواصل مع المسؤول؛ الرابط وحده لا يؤكد الإعداد الحالي.`;
+      } else {
+        const value = String(flag).toLowerCase();
+        const failed = value === "err" || value.endsWith("_err");
+        const base = failed ? value.replace(/_err$/, "") : value;
+        const label = lookup(base);
+        const known = Object.prototype.hasOwnProperty.call(labels, base);
+        const why = params.getAll("w").length === 1 ? params.get("w") : "";
+        const reasons = {
+          denied: "ربما رُفض التفويض أو ألغاه المستخدم.",
+          store: "تعذّر تأكيد حفظ الربط؛ قد تكون بعض القنوات حُفظت بالفعل، خصوصًا في فيسبوك/إنستغرام.",
+          no_code: "لم يصل رمز التفويض؛ ابدأ الربط من المتصفح نفسه.",
+          state: "تعذّر التحقق من جلسة التفويض؛ ابدأ الربط من المتصفح نفسه.",
+          token: "تعذّر تبادل رمز التفويض.",
+          identity: "تعذّر التحقق من هوية الحساب لدى المزوّد؛ راجع الحساب والصلاحيات قبل المحاولة مجددًا.",
+          pages: "لا يدعم الربط اختيار صفحة من عدة صفحات أو قائمة غير مكتملة بعد؛ راجع الصفحات والصلاحيات قبل المحاولة.",
+          channel: "لم تصل قناة يوتيوب صالحة من المزوّد.",
+        };
+        if (failed || !known) {
+          const detail = Object.prototype.hasOwnProperty.call(reasons, why) ? reasons[why] : "راجع القنوات قبل إعادة المحاولة.";
+          msg = `⚠️ يشير رابط العودة إلى أن ربط ${label} ربما لم يكتمل. ${detail} راجع القنوات المرتبطة وحالة الأتمتة للحساب الحالي؛ الرابط وحده لا يؤكد النتيجة.`;
+        } else {
+          msg = `ℹ️ يشير رابط العودة إلى ربط ${label}، لكنه لا يؤكد نجاحه أو الحساب الذي تم الربط له. راجع القنوات المرتبطة وحالة الأتمتة للحساب الحالي؛ المحاولات الفاشلة لا تُعاد تلقائيًا.`;
+          if (params.getAll("auto_error").length === 1 && params.get("auto_error") === "1") msg += " قد تكون الأتمتة لم تُفعّل؛ راجع إعداداتها.";
+          if (params.getAll("auto_resume").length === 1 && ["published", "failed"].includes(params.get("auto_resume"))) msg += " هذا رابط عودة قديم؛ راجع السجل للتحقق من أي محاولة سابقة.";
+          if (params.getAll("channel").length === 1 && params.get("channel") === "nondefault") msg += " قد تكون القناة دي مش الافتراضية؛ تغيير الافتراضية متوقف مؤقتًا لحماية وجهة النشر.";
+        }
       }
-      const m = raw.match(/[?&]linked=([a-z_]+)/i);
-      if (!m) return;
-      const flag = m[1].toLowerCase();
-      /* الخادم يرسل linked=youtube_err مع ?w=<سبب> — نزيل _err للاسم ونشرح السبب.
-       * (كانت الرسالة تعرض «youtube_err» حرفيًا وتطلب إعادة المحاولة بلا سبب.) */
-      const base = flag.replace(/_err$/, "");
-      const ok = (Boolean(CONNECT_PLATFORM[base]) || base === "meta") && !/_err$/.test(flag) && flag !== "err";
-      const label = PLATFORMS[base] || (base === "meta" ? "فيسبوك/إنستغرام" : base);
-      const whyKey = (raw.match(/[?&]w=([a-z_]+)/i) || [])[1] || "";
-      const WHY = {
-        denied: "لم توافق على كل الصلاحيات في شاشة جوجل/المزوّد (رفع الفيديوهات وقراءة القناة). إن كان التطبيق في وضع الاختبار فأضف حسابك كـ Test user ثم أعد المحاولة.",
-        store: "تعذّر حفظ الربط على الخادم — حاول تاني.",
-        no_code: "لم يصل رمز التفويض من المزوّد — ابدأ الربط من جديد من نفس المتصفح.",
-        state: "انتهت صلاحية جلسة التفويض أو مُنعت كوكيز الطرف الأول — أعد المحاولة الآن من نفس المتصفح دون فتح النافذة في تبويب آخر.",
-        token: "وصل الرمز لكن تبادله فشل — تحقّق من أسرار التطبيق (Client ID/Secret) وعنوان إعادة التوجيه المسجّل.",
-        channel: "جوجل لم ترجع قناة يوتيوب واضحة. تأكد إن الحساب عنده قناة ووافق على صلاحية قراءتها، ثم أعد الربط.",
-        err: "لم يصل رمز التفويض — أعد المحاولة من نفس المتصفح.",
-      };
       const notice = document.getElementById("acctNotice");
-      const msg = ok
-        ? (/auto_error=1/.test(raw) ? `⚠️ تم ربط ${label} لكن تعذّر تفعيل الأتمتة؛ احفظ الإعدادات يدويًا.`
-          : /auto_resume=published/.test(raw) ? `✅ تم ربط ${label} ونشر الفيديو الجاهز تلقائيًا.`
-          : /auto_resume=failed/.test(raw) ? `⚠️ تم ربط ${label}، لكن محاولة نشر الفيديو الجاهز لم تكتمل. راجع السجل.`
-          : `✅ تم ربط ${label}. راجع حالة الأتمتة من أعلى الصفحة.`)
-        : `⚠️ لم يكتمل ربط ${label}${whyKey ? " (" + whyKey + ")" : ""}: ${WHY[whyKey] || "أعد المحاولة، وتأكد من الموافقة على كل الصلاحيات المطلوبة."}`;
-      const channelHint = ok && /[?&]channel=nondefault(?:&|$)/.test(raw) ? " القناة دي مش الافتراضية؛ في وضع قناة واحدة، لو عايز تنشر عليها اختار «اجعلها الافتراضية» من بطاقة القنوات." : "";
-      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg + channelHint; notice.style.color = ok ? "#7ee0a2" : "#ffb4a2"; }
-      if (typeof toast === "function") toast(msg + channelHint);
-      // تنظيف الرابط حتى لا تتكرر الرسالة عند كل تحديث
-      try { history.replaceState(null, "", window.location.pathname + "#/account"); } catch {}
+      if (notice) { notice.hidden = false; notice.style.display = "block"; notice.textContent = msg; notice.style.color = "#ffcf8b"; }
+      if (typeof toast === "function") toast(msg);
+      // احتفظ بمعلمات الرابط غير المتعلقة بالعودة حتى لا تضيع عند التنظيف.
+      for (const key of ["setup", "linked", "w", "auto_error", "auto_resume", "channel"]) params.delete(key);
+      const rest = params.toString();
+      try { history.replaceState(null, "", window.location.pathname + window.location.search + "#/account" + (rest ? "?" + rest : "")); } catch {}
     } catch { /* تجاهل */ }
   },
 
@@ -908,52 +1026,174 @@ window.PublishApp = {
     wrap.addEventListener("click", async (e) => {
       const btnC = e.target.closest("[data-connect]");
       const btnD = e.target.closest("[data-unlink]");
+      const owner = this._accountOwner;
       if (btnC) {
-        const url = connectPath(btnC.dataset.connect, await window.AuthApp.getToken());
-        if (!url) { if (typeof toast === "function") toast("سجّل الدخول أولًا لربط القناة", "err"); return; }
-        btnC.disabled = true;
+        if (btnC.disabled || !owner || this._connectPending) return;
+        if (btnC.dataset.connectIntent === "relink" || btnC.dataset.connectIntent === "add") {
+          const seq = this._initSeq;
+          const meta = CONNECT_PLATFORM[btnC.dataset.connect] === "meta";
+          const msg = "اختيار الحساب يتم لدى المنصة، وليس من زر القناة هنا. إعادة الربط قد تضيف قناة أو تحدّث قناة أخرى، والإضافة قد تحدّث حسابًا موجودًا بدل إنشاء قناة جديدة. قد يُنشئ الربط أتمتة مفعّلة أو يضيف منصة لإعداد موجود؛ راجع القنوات والأتمتة بعد العودة." +
+            (meta ? " قد يتأثر فيسبوك وإنستغرام معًا." : "") + " هل تريد المتابعة؟";
+          let approved = false;
+          try { approved = window.confirm(msg) === true; } catch { return; }
+          if (!approved || owner !== this._accountOwner || seq !== this._initSeq || this._connectPending || !wrap.contains(btnC)) return;
+        }
+        // Only one start per tab at a time, including across a list rerender.
+        // Provider state cookies can overlap (Facebook and Instagram share Meta).
+        const attempt = Symbol("connect attempt"), platform = btnC.dataset.connect;
+        this._connectPending = attempt; this._connectAttempt = attempt;
+        const original = btnC.textContent;
+        wrap.querySelectorAll("[data-connect]").forEach(button => { button.disabled = true; });
         btnC.textContent = "⏳ جارٍ التحويل…";
-        window.location.href = url; // الخادم يحوّل بدوره إلى المزوّد (302)
+        const controller = new AbortController();
+        let sent = false, timer;
+        const deadline = new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("deadline")); }, 20000); });
+        const current = async () => {
+          if (controller.signal.aborted || this._connectAttempt !== attempt || owner !== this._accountOwner) return false;
+          let uid = null;
+          try { uid = await window.AuthApp.getUserId(); } catch { /* unknown is not current */ }
+          if (controller.signal.aborted || this._connectAttempt !== attempt || owner !== this._accountOwner) return false;
+          if (uid === owner) return true;
+          this.init().catch(() => {});
+          return false;
+        };
+        const notify = message => {
+          Promise.resolve().then(() => window.AuthApp.getUserId()).then(uid => {
+            if (uid === owner && owner === this._accountOwner && this._connectAttempt === attempt && typeof toast === "function") toast(message, "err");
+          }).catch(() => {});
+        };
+        try {
+          const operation = (async () => {
+            const token = await window.AuthApp.getToken();
+            if (controller.signal.aborted || !(await current()) || controller.signal.aborted) return null;
+            const url = connectPath(platform, token);
+            if (!url) throw new Error("سجّل الدخول أولًا لربط القناة");
+            sent = true;
+            const res = await fetch(url, {method:"POST", signal:controller.signal, headers:{Authorization:`Bearer ${token}`}, credentials:"same-origin"});
+            const data = await res.json().catch(() => ({}));
+            if (controller.signal.aborted || !(await current()) || controller.signal.aborted) return null;
+            if (!res.ok) throw new Error("تعذّر بدء الربط");
+            let target;
+            try { target = new URL(data.url); } catch { throw new Error("تعذّر التحقق من رابط الربط"); }
+            const provider = CONNECT_PLATFORM[platform];
+            const hosts = {youtube:"accounts.google.com",meta:"www.facebook.com",tiktok:"www.tiktok.com",x:"x.com"};
+            if (target.protocol !== "https:" || target.hostname !== hosts[provider] || target.port || target.username || target.password) throw new Error("تعذّر التحقق من رابط الربط");
+            return target.href;
+          })();
+          const target = await Promise.race([operation, deadline]);
+          if (target && !controller.signal.aborted && this._connectAttempt === attempt && owner === this._accountOwner) window.location.href = target;
+        } catch (error) {
+          const message = error?.message === "تعذّر التحقق من رابط الربط" ? error.message
+            : sent ? "تعذّر تأكيد بدء الربط ولم ننتقل للمنصة. قد يكون الخادم استقبل الطلب؛ ابدأ ربطًا جديدًا ولا تستخدم صفحة تفويض قديمة."
+            : "لم يُرسل طلب الربط؛ تعذّر التحقق من الجلسة. راجع الحساب وحاول مجددًا.";
+          notify(message);
+        } finally {
+          clearTimeout(timer); controller.abort();
+          if (this._connectPending === attempt) this._connectPending = null;
+          btnC.disabled = false; btnC.textContent = original;
+          if (!this._connectPending) wrap.querySelectorAll("[data-connect]").forEach(button => { button.disabled = false; });
+        }
         return;
       }
       const btnDef = e.target.closest("[data-default]");
       if (btnDef) {
+        if (btnDef.disabled) return;
         const id = btnDef.dataset.default;
         if (!id) return;
         btnDef.disabled = true;
         try {
+          const token = await window.AuthApp.getToken();
+          if (!token || !(await this.accountStillCurrent(owner))) return;
           const res = await fetch("/api/gw?op=default", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ id }),
           });
           const data = await res.json().catch(() => ({}));
+          if (!(await this.accountStillCurrent(owner))) return;
           if (!res.ok) throw new Error(data.error || "تعذّر تعيين القناة");
           if (typeof toast === "function") toast("⭐ صارت القناة الافتراضية للنشر");
-          await this.renderConnections(await window.AuthApp.getToken());
+          const nextToken = await window.AuthApp.getToken();
+          if (await this.accountStillCurrent(owner)) await this.renderConnections(nextToken);
         } catch (error) {
-          if (typeof toast === "function") toast(String(error?.message || error).slice(0, 120), "err");
-          btnDef.disabled = false;
-        }
+          if (await this.accountStillCurrent(owner) && typeof toast === "function") toast(String(error?.message || error).slice(0, 120), "err");
+        } finally { btnDef.disabled = false; }
         return;
       }
       if (btnD) {
+        if (btnD.disabled) return;
         const id = btnD.dataset.unlink;
-        if (!id || !confirm("فك ربط هذا الحساب؟ ستُحذف التوكنات فورًا.")) return;
+        if (!owner || !id) return;
+        const pendingKey = JSON.stringify([owner, id]);
+        if (!this._disconnectPending) this._disconnectPending = new Set();
+        if (this._disconnectPending.has(pendingKey)) return;
+        if (!confirm("طلب فك ربط هذا الحساب؟ قد تفقد المهام المجدولة وجهتها وتُنشر على قناة أخرى، وقد يستمر رفع بدأ بالفعل. إيقاف الأتمتة لا يلغي المهام الموجودة. راجع مهام النشر قبل المتابعة؛ إلغاء تصريح التطبيق لدى المنصة إجراء منفصل.")) return;
+        this._disconnectPending.add(pendingKey);
+        if (!this._disconnectAttempts) this._disconnectAttempts = new Map();
+        const attempt = Symbol("disconnect attempt");
+        this._disconnectAttempts.set(pendingKey, attempt);
         btnD.disabled = true;
+        const controller = new AbortController();
+        let sent = false;
+        // Abort alone cannot bound a stalled token lookup, identity check, or
+        // JSON reader. The deadline covers all of them, and a late continuation
+        // must never send the destructive request after the deadline.
+        let timer;
+        const deadline = new Promise((_, reject) => {
+          timer = setTimeout(() => { controller.abort(); reject(new Error("deadline")); }, 20000);
+        });
+        const current = async () => {
+          if (controller.signal.aborted || !owner || owner !== this._accountOwner) return false;
+          let uid = null;
+          try { uid = await window.AuthApp.getUserId(); } catch { /* unknown is not current */ }
+          if (controller.signal.aborted || owner !== this._accountOwner) return false;
+          if (uid === owner) return true;
+          this.init().catch(() => {});
+          return false;
+        };
+        // Do not let a stalled identity lookup keep the button disabled, or
+        // show a message belonging to an account that has since changed.
+        const notify = message => {
+          Promise.resolve().then(() => window.AuthApp.getUserId()).then(uid => {
+            if (uid === owner && owner === this._accountOwner && this._disconnectAttempts.get(pendingKey) === attempt && typeof toast === "function") toast(message, "err");
+          }).catch(() => {});
+        };
         try {
-          const res = await fetch("/api/gw?op=disconnect", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${await window.AuthApp.getToken()}` },
-            body: JSON.stringify({ id }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || "تعذّر فك الربط");
-          if (typeof toast === "function") toast("✓ تم فك الربط");
-          await this.renderConnections(await window.AuthApp.getToken());
-        } catch (error) {
-          if (typeof toast === "function") toast(String(error?.message || error).slice(0, 120), "err");
+          const operation = (async () => {
+            const token = await window.AuthApp.getToken();
+            if (controller.signal.aborted || !(await current()) || controller.signal.aborted) return false;
+            if (!token) throw new Error("no token");
+            sent = true;
+            const res = await fetch("/api/gw?op=disconnect", {
+              method: "POST", signal: controller.signal,
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ id }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (controller.signal.aborted || !(await current()) || controller.signal.aborted) return false;
+            if (!res.ok || data.ok !== true) throw new Error("unconfirmed");
+            return true;
+          })();
+          if (await Promise.race([operation, deadline])) {
+            if (typeof toast === "function") toast("✓ تم طلب فك الربط؛ راجع قائمة القنوات والمهام المجدولة");
+            // Refresh is independent of the bounded request; its own sequence
+            // and owner guards prevent stale channel results from rendering.
+            Promise.resolve().then(async () => {
+              const token = await window.AuthApp.getToken();
+              if (await this.accountStillCurrent(owner)) await this.renderConnections(token);
+            }).catch(() => {});
+          }
+        } catch {
+          notify(sent
+            ? "تعذّر تأكيد فك الربط. قد يكون الطلب وصل؛ حدّث القنوات وراجع المهام قبل إعادة المحاولة."
+            : "لم يُرسل طلب فك الربط؛ تعذّر التحقق من الجلسة في الوقت المحدد. راجع الحساب وحاول مجددًا.");
+        } finally {
+          clearTimeout(timer); controller.abort();
+          this._disconnectPending.delete(pendingKey);
           btnD.disabled = false;
+          if (owner === this._accountOwner) {
+            wrap.querySelectorAll("[data-unlink]").forEach(button => { if (button.dataset.unlink === id) button.disabled = false; });
+          }
         }
       }
     });
@@ -965,7 +1205,7 @@ window.PublishApp = {
   wireGlobals() { /* لا شيء مطلوب الآن — تُبقي النداء آمنًا */ },
   /* جدولة من صانع الريلز بعد التصدير: تحتاج رفع الفيديو إلى التخزين أولًا */
   scheduleFromExport() {
-    const msg = "لجدولة فيديو مُصدَّر: اربط قناة أولًا من «حسابي»، ثم استخدم «جدولة للنشر» بعد التصدير.";
+    const msg = "جدولة الفيديو المُصدَّر يدويًا غير متاحة حاليًا. يمكنك تحميل الفيديو ونشره بنفسك، أو ضبط النشر التلقائي من صفحة حسابي.";
     if (typeof toast === "function") toast(msg);
     else alert(msg);
   },
@@ -1224,7 +1464,7 @@ window.PublishApp = {
   },
 
   async retryPublish(btn) {
-    if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ النشر…"; }
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ جارٍ الفحص…"; }
     try {
       const out = await this.api("retry_publish");
       if (out.ok) { if (typeof toast === "function") toast("تم نشر الفيديو الجاهز ✅"); return this.init(); }
@@ -1232,7 +1472,7 @@ window.PublishApp = {
     } catch {
       if (typeof toast === "function") toast("تعذّر الاتصال بالخادم", "err");
     }
-    if (btn) { btn.disabled = false; btn.textContent = "🔁 انشر الفيديو الجاهز"; }
+    if (btn) { btn.disabled = false; btn.textContent = "🔍 افحص محاولات أتمتة اليوم الفاشلة"; }
   },
 
   /* فحص محرّك التوليد: سريع (يقلع المتصفح) وعميق (يُنتج فيديو قصيرًا فعلًا) */
@@ -1304,7 +1544,38 @@ window.PublishApp = {
  * ============================================================ */
 window.QRAuthUI = (function () {
   const $ = (id) => document.getElementById(id);
-  let wired = false;
+  let wired = false, signOutAttempt = 0;
+
+  async function signOut() {
+    const button = $("acctSignOut"), status = $("acctSignOutStatus");
+    let user = null;
+    try { user = QRAuth.user(); } catch {}
+    if (!user || button?.disabled) return;
+    if (!confirm("تسجيل الخروج من هذا المتصفح؟ قد تفقد تعديلات غير محفوظة. الخروج لا يوقف الأتمتة ولا يلغي مهام النشر.")) return;
+    const attempt = ++signOutAttempt;
+    if (button) button.disabled = true;
+    if (status) { status.hidden = false; status.textContent = "جارٍ إنهاء الجلسة والتحقق من رد الخادم…"; }
+    try {
+      const result = await QRAuth.signOut();
+      if (result?.session_changed) {
+        if (status && QRAuth.user() === result.current_user) {
+          status.hidden = false;
+          status.textContent = "تغيّرت الجلسة في تبويب آخر قبل الخروج؛ راجع الحساب الحالي وحاول مجددًا إذا أردت تسجيل خروجه.";
+        }
+        return;
+      }
+      if (attempt !== signOutAttempt || QRAuth.user()) return;
+      const local = result?.local_cleared
+        ? "تم مسح الجلسة المحلية من هذا المتصفح."
+        : "تعذّر تأكيد إزالة الجلسة من تخزين المتصفح؛ امسح بيانات الموقع على هذا الجهاز.";
+      const remote = result?.remote === "confirmed"
+        ? " تلقّى الخادم طلب إنهاء الجلسة؛ قد يظل رمز دخول سبق إصداره صالحًا حتى تنتهي صلاحيته."
+        : " لم يتأكد إنهاء الجلسة لدى الخادم؛ قد يظل رمز الدخول صالحًا حتى تنتهي صلاحيته.";
+      if (status) { status.hidden = false; status.textContent = local + remote + " الأتمتة والمهام لا تتوقف بتسجيل الخروج."; }
+    } catch {
+      if (attempt === signOutAttempt && status) { status.hidden = false; status.textContent = "تعذّر تأكيد نتيجة الخروج؛ تحقّق من الجلسة وامسح بيانات الموقع إن لزم. الأتمتة والمهام لا تتوقف بالخروج."; }
+    } finally { if (button) button.disabled = false; }
+  }
 
   function open() {
     const o = $("loginOverlay");
@@ -1346,6 +1617,7 @@ window.QRAuthUI = (function () {
       else open();
     });
 
+    $("acctSignOut")?.addEventListener("click", signOut);
     $("loginSubmit")?.addEventListener("click", submitEmail);
     $("loginEmail")?.addEventListener("keydown", (e) => { if (e.key === "Enter") submitEmail(); });
     $("loginGoogle")?.addEventListener("click", () => { try { QRAuth.google(); } catch {} });
@@ -1355,13 +1627,16 @@ window.QRAuthUI = (function () {
 
     try {
       QRAuth.on((u) => {
-        const b = $("authBtn");
+        const b = $("authBtn"), exit = $("acctSignOut"), status = $("acctSignOutStatus");
         if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
-        if (u) close();
-        if (/^#\/account(\?|$)/.test(window.location.hash || "")) window.PublishApp.init();
+        if (exit) exit.hidden = !u;
+        if (u?.id) { signOutAttempt++; if (status) status.hidden = true; close(); }
+        // Logout should not automatically reopen the login dialog.
+        if (u?.id && /^#\/account(\?|$)/.test(window.location.hash || "")) window.PublishApp.init();
       });
-      const b = $("authBtn");
+      const b = $("authBtn"), exit = $("acctSignOut");
       if (b) b.textContent = QRAuth.user() ? "🟢 حسابي" : "🔑 دخول";
+      if (exit) exit.hidden = !QRAuth.user();
     } catch {}
   }
 

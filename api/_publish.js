@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     if (!row) return json(res, 404, { error: "المهمة غير موجودة" });
     if (row.status === "published") return json(res, 400, { error: "منشورة مسبقًا" });
     const out = await publishRow(row);
-    return json(res, out.ok ? 200 : 502, out);
+    return json(res, out.ok ? 200 : out.skipped === "review-required" ? 409 : 502, out);
   }
 
   if (!PLATFORMS.includes(b.platform) || !b.video_path || typeof b.video_path !== "string") return json(res, 400, { error: "بيانات ناقصة" });

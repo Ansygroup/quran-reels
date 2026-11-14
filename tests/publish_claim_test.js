@@ -43,5 +43,11 @@ global.fetch = async (url, opts = {}) => {
   assert.equal(uploads, before);
   const unsafe = await publishRow({ ...snapshot, status: "publishing" });
   assert.equal(unsafe.skipped, "not-claimable");
-  console.log("ALL OK: طلبان متزامنان ⇒ حجز واحد ورفع واحد، ولا إعادة نشر صف مكتمل");
+  const numFilters=filters.length;
+  const uncertain = await publishRow({ ...snapshot, status: "failed" });
+  assert.equal(uncertain.skipped, "review-required");
+  const relinkRetry = await publishRow({ ...snapshot, status: "failed" }, 'youtube', {expectedConnectionId:'c1'});
+  assert.equal(relinkRetry.skipped, "review-required");
+  assert.equal(uploads, before);assert.equal(filters.length,numFilters,'failed retry must not claim or write, including relink');
+  console.log("ALL OK: طلبان متزامنان ⇒ حجز واحد ورفع واحد، وحجب إعادة الفشل الغامض بلا كتابة");
 })().catch(e => { console.error(e); process.exitCode = 1; });

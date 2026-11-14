@@ -124,7 +124,7 @@ const reqWith = (cookie) => ({ headers: cookie ? { cookie } : {}, url: "/api/oau
   const cbRes = mkRes();
   await YT({ url: `/api/oauth/callback?code=auth-code-1&state=${encodeURIComponent(state)}`, headers: { cookie: cookieOnly(startCookie) } }, cbRes);
   const cbLoc = String(cbRes.headers.location || "");
-  chk("العودة من جوجل تكمل الربط بنجاح (كانت تفشل دائمًا)", cbLoc === "/#/account?linked=youtube", cbLoc);
+  chk("العودة من جوجل تحفظ الربط مع إبلاغ أي فشل أتمتة", /^\/#\/account\?linked=youtube(?:&auto_error=1)?$/.test(cbLoc), cbLoc);
   const ins = dbCalls.find((c) => /insert into social_connections/i.test(c.sql));
   chk("يُكتب صف social_connections للمستخدم صاحب الكوكي",
     Boolean(ins) && String(ins.sql).includes("'youtube'") && ins.params[0] === "user-42" && ins.params[2] === "قناة اختبار",
@@ -139,7 +139,7 @@ const reqWith = (cookie) => ({ headers: cookie ? { cookie } : {}, url: "/api/oau
   /* 6) الرسالة في الواجهة تشرح السبب ولا تعرض الاسم الخام */
   const pub = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
   chk("publish.js يزيل _err من الاسم", /replace\(\/_err\$\/, ?""\)/.test(pub) || /REASONS|WHY/.test(pub));
-  chk("publish.js يقرأ ?w= ويشرحه", /[?&]w=/.test(pub) && /WHY\s*=/.test(pub) && /denied:/.test(pub) && /state:/.test(pub));
+  chk("publish.js يقرأ سبب العودة ويشرحه دون اعتباره إثباتًا", /params\.get\("w"\)/.test(pub) && /reasons\s*=/.test(pub) && /denied:/.test(pub) && /state:/.test(pub) && /الرابط وحده لا يؤكد/.test(pub));
   chk("لا رسالة عامة فقط بعد الآن", !/⚠️ لم يكتمل ربط \$\{label\}\. أعد المحاولة/.test(pub));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);

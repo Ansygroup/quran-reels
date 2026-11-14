@@ -1,0 +1,26 @@
+# Connection refresh concurrency — candidate only
+
+Status: local design and isolated tests, **not wired or deployed**. Do not apply the candidate function to production or a preview connected to production without a coordinated plan and approval. This document does not assert provider, Supabase, or PostgREST behavior beyond the tests described.
+
+## Current risk
+
+`refreshIfNeeded` obtains a connection snapshot, sends a refresh request to the provider, then writes credentials by connection ID. A relink, disconnect, or another worker can change/delete that row while the provider request is in flight. The late response can overwrite newer credentials, or a zero-row update can be treated as success and its access token used for publishing. An `invalid_grant` response on an older credential can write a new `reauth_needed` check after a successful relink; the account API compares check timestamps with `updated_at`, so that old failure may appear to refer to the new link. A failed publish row can similarly hold a late stale error. Refresh-token rotation can already have happened at the provider before any database write.
+
+## Narrow local candidate
+
+`sql/operations/candidate_connection_refresh_commit.sql` is an **unwired** service-only, security-definer prototype. One atomic `UPDATE` compares owner, connection ID, platform, provider account ID, the exact encrypted access and refresh values, nullable expiry and exact `updated_at`, then writes the proposed encrypted credentials. If the refresh response omits a new refresh token, a NULL argument leaves the current value in place. A mismatch, missing/deleted row, or wrong owner yields the same `conflict`; malformed inputs yield `invalid`; the result never contains credentials. It cannot validate that ciphertext decrypts or that a retained refresh token is still accepted. A trusted service would have to encrypt first, send ciphertext in a POST body, and prevent request/statement logging of credentials; a POST body is not inherently secret from server logs.
+
+Exact timestamp precision matters: clients must preserve PostgreSQL's fractional seconds, not round-trip through a millisecond-only JavaScript `Date`. Equality of a timestamp and tokens is still not a true generation. A trusted, non-login function owner and effective privilege checks, including inherited roles, require independent review. Direct client table grants and all other writers must be inventoried. Do not wire this function by itself.
+
+## What the test proves and does not
+
+`tests/connection_refresh_candidate_pg_test.js` starts a disposable PostgreSQL instance over a Unix socket. It tests valid/invalid inputs, owner and role separation, omitted/new refresh tokens, precise timestamps and NULL expiry, two concurrent transactions against the same snapshot, changed/deleted rows and lost-response replay. It intentionally demonstrates two blockers: an unguarded legacy writer can overwrite after a successful CAS, and delete/recreate with identical snapshot values is indistinguishable (ABA). The test exercises direct SQL, not real PostgREST HTTP, production RLS/grants, the application handler, a provider, or real tokens.
+
+Even if the compare-and-swap succeeds, it does **not** serialize outbound refresh requests. A provider can rotate or revoke a token during a failed, timed-out, duplicated or losing request. On a timeout or lost database response, neither retry nor using the returned access token is automatically safe. A previously saved token may be incompatible with a new provider grant. Uploads already sent to a provider cannot be canceled by this guard. The candidate also does not guard relink writes, defaults, queue retargeting, stale reauth diagnostics, or any direct legacy writer.
+
+## Before any rollout
+
+- Design a server-owned per-connection generation and durable operation/lease or fencing scheme shared by refresh, relink, disconnect, manual actions and all workers. A lease expiration does not undo a provider request: explicitly handle unknown/rotated remote outcomes and do not retry blindly. Prevent legacy/direct writers from bypassing the scheme.
+- Make all credential updates atomic with version checks, and ensure errors/reauth markers and queue outcomes are attributed to the version that generated them; do not announce that the current connection expired from an older failure.
+- Define recovery for remote success followed by DB failure or lost response, and safe behavior if a call completed after a timeout. Decide whether to halt publishing for human review instead of falling back to another account.
+- Test true PostgREST RPC argument/privilege behavior, real timestamp serialization, direct-table ACLs, provider-specific token rotation and reauthorization in isolated accounts, multi-worker concurrency, relink/disconnect races, access-token use after the commit, and secret-free logging. Preserve a rollback/compatibility plan for cached or old writers.

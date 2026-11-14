@@ -175,16 +175,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // المصادقة + واجهة الحساب
   if (typeof QRAuth !== "undefined") {
+    let accountIdentity;
     QRAuth.on(u => {
       const b = $("#authBtn");
       if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
-      /* كان الشرط !window._authBooted والراية تُضبط بعد QRAuth.boot() مباشرة،
-       * فحين تصل نتيجة الجلسة (غير متزامنة) تكون الراية true ولا يُنفَّذ
-       * afterLogin أبدًا — فلا تُحمَّل لوحة الحساب بعد الدخول. */
-      if (!u) { window._afterLoginDone = false; return; }
-      if (typeof QRPublish !== "undefined" && !window._afterLoginDone) {
-        window._afterLoginDone = true;
-        QRPublish.afterLogin();
+      const uid = typeof u?.id === "string" && u.id ? u.id : null;
+      if (accountIdentity === uid) return; // token refresh for the same user
+      accountIdentity = uid;
+      if (typeof QRPublish !== "undefined") {
+        // Clear the previous account synchronously, even before a new load
+        // completes and even if this was a cross-tab logout.
+        if (typeof QRPublish.authIdentityChanged === "function") QRPublish.authIdentityChanged(uid);
+        if (uid) QRPublish.afterLogin();
       }
     });
     QRAuth.boot();

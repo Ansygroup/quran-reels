@@ -130,6 +130,24 @@ const server = http.createServer((req, res) => {
     page.once('dialog', d => d.accept()); await page.evaluate(()=>PublishApp.randomArticle(document.querySelector('#autoGenArticle')));
     assert.equal(await page.evaluate(()=>posts.at(-1).action),'article_random');
     assert.equal(await page.evaluate(()=>posts.length),articleBefore+1);
+    // After relinking the UI describes a review, not an automatic repost.
+    await page.evaluate(()=>{const app=PublishApp;app.renderAccount({...app.data,reauth:['youtube'],pending_review:{available:true,truncated:false,items:[{id:'fake-pending',status:'scheduled',platform:'youtube',title:'فيديو مجدول',channel:null,target_recorded:false,publish_at:'2026-11-07T00:00:00Z'}]},failed_review:{available:true,truncated:false,items:[{id:'fake-attempt',platform:'youtube',title:'فيديو تجريبي',channel:null,target_recorded:false,created_at:'2026-11-07T00:00:00Z'}]}});app.api=async(action)=>{window.__reviewAction=action;return {ok:false,error:'راجع القناة قبل إعادة النشر'}};window.toast=(msg)=>{window.__reviewMessage=msg}});
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/قد تُختار قناة أخرى/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/لا تلغي المهام/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/قد لا تشمل كل المهام/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/اختار وجهته بالفعل/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/الوجهة الأصلية غير محددة/);
+    await page.evaluate(()=>{PublishApp.renderPendingReview({available:true,items:[{id:'p1',platform:'youtube',status:'scheduled',channel:null}]});PublishApp.renderFailedReview({available:true,items:[null]})});
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/تعذّر تحميل/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/تعذّر تحميل/);
+    await page.evaluate(()=>{PublishApp.renderPendingReview({available:true,items:[]});PublishApp.renderFailedReview({available:true,items:[]})});
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/لا يثبت ذلك خلو الطابور/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/لا يثبت ذلك خلو السجل/);
+    assert.match(await page.locator('#acctReauth').innerText(),/لا تُعاد المحاولات الفاشلة تلقائيًا/);
+    assert.match(await page.locator('#btnRetryPublish').innerText(),/افحص/);
+    await page.locator('#btnRetryPublish').click();await page.waitForFunction(()=>window.__reviewAction==='retry_publish');
+    assert.match(await page.evaluate(()=>window.__reviewMessage),/راجع القناة/);
+    assert.equal(await page.evaluate(()=>posts.length),articleBefore+1,'review test sends no publish request');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
     assert.deepEqual(errors,[]); await ctx.close();
     console.log('ALL OK: ambiguous save, failed/malformed reads, explicit review, local errors and article cancel; mocked network, no publishing');

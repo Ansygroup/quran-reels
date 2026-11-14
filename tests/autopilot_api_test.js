@@ -80,7 +80,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   setDb({ rest: async () => { throw new Error("boom"); } });
   let threw = false;
   try { out = await T.loadRuns("u1"); } catch { threw = true; }
-  chk("فشل كل القراءات يعطي قائمة فارغة بلا استثناء", !threw && Array.isArray(out.rows) && out.rows.length === 0);
+  chk("فشل كل القراءات يعطي قائمة فارغة بعلامة تعذّر القراءة", !threw && Array.isArray(out.rows) && out.rows.length === 0 && out.unavailable === true);
+  setDb({q1:async()=>null, rest:async p=>{ if (/social_connections/.test(p)) return []; throw new Error('unavailable'); }});
+  const unavailableData = await T.accountData('u1');
+  chk("فشل السجل والإحصاءات لا يظهر كبيانات فارغة أو صفرية", unavailableData.runs_available === false && unavailableData.stats === null);
 
   /* 4) accountData: العقد الكامل */
   setDb({
@@ -436,7 +439,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=38/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=55/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -505,10 +508,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("جلب التلاوة له مهلة وميزانية إرشادية للوسيط",
     /_fetchAudio\(url, ms = 20000, signal\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v38 / sw qr-v59)",
+  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v55 / sw qr-v78)",
     /reel\.js\?v=10/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=15/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v59/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v78/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");
@@ -609,9 +612,9 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     Array.isArray(acctRe3.reauth) && acctRe3.reauth.length === 0, JSON.stringify(acctRe3.reauth));
 
   const pubSrc4 = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
-  chk("اللوحة تشرح المحاولة التلقائية بعد إعادة الربط",
-    /acctReauth/.test(pubSrc4) && /هيحاول ينشر الفيديو الجاهز بعد الربط/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
-  chk("اللوحة فيها زر «انشر الفيديو الجاهز» بإجراء retry_publish",
+  chk("اللوحة توضح ضرورة المراجعة بعد إعادة الربط",
+    /acctReauth/.test(pubSrc4) && /لا تُعاد المحاولات الفاشلة تلقائيًا/.test(pubSrc4) && /lastReauthLine/.test(pubSrc4));
+  chk("اللوحة فيها زر فحص الفيديو الجاهز بإجراء retry_publish",
     /btnRetryPublish/.test(pubSrc4) && /retry_publish/.test(pubSrc4) && /retry_publish/.test(fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8")));
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
