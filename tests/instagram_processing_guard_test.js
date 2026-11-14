@@ -28,6 +28,11 @@ global.fetch = async url => {
   if (u.pathname === '/v21.0/ig/media_publish') return response({ id: 'published_1' });
   throw Error('unexpected network blocked');
 };
+// Fixture-only policy override to exercise retained, disabled Meta implementations.
+// No production path uses this override; all network here is mocked.
+const platformFixture = require("../lib/platforms");
+const actualCanPublish = platformFixture.canPublish;
+platformFixture.canPublish = p => ["facebook", "instagram"].includes(p) || actualCanPublish(p);
 const { publishRow } = require('../lib/publish');
 const originalTimeout = global.setTimeout;
 global.setTimeout = fn => { fn(); return 0; }; // Eliminate polling delays in this isolated test.

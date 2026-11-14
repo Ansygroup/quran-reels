@@ -41,7 +41,7 @@ function reset(platform, path, options = {}) {
   calls = []; dbWrites = []; connectionReads = 0; claimChangesPath = options.claimChangesPath; loseFinalReply = options.loseFinalReply;
 }
 (async () => {
-  for (const platform of ['youtube', 'facebook', 'instagram', 'x']) {
+  for (const platform of ['youtube', 'x']) {
     for (const entry of ['manual', 'cron']) {
       for (const path of ['other/video.mp4', 'owner2/video.mp4', 'shared/video.mp4', 'owner', 'owner/../other/video.mp4']) {
         reset(platform, path); const result = await (entry === 'manual' ? manual() : scheduled());

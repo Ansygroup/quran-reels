@@ -44,7 +44,7 @@ async function dispatch(path, platform = 'youtube') {
     'owner/file%2fsecret.mp4', 'owner\\file.mp4', 'owner/file\n.mp4', 'owner/file\0.mp4', 'owner/\ud800.mp4'];
   for (const p of bad) {
     const r = await manual(p); assert.equal(r.statusCode, 400, JSON.stringify(p)); assert.equal(writes.length, 0); assert.equal(requests.length, 0);
-    for (const platform of ['youtube', 'facebook', 'instagram', 'tiktok', 'x']) {
+    for (const platform of ['youtube', 'x']) {
       const result = await dispatch(p, platform); assert.equal(result.out.ok, false, platform); assert.equal(result.saved.status, 'failed');
       assert.equal(result.requests.length, 0, 'bad historical path must not contact storage or provider');
       assert.equal((await publishRow({ ...result.saved })).skipped, 'review-required'); assert.equal(requests.length, 0);

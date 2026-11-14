@@ -382,6 +382,8 @@ window.PublishApp = {
     const enabled = config.enabled === true;
     const conns = Array.isArray(this.connections) ? this.connections : [];
     const reauth = Array.isArray(this.reauth) ? this.reauth : [];
+    const unavailable = (Array.isArray(config.platforms) ? config.platforms : []).filter(key =>
+      Array.isArray(this.available) && this.available.some(p => p.key === key && !p.publish));
     const dot = document.getElementById("acctDot");
     const label = document.getElementById("acctStateLabel");
     const nextEl = document.getElementById("acctNextRun");
@@ -401,7 +403,9 @@ window.PublishApp = {
     let state = "idle", title = "الأتمتة موقوفة", hint = "اضغط الزر لتفعيل النشر اليومي التلقائي";
     if (this._connectionsState === "loading") { state = "idle"; title = enabled ? "الأتمتة مفعّلة" : "الأتمتة موقوفة"; hint = "جارٍ التحقق من القنوات المرتبطة"; }
     else if (this._connectionsState === "error") { state = "warn"; title = enabled ? "الأتمتة مفعّلة — حالة القنوات غير معروفة" : "الأتمتة موقوفة — حالة القنوات غير معروفة"; hint = "تعذّر تحميل القنوات؛ حدّث الصفحة للتحقق"; }
+    else if (enabled && unavailable.length) { state = "warn"; title = "الأتمتة مفعّلة — منصات مختارة غير متاحة"; hint = "التشغيل يتوقف حتى تراجع المنصات وتحفظ التعديلات"; }
     else if (!conns.length) { state = "idle"; title = enabled ? "الأتمتة مفعّلة، لكن لا توجد قناة مرتبطة" : "اربط قناة للبدء"; hint = "لا توجد قناة مرتبطة حاليًا — لا يمكن النشر قبل الربط"; }
+    else if (Array.isArray(this.available) && !conns.some(c => this.available.some(p => p.key === c.platform && p.publish))) { state = "warn"; title = "لا توجد قناة متاحة للنشر"; hint = "القنوات المرتبطة حاليًا لمنصات غير متاحة؛ اربط قناة متاحة للبدء"; }
     else if (reauth.length) { state = "warn"; title = "فشل تجديد سابق: " + reauth.map((p) => PLATFORMS[p] || p).join("، "); hint = "راجع القنوات والسجل؛ التحذير لا يؤكد حالة الربط الحالية"; }
     else if (enabled && (!Array.isArray(config.platforms) || !config.platforms.length || config.platforms.some(p => !conns.some(c => c.platform === p)))) { state = "warn"; title = "الأتمتة مفعّلة — تحقق من وجهات النشر"; hint = "اختر منصة واربط قناة لكل منصة مختارة"; }
     else if (enabled && conns.some(c => config.platforms?.includes(c.platform) && c.has_refresh === false)) { state = "warn"; title = "الأتمتة مفعّلة — قد تحتاج إعادة ربط"; hint = "تعذّر التحقق من تصريح التجديد لبعض القنوات؛ راجع بطاقة القنوات"; }
@@ -424,10 +428,12 @@ window.PublishApp = {
     const config = data.config || {};
     const conns = Array.isArray(this.connections) ? this.connections : [];
     const platforms = Array.isArray(config.platforms) ? config.platforms : [];
+    const available = (Array.isArray(this.available) ? this.available : []).filter(p => p.publish);
+    const unavailable = platforms.some(key => (Array.isArray(this.available) ? this.available : []).some(p => p.key === key && !p.publish));
     const steps = [
-      { n: 1, t: "اربط قناة", d: this._connectionsState === "error" ? "تعذّر التحقق من القنوات" : this._connectionsState === "loading" ? "جارٍ التحقق من القنوات…" : "يوتيوب / فيسبوك / إنستغرام / تيك توك / X", done: this._connectionsState !== "error" && this._connectionsState !== "loading" && conns.length > 0 },
-      { n: 2, t: "اختر المنصات والمحتوى", d: platforms.length ? platforms.map((p) => PLATFORMS[p] || p).join(" · ") : "لم تُختَر منصة بعد", done: platforms.length > 0 },
-      { n: 3, t: "فعّل الأتمتة", d: config.enabled ? "محاولة تلقائية كل يوم 04:15 UTC" : "موقوفة — فعّلها من الزر بالأعلى", done: config.enabled === true },
+      { n: 1, t: "اربط قناة", d: this._connectionsState === "error" ? "تعذّر التحقق من القنوات" : this._connectionsState === "loading" ? "جارٍ التحقق من القنوات…" : available.map(p => p.name).join(" / ") || "تحقق من المنصات المتاحة", done: this._connectionsState !== "error" && this._connectionsState !== "loading" && conns.some(c => available.some(p => p.key === c.platform)) },
+      { n: 2, t: "اختر المنصات والمحتوى", d: platforms.length ? platforms.map((p) => PLATFORMS[p] || p).join(" · ") + (unavailable ? " — راجع المنصات غير المتاحة" : "") : "لم تُختَر منصة بعد", done: platforms.length > 0 && !unavailable },
+      { n: 3, t: "فعّل الأتمتة", d: config.enabled ? (unavailable ? "مفعّلة لكن التشغيل يتوقف حتى مراجعة المنصات" : "محاولة تلقائية كل يوم 04:15 UTC") : "موقوفة — فعّلها من الزر بالأعلى", done: config.enabled === true && !unavailable },
     ];
     wrap.innerHTML = steps.map((s) => `
       <div class="acct-step ${s.done ? "done" : ""}">

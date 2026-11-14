@@ -34,8 +34,8 @@ async function runCron(){const res={setHeader(){},end(s){this.body=JSON.parse(s)
  reset();mode='lost';result=await call({publish_at:new Date(Date.now()+86400000).toISOString()});assert.equal(result.statusCode,503);assert.match(result.body.error,/قد تكون المهمة مجدولة وستُنشر/);assert.equal(calls.length,1);assert.equal(rows[0].status,'scheduled');assert.equal(dispatches.length,0);
  reset();channel=null;result=await call({now:true,connection_id:'c1'});assert.equal(result.statusCode,400);assert.equal(calls.length,0);assert.deepEqual(lookups[0].args,['c1','u1']);
  reset();channel={id:'different',platform:'youtube'};result=await call({now:true,connection_id:'c1'});assert.equal(result.statusCode,400);assert.equal(calls.length,0);
- reset();channel={id:'c1',platform:'facebook'};result=await call({platform:'instagram',now:true,connection_id:'c1'});assert.equal(result.statusCode,400);assert.equal(calls.length,0);assert.equal(dispatches.length,0);
- reset();channel={id:'c1',platform:'instagram'};result=await call({platform:'instagram',now:true,connection_id:'c1'});assert.equal(result.statusCode,200);assert.equal(calls[0].connection_id,'c1');assert.equal(dispatches[0].platform,'instagram');
+ reset();channel={id:'c1',platform:'x'};result=await call({platform:'youtube',now:true,connection_id:'c1'});assert.equal(result.statusCode,400);assert.equal(calls.length,0);assert.equal(dispatches.length,0);
+ reset();channel={id:'c1',platform:'youtube'};result=await call({platform:'youtube',now:true,connection_id:'c1'});assert.equal(result.statusCode,200);assert.equal(calls[0].connection_id,'c1');assert.equal(dispatches[0].platform,'youtube');
  reset();mode='lookup-error';result=await call({now:true,connection_id:'c1'});assert.equal(result.statusCode,503);assert.match(result.body.error,/لم تُنشأ المهمة/);assert.equal(calls.length,0);
  console.log('PASS manual immediate drafts, unconfirmed responses and preserved future scheduling (mock DB and publisher; no provider)');
 })().catch(e=>{console.error(e);process.exitCode=1});

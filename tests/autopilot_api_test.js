@@ -99,9 +99,12 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("accountData يعيد كل مفاتيح العقد", keys.every((k) => k in data), Object.keys(data).join(","));
   chk("config افتراضي عند عدم وجود صف", Boolean(data.config) && data.config.enabled === false, JSON.stringify(data.config));
   chk("connected/platforms من social_connections", data.connected === true && data.platforms.includes("youtube"), JSON.stringify(data.platforms));
-  chk("available = 8 منصات (4 قابلة للنشر)",
-    Array.isArray(data.available) && data.available.length === 8 && data.available.filter((p) => p.publish).length === 4,
+  chk("available = 8 منصات (2 قابلة للنشر)",
+    Array.isArray(data.available) && data.available.length === 8 && data.available.filter((p) => p.publish).length === 2,
     JSON.stringify(data.available.map((p) => p.key + ":" + p.publish)));
+  chk("Meta وتيك توك متوقفة للعرض فقط", ["facebook", "instagram", "tiktok"].every(key => {
+    const p = data.available.find(x => x.key === key); return p && p.publish === false && p.connect === null && p.ready === false;
+  }));
   chk("channel يحتوي اسم القناة", /يوتيوب/.test(data.channel) && /قناة قرآن/.test(data.channel), data.channel);
 
   /* 5) المقال العشوائي: احتياطي من المستودع عند غياب الجدول */
@@ -123,7 +126,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   const missing = libPlatforms.PUBLISHABLE.filter((p) => !dispatchable.includes(p));
   const extra = dispatchable.filter((p) => !libPlatforms.PUBLISHABLE.includes(p));
   chk("كل منصة publish:true لها حالة نشر في lib/publish", missing.length === 0, missing.join(","));
-  chk("لا منصة تُنشر بلا إعلانها في lib/platforms", extra.length === 0, extra.join(","));
+  chk("مسارات Meta القديمة محجوبة بسياسة النشر رغم بقائها في المصدر", extra.every(p => ["facebook", "instagram"].includes(p)) && /if \(!canPublish\(conn.platform\)\)/.test(publishSrc) && /if \(!canPublish\(p\)\)/.test(publishSrc) && !libPlatforms.canPublish("facebook") && !libPlatforms.canPublish("instagram"), extra.join(","));
 
   /* 7) مطابقة أسماء المنصات في العميل مع المصدر الواحد */
   const clientSrc = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
@@ -439,7 +442,7 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
   chk("اللوحة ترسم سطر آخر تشغيل آلي وتهرّب النص",
     /acctLastDaily/.test(pubSrc2) && /(?:lastDailyLine|dailyLine)\(data\.last_daily\)/.test(pubSrc2) && /&quot;/.test(pubSrc2));
 
-  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=62/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
+  chk("publish.js مكسور الكاش في index.html", /publish\.js\?v=63/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")));
 
   /* 19) G42: التلاوة أولًا — فحص مبكر بدل تعليق ٢١٠ ثانية، وتشخيص صوت
    * (تشغيل 2026-11-11 14:22 كان pct="" stage="" running=false: الصفحة كانت
@@ -508,10 +511,10 @@ const libPlatforms = require(path.join(ROOT, "lib", "platforms.js"));
     "ترتيب النافذة/التحضير");
   chk("جلب التلاوة له مهلة وميزانية إرشادية للوسيط",
     /_fetchAudio\(url, ms = 20000, signal\)/.test(g42ReelSrc) && /deadline = Date\.now\(\) \+ 45000/.test(g42ReelSrc) && /AbortController/.test(g42ReelSrc));
-  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v62 / sw qr-v85)",
+  chk("نسخ الأصول مرفوعة (reel v10 / creator v15 / publish v63 / sw qr-v86)",
     /reel\.js\?v=10/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
     /creator\.js\?v=15/.test(fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8")) &&
-    /qr-v85/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
+    /qr-v86/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")));
 
   /* 20) G43: لا نشر بلا صوت + حلقة التشغيل الصامت لا تموت بعد أول آية */
   chk("assertAudioPresent مُصدَّرة", typeof libAuto2.__test.assertAudioPresent === "function");

@@ -35,6 +35,11 @@ global.fetch=async(url,opts={})=>{
  }
  throw Error('unexpected Meta request');
 };
+// Fixture-only policy override to exercise retained, disabled Meta implementations.
+// No production path uses this override; all network here is mocked.
+const platformFixture = require("../lib/platforms");
+const actualCanPublish = platformFixture.canPublish;
+platformFixture.canPublish = p => ["facebook", "instagram"].includes(p) || actualCanPublish(p);
 const {publishRow}=require('../lib/publish');
 const realTimer=global.setTimeout;global.setTimeout=fn=>{fn();return 0};
 async function run(m){mode=m;requests=[];writes=[];row={id:'job',user_id:'owner',platform:'instagram',connection_id:null,status:'scheduled',video_path:'owner/video.mp4',caption:'وصف تجريبي',hashtags:'#fixture'};const out=await publishRow({...row});return {out,saved:{...row},requests:[...requests],writes:[...writes]};}

@@ -12,7 +12,7 @@ function response(){return {headers:{},setHeader(k,v){this.headers[k.toLowerCase
 function cookie(name,body){const payload=Buffer.from(JSON.stringify(body)).toString('base64url');return `qr_${name}_st=${payload}.${sign(payload)}`}
 async function callCallback(state,cookieValue){const r=response();await callback({url:`/api/oauth/callback?code=fixture-code&state=${encodeURIComponent(state)}`,headers:{cookie:cookieValue}},r);return r}
 (async()=>{
- for(const name of ['youtube','meta','x']){
+ for(const name of ['youtube','x']){
   const r=response();await start({method:'POST',url:`/api/gw?op=start&p=${name}`,headers:{authorization:'Bearer fixture'}},r);assert.equal(r.statusCode,200);assert.match(r.headers['set-cookie'],/Max-Age=900/);
   const value=JSON.parse(r.body),state=new URL(value.url).searchParams.get('state');const original=r.headers['set-cookie'].split(';')[0];
   const saved=oauth.readStCookie({headers:{cookie:original}},name);assert.equal(saved.t,now);assert.equal(saved.r,state);assert.equal(saved.u,'fixture-owner');

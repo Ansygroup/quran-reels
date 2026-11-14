@@ -47,15 +47,15 @@ function stub(rel,exports){const id=require.resolve(rel);require.cache[id]={id,f
    const rejected=await call({platform:'youtube',video_path,now:true});
    assert.equal(rejected.statusCode,400);assert.equal(posts,beforeBadPaths);assert.equal(dispatched.length,1);
   }
-  for(const row of [{id:FB,user_id:U,platform:'facebook'},{id:IG,user_id:U,platform:'instagram'},{id:FOREIGN,user_id:OTHER,platform:'instagram'}])await fixture('POST','/social_connections',row);
-  const request={platform:'instagram',video_path:paths[4],publish_at:new Date(Date.now()+86400000).toISOString()};
+  for(const row of [{id:FB,user_id:U,platform:'x'},{id:IG,user_id:U,platform:'youtube'},{id:FOREIGN,user_id:OTHER,platform:'youtube'}])await fixture('POST','/social_connections',row);
+  const request={platform:'youtube',video_path:paths[4],publish_at:new Date(Date.now()+86400000).toISOString()};
   const before=posts;
   assert.equal((await call({...request,connection_id:FB})).statusCode,400);
   assert.equal((await call({...request,connection_id:FOREIGN})).statusCode,400);
   assert.equal(posts,before);
   assert.equal((await call({...request,connection_id:IG.toUpperCase()})).statusCode,200);assert.equal(posts,before+1);
   const [target]=await fixture('GET','/publish_queue?video_path=eq.'+encodeURIComponent(paths[4])+'&select=connection_id,platform,status');
-  assert.equal(target.connection_id,IG);assert.equal(target.platform,'instagram');assert.equal(target.status,'scheduled');
+  assert.equal(target.connection_id,IG);assert.equal(target.platform,'youtube');assert.equal(target.status,'scheduled');
   const cronResult=await runCron();assert.equal(cronResult.ran,0);assert.equal(dispatched.length,1);
   console.log('PASS manual API with disposable PostgREST: lost draft and schedule replies; exact owned platform target; provider blocked');
  }finally{

@@ -47,6 +47,11 @@ global.fetch = async (url, opts = {}) => {
   if (u.origin === 'https://api.x.com' && u.pathname.endsWith('/tweets')) return reply('x-post', { data: { id: id('x-post') } });
   throw Error('blocked unexpected network');
 };
+// Fixture-only policy override to exercise retained, disabled Meta implementations.
+// No production path uses this override; all network here is mocked.
+const platformFixture = require("../lib/platforms");
+const actualCanPublish = platformFixture.canPublish;
+platformFixture.canPublish = p => ["facebook", "instagram"].includes(p) || actualCanPublish(p);
 const { publishRow } = require('../lib/publish');
 const oldTimeout = global.setTimeout;
 global.setTimeout = fn => { fn(); return 0; }; // local Instagram polling only

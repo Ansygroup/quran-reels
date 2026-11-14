@@ -13,6 +13,11 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
   q: async (sql, params) => { queries.push({ sql, params }); if (/set status='publishing'/i.test(sql)) return [{ id: params[0], user_id: params[1], status: "publishing", platform: "instagram", connection_id: "ig1", video_path: "u1/video.mp4" }]; return /from social_connections/i.test(sql) ? (channel ? [channel] : []) : []; },
   q1: async () => null,
 }};
+// Fixture-only policy override to exercise retained, disabled Meta implementations.
+// No production path uses this override; all network here is mocked.
+const platformFixture = require("../lib/platforms");
+const actualCanPublish = platformFixture.canPublish;
+platformFixture.canPublish = p => ["facebook", "instagram"].includes(p) || actualCanPublish(p);
 const pub = require("../lib/publish");
 const requests = [];
 global.fetch = async (url, opts = {}) => {
