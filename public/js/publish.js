@@ -515,10 +515,11 @@ window.PublishApp = {
           <select id="selContentMode">${modes.map((m) => `<option value="${this.esc(m)}" ${template.content_mode === m ? "selected" : ""}>${this.esc(MODES[m] || m)}</option>`).join("")}</select>
         </div>
         <div class="f-group"><label for="acctReciter">القارئ</label>
-          <select id="acctReciter">
+          <select id="acctReciter" aria-describedby="acctReciterRights">
             <option value="" ${template.reciter_mode !== "fixed" ? "selected" : ""}>تلقائي (يتنوّع كل يوم)</option>
             ${reciters.map((r) => `<option value="${this.esc(r.id)}" ${template.reciter_mode === "fixed" && template.reciter === r.id ? "selected" : ""}>${this.esc(r.name || r.id)}</option>`).join("")}
           </select>
+          <p class="hint" id="acctReciterRights">التلاوات من EveryAyah؛ لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح. راجع حقوقها قبل تشغيل الأتمتة؛ قد تظهر مطالبات على يوتيوب. <a href="/terms/">تفاصيل الاستخدام</a></p>
         </div>
         <div class="f-group"><label for="selBackground">الخلفية</label>
           <select id="selBackground">${bgs.map((b) => `<option value="${this.esc(b)}" ${template.background === b ? "selected" : ""}>${this.esc(BGS[b] || b)}</option>`).join("")}</select>
