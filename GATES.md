@@ -498,3 +498,7 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
 - **AUTOPILOT-DRAFT-BATCH — دفعة مسودات مؤكدة قبل النشر المباشر**
   CHECK: `node tests/queue_atomic_safety_test.js && node tests/queue_draft_cron_guard_test.js`؛ CI المعزول: `tests/postgrest_draft_queue_integration_test.js` و`tests/postgrest_publish_claim_integration_test.js`.
   EXPECT: علامة تشغيل مشروطة، ثم POST واحد لمهام `draft`، والتحقق من تطابق كل صف بما فيه المالك والوجهة والمحتوى والتوقيت قبل استدعاء النشر. رد ناقص أو مشوّه أو مفقود لا يُعاد ولا يتبعه نشر من تلك المحاولة؛ الكرون الاعتيادي يستعلم عن `scheduled` لا المسودات. يختبر PostgREST المؤقت الإدراج والرد المفقود بعد commit ويختبر claim الفعلي لمسودة مع حجب المزود، لا قاعدة الإنتاج أو مزودًا حقيقيًا. يمكن لكاتب آخر تغيير المسودة أو نشرها؛ وقد تتوقف المهمة وتبقى للمراجعة دون نشر آلي.
+
+- **MANUAL-PUBLISH-DRAFT — تأكيد مهمة النشر اليدوي الفوري**
+  CHECK: `node tests/manual_new_publish_guard_test.js`؛ CI المعزول: `tests/postgrest_manual_publish_integration_test.js`.
+  EXPECT: طلب النشر الفوري الجديد يُدرج `draft` ويؤكد حقول الصف قبل استدعاء الناشر؛ رد الإدراج غير المؤكد لا يطلق المحاولة ولا يُعاد، والكرون لا يلتقط المسودة. الجدولة المستقبلية تظل `scheduled` وقد تُنفَّذ رغم فقد الرد؛ رسالة الفشل تنبه لمراجعة القائمة والمنصة. لا يمنع هذا تكرار طلبات مستقلة أو تدخل كاتب آخر أو النشر عند فقد رد بعد بدء المحاولة. الاختبارات بمزود محاكى وPostgREST مؤقت لا إنتاجي.
