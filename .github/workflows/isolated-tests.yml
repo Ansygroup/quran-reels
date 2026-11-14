@@ -86,6 +86,7 @@ jobs:
           node tests/account_default_candidate_pg_test.js
           node tests/connection_refresh_candidate_pg_test.js
           node tests/publish_attempt_generation_candidate_pg_test.js
+          node tests/publish_queue_revision_candidate_pg_test.js
           node tests/account_disconnect_candidate_pg_test.js
           node tests/account_channel_fixture_pg_test.js
       - name: Install media tools for synthetic fixtures

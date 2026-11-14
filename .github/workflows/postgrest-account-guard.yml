@@ -60,6 +60,15 @@ jobs:
           docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < sql/operations/candidate_account_table_acl.sql
       - name: Exercise candidate RPC, triggers and ACLs over HTTP
         run: node tests/postgrest_channel_candidate_http_test.js guarded
+      - name: Install experimental queue revision in disposable container only
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < sql/operations/candidate_publish_queue_revision.sql
+          docker exec "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c "notify pgrst, 'reload schema'"
+      - name: Exercise candidate revision through disposable PostgREST
+        run: node tests/postgrest_publish_queue_revision_candidate_test.js
       - name: Local PostgREST log on failure
         if: failure()
         run: docker logs qr-channel-postgrest || true
