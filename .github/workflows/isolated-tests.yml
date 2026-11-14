@@ -51,6 +51,8 @@ jobs:
           node tests/publish_storage_redirect_test.js
           node tests/publish_bounded_read_candidate_test.js
           node tests/publish_bounded_read_concurrency_candidate_test.js
+          node tests/publish_batch_limit_candidate_test.js
+          node tests/publish_batch_limit_publisher_candidate_test.js
           node tests/publish_upload_url_guard_test.js
           node tests/publish_video_path_guard_test.js
           node tests/publish_reclaim_race_test.js
