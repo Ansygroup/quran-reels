@@ -143,6 +143,14 @@ jobs:
         run: node tests/postgrest_draft_queue_integration_test.js
       - name: Exercise manual publish with disposable PostgREST
         run: node tests/postgrest_manual_publish_integration_test.js
+      - name: Extend disposable connection fixture for OAuth callback
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg='${{ job.services.postgres.id }}'
+          docker exec -i "$pg" psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 < tests/postgrest_youtube_callback_fixture.sql
+      - name: Exercise YouTube callback with disposable PostgREST
+        run: node tests/postgrest_youtube_callback_integration_test.js
       - name: Local PostgREST log on failure
         if: failure()
         run: docker logs qr-local-postgrest || true

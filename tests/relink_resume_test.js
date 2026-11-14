@@ -70,7 +70,7 @@ global.fetch = async (url, opts = {}) => {
       tables.social_connections.push({ ...tables.social_connections[0], id: "c2", account_id: "UC2", is_default: true });
     }
   }
-  if (method === "POST" && name === "social_connections") { const body = JSON.parse(opts.body); const row = tables.social_connections.find(r => r.user_id === body.user_id && r.platform === body.platform && r.account_id === body.account_id); if (row) Object.assign(row, body); else tables.social_connections.push({ id: "new", ...body }); selected = row ? [row] : []; }
+  if (method === "POST" && name === "social_connections") { const body = JSON.parse(opts.body); let row = tables.social_connections.find(r => r.user_id === body.user_id && r.platform === body.platform && r.account_id === body.account_id); if (row) Object.assign(row, body); else { row = { id: "new", ...body }; tables.social_connections.push(row); } selected = [row]; }
   return result(selected.map(r => ({ ...r })));
 };
 function response() { return { headers: {}, setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, end() {} }; }

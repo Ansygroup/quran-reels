@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 Object.assign(process.env,{TOKEN_ENC_KEY:'fixture-key',SITE_ORIGIN:'https://fixture.invalid',GOOGLE_CLIENT_ID:'fixture-id',GOOGLE_CLIENT_SECRET:'fixture-secret'});
 let writes,defaults,automations,calls,token,profile;
 function stub(rel,exports){const id=require.resolve(rel);require.cache[id]={id,filename:id,loaded:true,exports}}
-stub('../lib/db',{q:async()=>{writes++;return []},q1:async()=>null});
+stub('../lib/db',{q:async(_sql,p)=>{writes++;return [{id:'channel',user_id:p[0],platform:'youtube',account_id:p[1],access_token:p[4],refresh_token:p[5]}]},q1:async()=>null});
 const def=()=>{};def.ensureDefault=async()=>{defaults++};stub('../lib/soc_default',def);
 stub('../lib/autopilot',{enableDefaultAutomation:async()=>{automations++;return 'ok'}});
 const oauth=require('../lib/oauth'),callback=require('../api/oauth/callback');

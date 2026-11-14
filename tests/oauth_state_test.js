@@ -31,7 +31,7 @@ const dbPath = require.resolve(path.join(ROOT, "lib", "db.js"));
 require.cache[dbPath] = {
   id: dbPath, filename: dbPath, loaded: true,
   exports: {
-    q: async (sql, params) => { dbCalls.push({ sql, params }); return []; },
+    q: async (sql, params) => { dbCalls.push({ sql, params }); return /insert into social_connections/i.test(sql) && sql.includes("'youtube'") ? [{ id: 'channel', user_id: params[0], platform: 'youtube', account_id: params[1], access_token: params[4], refresh_token: params[5] }] : []; },
     q1: async () => null,
     rest: async () => [],
   },
