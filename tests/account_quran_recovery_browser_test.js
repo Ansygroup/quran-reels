@@ -54,6 +54,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(() => document.querySelector('#acctPreviewNote')?.textContent.includes('تعذّر تحميل المعاينة'), null, { timeout: 10000 });
     const failed = await page.evaluate(() => ({ data: Quran.data, loading: Quran._loading, options: document.querySelector('#acctSurah').options.length }));
     assert.equal(failed.data, null); assert.equal(failed.loading, null); assert.equal(failed.options, 0); assert.equal(requests, 1);
+    await page.locator('#acctCustomize > summary').click();
     await page.fill('#acctDed', 'تجربة محلية');
     await page.waitForFunction(() => document.querySelector('#acctSurah')?.options.length === 114 &&
       !document.querySelector('#acctPreviewNote').textContent.includes('تعذّر'), null, { timeout: 15000 });

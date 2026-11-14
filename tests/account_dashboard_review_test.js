@@ -6,12 +6,13 @@ const w=dom.window;w.eval(fs.readFileSync('public/js/publish.js','utf8'));const 
 (async()=>{
  app.renderHistory([{status:'queued',title:'<img>',external_url:'https://youtu.be/one | https://youtu.be/two | javascript:alert(1)'}]);
  assert.match(d.querySelector('#queueList').textContent,/الطابور/);assert(!d.querySelector('#queueList img'));assert.equal(d.querySelectorAll('#queueList a').length,2);assert.equal(d.querySelectorAll('#queueList a')[1].href,'https://youtu.be/two');
- app.renderHistory([],false);assert.match(d.querySelector('#queueList').textContent,/تعذّر تحميل/);assert.doesNotMatch(d.querySelector('#queueList').textContent,/لا يوجد سجل/);
+ app.renderHistory([],false);assert.match(d.querySelector('#queueList').textContent,/تعذّر تحميل/);assert.match(d.querySelector('#acctHistorySummary').textContent,/تعذّر تحميل/);assert.doesNotMatch(d.querySelector('#queueList').textContent,/لا يوجد سجل/);
  app.renderKpis({stats:null});assert.match(d.querySelector('#acctKpis').textContent,/تعذّر تحميل/);assert(!d.querySelector('#acctKpis').textContent.includes('0'));
  app.renderPendingReview({available:true,truncated:true,items:[{id:'p1',platform:'youtube',status:'scheduled',title:'<img src=x>',channel:null,target_recorded:false,publish_at:'2026-11-08T04:15:00Z'},{id:'p2',platform:'youtube',status:'publishing',channel:'<script>x</script>',target_recorded:true}]});
  assert.match(d.querySelector('#acctPendingReviewList').textContent,/قد تُختار قناة أخرى/);assert.match(d.querySelector('#acctPendingReviewList').textContent,/قيد النشر/);assert.match(d.querySelector('#acctPendingReviewList').textContent,/أول ٢٠/);assert.equal(d.querySelector('#acctPendingReviewList img, #acctPendingReviewList script'),null);
- app.renderPendingReview({available:false,items:[]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/تعذّر تحميل/);
- app.renderPendingReview({available:true,items:[]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/لا يثبت ذلك خلو الطابور/);
+ assert.match(d.querySelector('#acctPendingSummary').textContent,/2 في اللقطة.*قد توجد أخرى/);
+ app.renderPendingReview({available:false,items:[]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/تعذّر تحميل/);assert.match(d.querySelector('#acctPendingSummary').textContent,/تعذّر التحقق/);
+ app.renderPendingReview({available:true,items:[]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/لا يثبت ذلك خلو الطابور/);assert.match(d.querySelector('#acctPendingSummary').textContent,/هذه اللقطة/);
  const pendingItem={id:'p1',platform:'youtube',status:'publishing',target_recorded:true,channel:null,publish_at:'04:15:00'};
  app.renderPendingReview({available:true,items:[pendingItem]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/تعذّر معرفة اسم القناة/);assert.match(d.querySelector('#acctPendingReviewList').textContent,/وقت غير متاح/);assert.doesNotMatch(d.querySelector('#acctPendingReviewList').textContent,/UTC.*القاهرة/);
  for (const invalid of [null,{...pendingItem,target_recorded:undefined},{...pendingItem,target_recorded:false,channel:'contradiction'},{...pendingItem,status:'published'},{...pendingItem,id:''}]) {app.renderPendingReview({available:true,items:[invalid]});assert.match(d.querySelector('#acctPendingReviewList').textContent,/تعذّر تحميل/);}

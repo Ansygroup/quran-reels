@@ -172,6 +172,10 @@ window.PublishApp = {
     }
     const notice = document.getElementById("acctNotice");
     if (notice) { notice.textContent = ""; notice.hidden = true; notice.style.display = "none"; notice.style.color = ""; delete notice.dataset.loadError; }
+    const badge = document.getElementById("acctDraftBadge"); if (badge) badge.hidden = true;
+    for (const [id, text] of [["acctHistorySummary", "نتائج المحاولات وإحصاءات النشر"], ["acctPendingSummary", "جارٍ التحقق من المهام…"], ["acctFailedSummary", "جارٍ التحقق من المحاولات…"]]) {
+      const summary = document.getElementById(id); if (summary) { summary.textContent = text; summary.classList.remove("warn"); }
+    }
     const accounts = document.getElementById("acctAccounts"); if (accounts) accounts.hidden = true;
     this.reauth = []; this._settingsUncertain = false; this._reviewedUncertain = false; this.showUncertainty();
     const toggle = document.getElementById("acctEnabled"); if (toggle) { toggle.checked = false; toggle.disabled = true; }
@@ -494,10 +498,7 @@ window.PublishApp = {
     this._draftBackgroundImageId = template.background === "custom" ? template.background_image_id || null : null;
     this._draftAllChannels = config.all_channels === true;
     wrap.innerHTML = `
-      <div class="acct-sec-head">
-        <h2>🎛️ التخصيص</h2>
-        <span class="hint">التعديلات هنا تحتاج تضغط «حفظ التعديلات»؛ مفتاح الأتمتة يستخدم الإعدادات المحفوظة</span>
-      </div>
+      <div class="acct-panel-intro"><h2>التخصيص</h2><p class="hint">احفظ التعديلات لتطبيقها؛ مفتاح الأتمتة يستخدم الإعدادات المحفوظة.</p></div>
       <div class="acct-grid3">
         <div class="f-group"><label for="selContentMode">محتوى الفيديو</label>
           <select id="selContentMode">${modes.map((m) => `<option value="${this.esc(m)}" ${template.content_mode === m ? "selected" : ""}>${this.esc(MODES[m] || m)}</option>`).join("")}</select>
@@ -557,6 +558,7 @@ window.PublishApp = {
 
     this.renderPlatformChecks(data);
     this.initReelEditor(wrap);
+    this.renderEditState();
   },
 
   /* نرسم بمحرك الصانع نفسه، من غير إنشاء أو نشر أو تغيير إعداداته المحلية. */
@@ -661,6 +663,8 @@ window.PublishApp = {
 
   renderEditState() {
     const state = document.getElementById("acctEditState");
+    const badge = document.getElementById("acctDraftBadge");
+    if (badge) badge.hidden = !this._autoDirty;
     if (!state) return;
     state.textContent = this._autoDirty ? "عندك تعديلات غير محفوظة؛ اضغط حفظ التعديلات لتطبيقها. التشغيل يستخدم الإعدادات المحفوظة. قد تضيع التعديلات عند تحديث الصفحة أو تغيير الحساب." : "لا توجد تعديلات غير محفوظة في هذه الصفحة.";
     state.classList.toggle("warn", Boolean(this._autoDirty));
@@ -670,7 +674,8 @@ window.PublishApp = {
   renderProgress(data = {}) {
     const wrap = document.getElementById("acctProgress");
     if (!wrap) return;
-    const head = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div>';
+    const head = '<div class="acct-sec-head"><div><span class="acct-overline">المتابعة المباشرة</span><h2>آخر تشغيل</h2></div><span class="acct-card-icon" aria-hidden="true">◷</span></div>';
+    const detailsOpen = Boolean(wrap.querySelector(".acct-progress-detail")?.open);
     if (this._progressWaiting) { wrap.innerHTML = head + '<p class="hint">⏳ بنستنى الخادم يبدأ التشغيل ويسجّل أول خطوة…</p>'; return; }
     const r = data.run;
     if (!r) { wrap.innerHTML = head + '<p class="hint">مفيش تشغيل مسجّل لسه.</p>'; return; }
@@ -688,7 +693,9 @@ window.PublishApp = {
     const warning = data.targets_available === false ? '<p class="hint warn">تعذّر قراءة حالة القنوات دلوقتي.</p>' : data.targets_truncated ? '<p class="hint warn">قائمة القنوات المعروضة ممكن تكون ناقصة.</p>' : "";
     const error = r.status === "failed" && r.error ? `<p class="hint warn">${this.esc(this.friendly(r.error))}</p>` : "";
     const at = events.length && events[events.length - 1].at ? `آخر خطوة مسجّلة: ${this.esc(cairoClockLabel(events[events.length - 1].at))}. ` : "";
-    wrap.innerHTML = head + `<p><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + steps + channels + warning + error + `<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p>`;
+    const latest = events.length ? `<p class="acct-progress-latest">${this.esc(labels[events[events.length - 1].stage])}</p>` : "";
+    const targetWarning = targets.some(t => t.status === "failed") ? '<p class="hint warn">بعض القنوات تحتاج مراجعة؛ افتح تفاصيل التشغيل.</p>' : "";
+    wrap.innerHTML = head + `<p class="acct-progress-state"><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + latest + warning + targetWarning + error + `<details class="acct-progress-detail" ${detailsOpen ? "open" : ""}><summary>تفاصيل المراحل والقنوات</summary>${steps}${channels}<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p></details>`;
   },
 
   startProgressPolling() {
@@ -724,9 +731,14 @@ window.PublishApp = {
   /* ---------- سجل التشغيل ---------- */
   renderHistory(runs, available = true) {
     const list = document.getElementById("queueList");
+    const summary = document.getElementById("acctHistorySummary");
+    const rows = Array.isArray(runs) ? runs : [];
+    if (summary) {
+      summary.classList.toggle("warn", !available);
+      summary.textContent = !available ? "تعذّر تحميل السجل — افتح التفاصيل" : rows.length ? `${rows.length} تشغيل في العرض · وإحصاءات النشر` : "لا تشغيلات ظاهرة · وإحصاءات النشر";
+    }
     if (!list) return;
     if (!available) { list.innerHTML = '<p class="hint warn">تعذّر تحميل السجل. حاول تحديث الصفحة؛ هذا لا يعني عدم وجود تشغيلات.</p>'; return; }
-    const rows = Array.isArray(runs) ? runs : [];
     if (!rows.length) {
       list.innerHTML = `<p class="hint">لا يوجد سجل بعد — أول تشغيل سيظهر هنا تلقائيًا.</p>`;
       return;
@@ -763,7 +775,18 @@ window.PublishApp = {
     return this.cairoClockLabel(value) + " (القاهرة)";
   },
 
+  renderReviewSummary(id, review, statuses) {
+    const summary = document.getElementById(id);
+    if (!summary) return;
+    const valid = this.validReviewItems(review, statuses);
+    summary.classList.toggle("warn", !valid || (valid && review.items.length > 0));
+    summary.textContent = !valid ? "تعذّر التحقق — افتح التفاصيل" : review.items.length
+      ? `${review.items.length} في اللقطة${review.truncated ? " وقد توجد أخرى" : ""} · افتح للمراجعة`
+      : "لا عناصر ظاهرة في هذه اللقطة";
+  },
+
   renderPendingReview(review) {
+    this.renderReviewSummary("acctPendingSummary", review, ["scheduled", "publishing", "draft"]);
     const list = document.getElementById("acctPendingReviewList");
     if (!list) return;
     if (!this.validReviewItems(review, ["scheduled", "publishing", "draft"])) {
@@ -779,6 +802,7 @@ window.PublishApp = {
   },
 
   renderFailedReview(review) {
+    this.renderReviewSummary("acctFailedSummary", review);
     const list = document.getElementById("acctFailedReviewList");
     if (!list) return;
     if (!this.validReviewItems(review)) {
@@ -854,6 +878,7 @@ window.PublishApp = {
     card.hidden = false;
     // نحافظ على القسم المفتوح عند تحديث القنوات بعد ربط أو فك ربط.
     const moreWasOpen = Boolean(wrap.querySelector("#acctMorePlatforms")?.open);
+    const openDetails = new Set([...wrap.querySelectorAll(".chan-detail[open]")].map(d => d.closest(".chan-group")?.dataset.soc).filter(Boolean));
     wrap.innerHTML = '<p class="hint">جارٍ تحميل الحسابات المرتبطة…</p>';
 
     let conns = [];
@@ -924,8 +949,11 @@ window.PublishApp = {
           <div class="chan-list">${mine.map(one).join("")}</div>
           <div class="chan-foot">
             ${prov && ready ? `<button class="btn btn-ghost btn-sm" data-connect="${this.esc(p.key)}" data-connect-intent="add" ${this._connectPending ? "disabled" : ""}>➕ إضافة قناة</button>` : ""}
-            <small class="hint">${savedMode} هذا عرض للخادم وليس لتعديلات المسودة غير المحفوظة. ${defaultHint} عند النشر بلا قناة محددة قد يختار النظام الافتراضية وقت التنفيذ، أو أحدث اتصال إذا غابت؛ عند تساوي أوقات التحديث أو نقصها لا يمكن الجزم بالاختيار. وقد تتغير الوجهة. القائمة لقطة قد تكون غير مكتملة ولا تحدد وجهات المهام الموجودة.</small>
-            <small class="hint">الحساب يُختار لدى المنصة؛ محاولة إعادة الربط لا تضمن تحديث القناة المقصودة، والإضافة قد تحدّث حسابًا موجودًا. راجع القنوات والأتمتة بعد العودة.</small>
+            <small class="hint">${savedMode} ${defaultHint} قد تتغير وجهة النشر؛ راجع التفاصيل والمهام الموجودة.</small>
+            <details class="chan-detail" ${openDetails.has(p.key) ? "open" : ""}><summary>تفاصيل الوجهة والربط</summary>
+              <small class="hint">هذا عرض للخادم وليس لتعديلات المسودة غير المحفوظة. عند النشر بلا قناة محددة قد يختار النظام الافتراضية وقت التنفيذ، أو أحدث اتصال إذا غابت؛ عند تساوي أوقات التحديث أو نقصها لا يمكن الجزم بالاختيار. وقد تتغير الوجهة. القائمة لقطة قد تكون غير مكتملة ولا تحدد وجهات المهام الموجودة.</small>
+              <small class="hint">الحساب يُختار لدى المنصة؛ محاولة إعادة الربط لا تضمن تحديث القناة المقصودة، والإضافة قد تحدّث حسابًا موجودًا. راجع القنوات والأتمتة بعد العودة.</small>
+            </details>
           </div>
         </div>`;
       }

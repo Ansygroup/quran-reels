@@ -963,3 +963,84 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--gold)}
 
 /* مراجعة نتيجة حفظ غير مؤكدة دون إخفاء مسودة المستخدم. */
 #acctRecovery p{margin:0 0 10px}#acctSavedReview{margin-top:14px}#acctSavedReviewText{max-height:18rem;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:rgba(0,0,0,.25);border-radius:10px;font-size:.82rem}
+
+/* حسابي: نظرة هادئة، والتفاصيل تبقى متاحة عند الحاجة. */
+#view-account .acct-wrap{max-width:1120px;padding-top:48px;padding-bottom:88px}
+#view-account .acct-hero{position:relative;overflow:hidden;grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);gap:32px;padding:38px 42px;border-radius:24px;border:1px solid rgba(195,178,113,.18);background:linear-gradient(115deg,#102e24 0%,#0b211a 60%,#10271e 100%);box-shadow:0 18px 50px rgba(0,0,0,.16)}
+#view-account .acct-hero::after{content:'✧';position:absolute;inset-inline-start:-10px;bottom:-88px;font-size:240px;line-height:1;color:rgba(218,195,125,.035);pointer-events:none}
+#view-account .acct-hero-l,#view-account .acct-hero-r{position:relative;z-index:1;min-width:0}
+#view-account .acct-eyebrow{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;letter-spacing:.03em;color:#d9c594}
+#view-account .acct-eyebrow-mark{font-size:1rem;color:#e7d39d}
+#view-account .acct-hero-l h1{font-size:clamp(2rem,3.5vw,2.8rem);line-height:1.3;margin:9px 0 8px;letter-spacing:0}
+#view-account .acct-hero-l .lead{font-size:.98rem;line-height:1.8;color:#acc2b7}
+#view-account #acctSignOut{margin-top:17px}
+#view-account .acct-status{padding:20px 22px;border-radius:17px;background:rgba(5,18,14,.42);border-color:rgba(198,225,210,.1)}
+#view-account .acct-status-txt b{font-size:1rem}
+#view-account .acct-status-txt small{margin-top:4px;line-height:1.6}
+#view-account .acct-section-intro{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:37px 2px 16px}
+#view-account .acct-section-intro span,#view-account .acct-overline{display:block;color:#adbfad;font-size:.73rem;font-weight:700;letter-spacing:.02em}
+#view-account .acct-section-intro h2{font-size:1.35rem;line-height:1.35;margin-top:4px}
+#view-account .acct-section-intro p{color:var(--muted);font-size:.85rem}
+#view-account .acct-overview-grid{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(0,.82fr);gap:14px;align-items:start}
+#view-account .acct-sec{background:rgba(13,32,25,.91);border:1px solid rgba(202,224,208,.1);border-radius:19px;box-shadow:none}
+#view-account .acct-overview-grid .acct-sec{margin:0;padding:23px 24px}
+#view-account .acct-sec-head{align-items:center;margin-bottom:14px}
+#view-account .acct-sec-head h2{font-size:1.12rem;margin:3px 0 0}
+#view-account .acct-card-icon,#view-account .acct-summary-icon{display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border:1px solid rgba(218,195,125,.16);border-radius:12px;color:#d9c594;background:rgba(218,195,125,.06);font-size:1.2rem}
+#view-account .acct-channel-intro{margin-bottom:18px;line-height:1.75}
+#view-account .chan-group+.chan-group{padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+#view-account .chan-card{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.09);padding:13px}
+#view-account .chan-card.off{border-color:rgba(255,207,139,.42)}
+#view-account .chan-foot{align-items:flex-start}
+#view-account .chan-foot>.hint{flex:1 1 100%;font-size:.79rem;line-height:1.75}
+#view-account .chan-detail{flex:1 1 100%;font-size:.8rem;color:var(--muted)}
+#view-account .chan-detail summary{cursor:pointer;color:#cfbf95;font-weight:700;list-style:none}
+#view-account .chan-detail summary::-webkit-details-marker{display:none}
+#view-account .chan-detail summary::before{content:'+';margin-inline-end:7px}
+#view-account .chan-detail[open] summary::before{content:'−'}
+#view-account .chan-detail .hint{display:block;margin-top:8px;line-height:1.8}
+#view-account .acct-progress{min-height:150px;border-color:rgba(202,224,208,.1)}
+#view-account .acct-progress-state{margin-top:10px;line-height:1.75}
+#view-account .acct-progress-latest{margin-top:5px;color:var(--muted);font-size:.85rem}
+#view-account .acct-progress-detail{border-top:1px solid rgba(255,255,255,.08);margin-top:18px;padding-top:13px;font-size:.87rem}
+#view-account .acct-progress-detail summary{cursor:pointer;color:#d7c597;font-weight:700}
+#view-account .acct-progress-detail .hint{line-height:1.8}
+#view-account .acct-disclosure{padding:0;margin-top:10px;overflow:hidden}
+#view-account .acct-disclosure>summary{display:flex;align-items:center;gap:15px;min-height:78px;padding:16px 20px;list-style:none;color:var(--txt);cursor:pointer}
+#view-account .acct-disclosure>summary::-webkit-details-marker{display:none}
+#view-account .acct-disclosure>summary:hover{background:rgba(255,255,255,.025)}
+#view-account .acct-disclosure>summary:focus-visible,#view-account .chan-detail summary:focus-visible,#view-account .acct-progress-detail summary:focus-visible{outline:2px solid var(--gold);outline-offset:-4px}
+#view-account .acct-disclosure[open]>summary{margin:0;border-bottom:1px solid rgba(255,255,255,.08)}
+#view-account .acct-summary-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}
+#view-account .acct-summary-copy b{font-size:.99rem;line-height:1.4}
+#view-account .acct-disclosure .acct-summary-copy small{display:block;margin:0;color:var(--muted);font-size:.8rem;line-height:1.5;font-weight:400}
+#view-account .acct-disclosure .acct-summary-copy small.warn{color:#ffcf8b}
+#view-account .acct-chevron{font-size:1.4rem;line-height:1;color:#99b2a5;transition:transform .2s}
+#view-account .acct-disclosure[open] .acct-chevron{transform:rotate(180deg)}
+#view-account .acct-disclosure>section,#view-account .acct-disclosure>#acctAuto,#view-account .acct-disclosure>#acctSteps,#view-account .acct-disclosure>#acctQuickActions,#view-account .acct-disclosure>p{margin:0;padding:20px 24px}
+#view-account #acctTools>p{padding-bottom:0}
+#view-account .acct-customize{border-color:rgba(218,195,125,.2);margin-top:14px}
+#view-account .acct-customize .acct-summary-icon{background:rgba(218,195,125,.12)}
+#view-account .acct-panel-intro{margin-bottom:18px}
+#view-account .acct-panel-intro h2{font-size:1rem;margin:0 0 4px}
+#view-account .acct-panel-intro p{line-height:1.7}
+#view-account .acct-draft-badge{color:#ffcf8b;background:rgba(255,207,139,.09);border:1px solid rgba(255,207,139,.22);padding:4px 9px;border-radius:99px;font-size:.72rem;white-space:nowrap}
+#view-account .acct-activity-intro{margin-top:34px}
+#view-account .acct-kpis{margin:0 0 20px}
+#view-account .acct-kpis .kpi{background:rgba(255,255,255,.025)}
+#view-account .acct-activity section>p{margin-bottom:16px;line-height:1.8}
+#view-account .acct-visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:760px){
+  #view-account .acct-wrap{padding-top:24px;padding-bottom:55px}
+  #view-account .acct-hero{grid-template-columns:1fr;padding:25px 23px;gap:20px}
+  #view-account .acct-hero-l h1{font-size:2rem}
+  #view-account .acct-status{padding:16px}
+  #view-account .acct-section-intro{margin-top:30px;align-items:start;flex-direction:column;gap:4px}
+  #view-account .acct-overview-grid{grid-template-columns:1fr;gap:10px}
+  #view-account .acct-overview-grid .acct-sec{padding:20px}
+  #view-account .acct-disclosure>summary{padding:14px 16px;gap:11px}
+  #view-account .acct-disclosure>section,#view-account .acct-disclosure>#acctAuto,#view-account .acct-disclosure>#acctSteps,#view-account .acct-disclosure>#acctQuickActions,#view-account .acct-disclosure>p{padding:18px}
+  #view-account #acctTools>p{padding-bottom:0}
+  #view-account .acct-draft-badge{white-space:normal;text-align:center;line-height:1.3}
+}
+#view-account .switch input:focus-visible+i{outline:2px solid var(--gold);outline-offset:4px}

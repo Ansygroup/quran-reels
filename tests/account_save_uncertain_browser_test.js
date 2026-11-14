@@ -51,6 +51,7 @@ const server = http.createServer((req, res) => {
         return orig(url,opts);
       };
     });
+    await page.locator('#acctCustomize > summary').click();
     await page.locator('#acctBackgroundFile').setInputFiles({name:'private.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0pQAAAAASUVORK5CYII=','base64')});
     await page.fill('#acctDed','مسودة لم تضِع');
     await page.locator('#autoSave').click();
@@ -132,6 +133,8 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.evaluate(()=>posts.length),articleBefore+1);
     // After relinking the UI describes a review, not an automatic repost.
     await page.evaluate(()=>{const app=PublishApp;app.renderAccount({...app.data,reauth:['youtube'],pending_review:{available:true,truncated:false,items:[{id:'fake-pending',status:'scheduled',platform:'youtube',title:'فيديو مجدول',channel:null,target_recorded:false,publish_at:'2026-11-07T00:00:00Z'}]},failed_review:{available:true,truncated:false,items:[{id:'fake-attempt',platform:'youtube',title:'فيديو تجريبي',channel:null,target_recorded:false,created_at:'2026-11-07T00:00:00Z'}]}});app.api=async(action)=>{window.__reviewAction=action;return {ok:false,error:'راجع القناة قبل إعادة النشر'}};window.toast=(msg)=>{window.__reviewMessage=msg}});
+    await page.locator('#acctPendingDisclosure > summary').click();
+    await page.locator('#acctFailedDisclosure > summary').click();
     assert.match(await page.locator('#acctPendingReviewList').innerText(),/قد تُختار قناة أخرى/);
     assert.match(await page.locator('#acctPendingReview').innerText(),/لا تلغي المهام/);
     assert.match(await page.locator('#acctPendingReview').innerText(),/قد لا تشمل كل المهام/);
