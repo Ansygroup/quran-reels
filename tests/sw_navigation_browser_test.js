@@ -37,7 +37,7 @@ const server = http.createServer((req, res) => {
     assert(await page.evaluate(() => !!navigator.serviceWorker.controller), 'fixture page controlled by service worker');
     return {ctx, page};
   }
-  const getShell = page => page.evaluate(async () => {const c = await caches.open('qr-v82'); const r = await c.match('/'); return r ? r.text() : null;});
+  const getShell = page => page.evaluate(async () => {const c = await caches.open('qr-v83'); const r = await c.match('/'); return r ? r.text() : null;});
   const offlineFailure = async (page, url) => { let failed = false; try { await page.goto(url); } catch { failed = true; } assert(failed, 'navigation should fail instead of displaying an unrelated shell'); };
   // An install served an error must not save it as a shell.
   rootMode = 'error';

@@ -163,6 +163,7 @@ window.PublishApp = {
     this._connectAttempt = null; // invalidate pending OAuth-start results on identity changes
     this._autoDirty = false; this._draftRevision = undefined; this._draftBackgroundImageId = null; this._draftAllChannels = false;
     const editor = document.getElementById("acctAuto"); if (editor) editor._reelGeneration = (editor._reelGeneration || 0) + 1;
+    const progress = document.getElementById("acctProgress"); if (progress) progress._progressRenderKey = null;
     if (this._progressTimer) clearTimeout(this._progressTimer);
     this._progressWaiting = false; this._lastProgressRunId = null;
     this.data = null; this.connections = []; this._connectionsState = "loading"; this._connectionsSeq = (this._connectionsSeq || 0) + 1; this._bgPreviewCache = null;
@@ -704,15 +705,32 @@ window.PublishApp = {
     state.classList.toggle("warn", Boolean(this._autoDirty));
   },
 
+  // Polling must not repeatedly replace unchanged content or drop keyboard focus.
+  updateProgressMarkup(wrap, html) {
+    if (wrap._progressRenderKey === html && wrap.childNodes.length) return;
+    const detail = wrap.querySelector(".acct-progress-detail");
+    const wasOpen = Boolean(detail?.open);
+    const active = document.activeElement;
+    const hadFocus = active && active !== wrap && wrap.contains(active);
+    const href = hadFocus && active.matches(".acct-progress-detail a") ? active.getAttribute("href") : null;
+    wrap.innerHTML = html;
+    wrap._progressRenderKey = html;
+    const newDetail = wrap.querySelector(".acct-progress-detail");
+    if (newDetail) newDetail.open = wasOpen;
+    if (hadFocus) {
+      const link = href && [...wrap.querySelectorAll(".acct-progress-detail a")].find(a => a.getAttribute("href") === href);
+      (link || newDetail?.querySelector("summary") || wrap).focus({ preventScroll: true });
+    }
+  },
+
   /* نعرض فقط المراحل التي سجّلها الخادم وحالة كل صف نشر فعلي. */
   renderProgress(data = {}) {
     const wrap = document.getElementById("acctProgress");
     if (!wrap) return;
     const head = '<div class="acct-sec-head"><div><span class="acct-overline">المتابعة المباشرة</span><h2>آخر تشغيل</h2></div><span class="acct-card-icon" aria-hidden="true">◷</span></div>';
-    const detailsOpen = Boolean(wrap.querySelector(".acct-progress-detail")?.open);
-    if (this._progressWaiting) { wrap.innerHTML = head + '<p class="hint">⏳ بنستنى الخادم يبدأ التشغيل ويسجّل أول خطوة…</p>'; return; }
+    if (this._progressWaiting) { this.updateProgressMarkup(wrap, head + '<p class="hint">⏳ بنستنى الخادم يبدأ التشغيل ويسجّل أول خطوة…</p>'); return; }
     const r = data.run;
-    if (!r) { wrap.innerHTML = head + '<p class="hint">مفيش تشغيل مسجّل لسه.</p>'; return; }
+    if (!r) { this.updateProgressMarkup(wrap, head + '<p class="hint">مفيش تشغيل مسجّل لسه.</p>'); return; }
     const labels = { checking: "فحص القنوات والإعدادات", preparing: "تجهيز الفيديو", audio: "فحص التلاوة", export: "إنشاء الفيديو", validating: "فحص الصوت والملف", storage: "حفظ الفيديو", queue: "تجهيز مهام القنوات", publishing: "محاولة النشر على القنوات" };
     const states = { rendering: "⏳ جاري التجهيز", queued: "⏳ تجهيز أو نشر", published: "✅ التشغيل مكتمل", failed: "⚠️ التشغيل ما اكتملش" };
     const events = (Array.isArray(data.events) ? data.events : []).filter(e => labels[e.stage]);
@@ -729,7 +747,7 @@ window.PublishApp = {
     const at = events.length && events[events.length - 1].at ? `آخر خطوة مسجّلة: ${this.esc(cairoClockLabel(events[events.length - 1].at))}. ` : "";
     const latest = events.length ? `<p class="acct-progress-latest">${this.esc(labels[events[events.length - 1].stage])}</p>` : "";
     const targetWarning = targets.some(t => t.status === "failed") ? '<p class="hint warn">بعض القنوات تحتاج مراجعة؛ افتح تفاصيل التشغيل.</p>' : "";
-    wrap.innerHTML = head + `<p class="acct-progress-state"><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + latest + warning + targetWarning + error + `<details class="acct-progress-detail" ${detailsOpen ? "open" : ""}><summary>تفاصيل المراحل والقنوات</summary>${steps}${channels}<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p></details>`;
+    this.updateProgressMarkup(wrap, head + `<p class="acct-progress-state"><b>${this.esc(states[r.status] || "حالة غير معروفة")}</b>${r.title ? ` · ${this.esc(r.title)}` : ""}</p>` + latest + warning + targetWarning + error + `<details class="acct-progress-detail"><summary>تفاصيل المراحل والقنوات</summary>${steps}${channels}<p class="hint">${at}لو الاتصال اتقطع، راجع الحالة قبل ما تشغّل تاني.</p></details>`);
   },
 
   startProgressPolling() {
@@ -753,7 +771,7 @@ window.PublishApp = {
     } catch {
       if (owner !== this._accountOwner) return;
       const wrap = document.getElementById("acctProgress");
-      if (wrap) wrap.innerHTML = '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div><p class="hint warn">مش قادرين نحدّث الحالة دلوقتي؛ ده مش معناه إن التشغيل وقف. راجعها قبل ما تشغّل تاني.</p>';
+      if (wrap) this.updateProgressMarkup(wrap, '<div class="acct-sec-head"><h2>📍 مراحل آخر فيديو</h2></div><p class="hint warn">مش قادرين نحدّث الحالة دلوقتي؛ ده مش معناه إن التشغيل وقف. راجعها قبل ما تشغّل تاني.</p>');
     } finally {
       this._progressBusy = false;
       if (this._progressTimer) clearTimeout(this._progressTimer);
