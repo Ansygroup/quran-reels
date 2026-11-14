@@ -1,0 +1,242 @@
+{
+  "description": "Configured folder inventory, not proof of existence, identity or license. Recording rights require individual verification.",
+  "source": "public/js/data.js",
+  "folder_template": "https://everyayah.com/data/{folder}/{surah:03d}{ayah:03d}.mp3",
+  "reciters": [
+    {
+      "id": "Alafasy_128kbps",
+      "name": "مشاري راشد العفاسي",
+      "folder": "Alafasy_128kbps"
+    },
+    {
+      "id": "Abdul_Basit_Murattal_192kbps",
+      "name": "الشيخ عبدالباسط عبدالصمد (مرتل)",
+      "folder": "Abdul_Basit_Murattal_192kbps"
+    },
+    {
+      "id": "Abdul_Basit_Mujawwad_128kbps",
+      "name": "الشيخ عبدالباسط عبدالصمد (مجوّد)",
+      "folder": "Abdul_Basit_Mujawwad_128kbps"
+    },
+    {
+      "id": "Abdurrahmaan_As-Sudais_192kbps",
+      "name": "الشيخ عبدالرحمن السديس",
+      "folder": "Abdurrahmaan_As-Sudais_192kbps"
+    },
+    {
+      "id": "Saood_ash-Shuraym_128kbps",
+      "name": "الشيخ سعود الشريم",
+      "folder": "Saood_ash-Shuraym_128kbps"
+    },
+    {
+      "id": "MaherAlMuaiqly128kbps",
+      "name": "الشيخ ماهر المعيقلي",
+      "folder": "MaherAlMuaiqly128kbps"
+    },
+    {
+      "id": "Minshawy_Murattal_128kbps",
+      "name": "الشيخ محمد صديق المنشاوي (مرتل)",
+      "folder": "Minshawy_Murattal_128kbps"
+    },
+    {
+      "id": "Minshawy_Mujawwad_192kbps",
+      "name": "الشيخ محمد صديق المنشاوي (مجوّد)",
+      "folder": "Minshawy_Mujawwad_192kbps"
+    },
+    {
+      "id": "Minshawy_Teacher_128kbps",
+      "name": "الشيخ محمد صديق المنشاوي (معلّم)",
+      "folder": "Minshawy_Teacher_128kbps"
+    },
+    {
+      "id": "Husary_128kbps",
+      "name": "الشيخ محمود خليل الحصري (مرتل)",
+      "folder": "Husary_128kbps"
+    },
+    {
+      "id": "Husary_128kbps_Mujawwad",
+      "name": "الشيخ محمود خليل الحصري (مجوّد)",
+      "folder": "Husary_128kbps_Mujawwad"
+    },
+    {
+      "id": "Husary_Muallim_128kbps",
+      "name": "الشيخ محمود خليل الحصري (معلّم)",
+      "folder": "Husary_Muallim_128kbps"
+    },
+    {
+      "id": "Mohammad_al_Tablaway_128kbps",
+      "name": "الشيخ محمد الطبلاوي",
+      "folder": "Mohammad_al_Tablaway_128kbps"
+    },
+    {
+      "id": "Muhammad_Jibreel_128kbps",
+      "name": "الشيخ محمد جبريل",
+      "folder": "Muhammad_Jibreel_128kbps"
+    },
+    {
+      "id": "Abu_Bakr_Ash-Shaatree_128kbps",
+      "name": "الشيخ أبو بكر الشاطري",
+      "folder": "Abu_Bakr_Ash-Shaatree_128kbps"
+    },
+    {
+      "id": "Hani_Rifai_192kbps",
+      "name": "الشيخ هاني الرفاعي",
+      "folder": "Hani_Rifai_192kbps"
+    },
+    {
+      "id": "SaadAlGhamadi",
+      "name": "الشيخ سعد الغامدي",
+      "folder": "Ghamadi_40kbps"
+    },
+    {
+      "id": "Hudhaify_128kbps",
+      "name": "الشيخ عبد الله الحذيفي",
+      "folder": "Hudhaify_128kbps"
+    },
+    {
+      "id": "Nasser_Alqatami_128kbps",
+      "name": "الشيخ ناصر القطامي",
+      "folder": "Nasser_Alqatami_128kbps"
+    },
+    {
+      "id": "Yasser_Ad-Dussary_128kbps",
+      "name": "الشيخ ياسر الدوسري",
+      "folder": "Yasser_Ad-Dussary_128kbps"
+    },
+    {
+      "id": "Salah_Al_Budair_128kbps",
+      "name": "الشيخ صلاح البدير",
+      "folder": "Salah_Al_Budair_128kbps"
+    },
+    {
+      "id": "Salaah_AbdulRahman_Bukhatir_128kbps",
+      "name": "الشيخ صالح عبد الرحمن بوخاطر",
+      "folder": "Salaah_AbdulRahman_Bukhatir_128kbps"
+    },
+    {
+      "id": "Abdullah_Basfar_192kbps",
+      "name": "الشيخ عبدالله بصفر",
+      "folder": "Abdullah_Basfar_192kbps"
+    },
+    {
+      "id": "Abdullah_Matroud_128kbps",
+      "name": "الشيخ عبدالله المطرود",
+      "folder": "Abdullah_Matroud_128kbps"
+    },
+    {
+      "id": "Abdullaah_3awwaad_Al-Juhaynee_128kbps",
+      "name": "الشيخ عبدالله عوض الجهني",
+      "folder": "Abdullaah_3awwaad_Al-Juhaynee_128kbps"
+    },
+    {
+      "id": "Muhsin_Al_Qasim_192kbps",
+      "name": "الشيخ محسن القاسم",
+      "folder": "Muhsin_Al_Qasim_192kbps"
+    },
+    {
+      "id": "Muhammad_Ayyoub_128kbps",
+      "name": "الشيخ محمد أيوب",
+      "folder": "Muhammad_Ayyoub_128kbps"
+    },
+    {
+      "id": "Khaalid_Abdullaah_al-Qahtaanee_192kbps",
+      "name": "الشيخ خالد القحطاني",
+      "folder": "Khaalid_Abdullaah_al-Qahtaanee_192kbps"
+    },
+    {
+      "id": "Ahmed_Neana_128kbps",
+      "name": "الشيخ أحمد نعينع",
+      "folder": "Ahmed_Neana_128kbps"
+    },
+    {
+      "id": "ahmed_ibn_ali_al_ajamy_128kbps",
+      "name": "الشيخ أحمد العجمي",
+      "folder": "ahmed_ibn_ali_al_ajamy_128kbps"
+    },
+    {
+      "id": "Ibrahim_Akhdar_32kbps",
+      "name": "الشيخ إبراهيم الأخضر",
+      "folder": "Ibrahim_Akhdar_32kbps"
+    },
+    {
+      "id": "Ali_Jaber_64kbps",
+      "name": "الشيخ علي جابر",
+      "folder": "Ali_Jaber_64kbps"
+    },
+    {
+      "id": "Fares_Abbad_64kbps",
+      "name": "الشيخ فارس عباد",
+      "folder": "Fares_Abbad_64kbps"
+    },
+    {
+      "id": "Ayman_Sowaid_64kbps",
+      "name": "الشيخ أيمن سويد",
+      "folder": "Ayman_Sowaid_64kbps"
+    },
+    {
+      "id": "khalefa_al_tunaiji_64kbps",
+      "name": "الشيخ خليفة الطنيجي",
+      "folder": "khalefa_al_tunaiji_64kbps"
+    },
+    {
+      "id": "mahmoud_ali_al_banna_32kbps",
+      "name": "الشيخ محمود علي البنا",
+      "folder": "mahmoud_ali_al_banna_32kbps"
+    },
+    {
+      "id": "Yaser_Salamah_128kbps",
+      "name": "الشيخ ياسر سلامة",
+      "folder": "Yaser_Salamah_128kbps"
+    },
+    {
+      "id": "Muhammad_AbdulKareem_128kbps",
+      "name": "الشيخ محمد عبد الكريم",
+      "folder": "Muhammad_AbdulKareem_128kbps"
+    },
+    {
+      "id": "Ali_Hajjaj_AlSuesy_128kbps",
+      "name": "الشيخ علي حجاج السويسي",
+      "folder": "Ali_Hajjaj_AlSuesy_128kbps"
+    },
+    {
+      "id": "Akram_AlAlaqimy_128kbps",
+      "name": "الشيخ أكرم العلاقمي",
+      "folder": "Akram_AlAlaqimy_128kbps"
+    },
+    {
+      "id": "Sahl_Yassin_128kbps",
+      "name": "الشيخ سهل ياسين",
+      "folder": "Sahl_Yassin_128kbps"
+    },
+    {
+      "id": "Mustafa_Ismail_48kbps",
+      "name": "الشيخ مصطفى إسماعيل",
+      "folder": "Mustafa_Ismail_48kbps"
+    },
+    {
+      "id": "Nabil_Rifa3i_48kbps",
+      "name": "الشيخ نبيل الرفاعي",
+      "folder": "Nabil_Rifa3i_48kbps"
+    },
+    {
+      "id": "aziz_alili_128kbps",
+      "name": "الشيخ عزيز علي",
+      "folder": "aziz_alili_128kbps"
+    },
+    {
+      "id": "Saood%20bin%20Ibraaheem%20Ash-Shuraym_128kbps",
+      "name": "الشيخ سعود بن إبراهيم الشريم",
+      "folder": "Saood%20bin%20Ibraaheem%20Ash-Shuraym_128kbps"
+    },
+    {
+      "id": "AbdulSamad_64kbps_QuranExplorer.Com",
+      "name": "الشيخ عبدالصمد",
+      "folder": "AbdulSamad_64kbps_QuranExplorer.Com"
+    },
+    {
+      "id": "Karim_Mansoori_40kbps",
+      "name": "الشيخ كريم المنصوري",
+      "folder": "Karim_Mansoori_40kbps"
+    }
+  ]
+}
