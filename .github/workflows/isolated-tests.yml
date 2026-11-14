@@ -49,6 +49,7 @@ jobs:
           node tests/publish_claim_evidence_test.js
           node tests/publish_connection_scope_test.js
           node tests/publish_provider_response_test.js
+          node tests/publish_provider_redirect_guard_test.js
           node tests/publish_storage_guard_test.js
           node tests/publish_storage_redirect_test.js
           node tests/publish_bounded_read_candidate_test.js
