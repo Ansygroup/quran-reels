@@ -479,3 +479,34 @@ Scope: Complete management of quran-reels project — build, test, verify, deplo
   CHECK: NODE_PATH=/tmp/qr89deps/node_modules node tests/autopilot_settings_guard_db_test.js؛ PG_BIN_DIR=/tmp/qr89deps/node_modules/@embedded-postgres/linux-x64/native/bin PG_LIB_DIR=/tmp/qr89deps/node_modules/@embedded-postgres/linux-x64/native/lib NODE_PATH=/tmp/qr89deps/node_modules node tests/autopilot_settings_guard_pg_test.js؛ git diff --check.
   EXPECT: هجرة إضافية محلية فقط تضيف مراجعة فريدة لتغييرات الإعدادات، وتتيح حفظًا مشروطًا في معاملة واحدة مع الصورة الخاصة. تعارض الصف الموجود أو الإدراج الأول يعيد صفر صفوف ولا يغيّر الصورة أو الإعدادات. تحديث updated_at فقط لا يبطل المسودة؛ وتبديل الخلفية يواصل حذف الصورة بالـtrigger السابق. الدالة متاحة لدور الخدمة فقط.
   EVIDENCE: PGlite يغطي التعارض والملكية والصلاحيات وتراجع المعاملة وتغيير/إزالة الصورة؛ PostgreSQL 17 محلي حقيقي باتصالين متزامنين أظهر انتظار القفل ورفض حفظ قديم مقابل إيقاف، وتنافس إنشاء الصف الأول دون فقد، مع حساب مستقل. الاستعلامات الإنتاجية للقراءة فقط أكدت مفتاح user_id ووجود trigger الصورة وسياسة RLS؛ لم تُنفّذ الهجرة على الإنتاج ولم يُغيَّر التطبيق أو الحسابات. هذا أساس غير موصول بعد بالواجهة أو API، ولا يمنع المسارات القديمة أو كتابة المستخدم المباشرة؛ تفاصيل الدمج والمخاطر في docs/account-settings-concurrency.md. لم يُختبر PostgREST حي أو يُنشر فيديو.
+
+- [ ] G99: ربط حماية إعدادات الحساب وخطة تقييد الكتّاب القديمة — تجارب محلية فقط
+  CHECK: NODE_PATH=/tmp/qr90deps/node_modules npm run pretest؛ NODE_PATH=/tmp/qr90deps/node_modules node tests/account_concurrency_draft_test.js؛ NODE_PATH=/tmp/qr90deps/node_modules node tests/publish_client_dom.js؛ NODE_PATH=/tmp/qr90deps/node_modules node tests/autopilot_settings_guard_db_test.js؛ PG_BIN_DIR=/tmp/qr90deps/node_modules/@embedded-postgres/linux-x64/native/bin PG_LIB_DIR=/tmp/qr90deps/node_modules/@embedded-postgres/linux-x64/native/lib NODE_PATH=/tmp/qr90deps/node_modules node tests/autopilot_settings_guard_pg_test.js؛ اختبار Chromium محلي للشبكة المحاكاة في tests/account_save_uncertain_browser_test.js وtests/account_reel_browser_test.js؛ git diff --check.
+  EXPECT: لا يكتب حفظ قديم فوق مراجعة مختلفة، وتحافظ الواجهة على المسودة وتسمح بالإيقاف ومراجعة الخادم. مسودتا الصلاحيات في sql/operations غير تلقائيتين ولم تُعتمدا أو تُطبقا؛ الثانية تمنع كتّاب الخدمة القدامى دون منع الإيقاف المباشر للصف الموجود، لكنها تمنع حفظهم وربطهم القديم وقد تؤثر خدمات خارجية.
+  EVIDENCE: PostgreSQL 17 مع role يتجاوز RLS اختبر منافسة الحفظ والإيقاف وأول صف، وتأخر التثبيت بسبب معاملة قديمة قائمة، ورفض الكتابة والتفعيل والصورة المباشرة والـRPC القديم؛ نجحت الدوال الجديدة والإيقاف القديم وتحديث الجدولة، واختُبرت المنح الموروثة والصورة وتراجع المعاملة. اختُبر معالج API عبر محوّل PostgreSQL محلي لا يحاكي PostgREST. اختبارات DOM وChromium تستخدم مصادقة وشبكة محاكاة. اختبار PostgREST المعزول نجح لاحقًا ضمن G100، وتكامل معالج API معه نجح ضمن G101 بهوية محاكاة؛ لا يختبر ذلك Supabase الإنتاجي أو كل مسارات API. لا اعتماد بعد لخطة النشر والتراجع ولا ضمان للكتّاب الخارجيين أو اتصال القنوات المتزامن. لم تتغير إعدادات أو صلاحيات الإنتاج ولم يُنشر فيديو.
+
+- [x] G100: PostgREST فعلي في بيئة اختبار مؤقتة على GitHub Actions
+  CHECK: تشغيل .github/workflows/postgrest-account-guard.yml والتحقق من نتائج مرحلتَي foundation وguarded؛ git diff --check.
+  EXPECT: اختبار HTTP وJWT وصلاحيات RLS والتعارض المتزامن ورفض الكتابة المباشرة والإيقاف القديم داخل PostgreSQL وPostgREST مؤقتين فقط، بمفاتيح وبيانات وهمية ودون اتصال Supabase أو نشر.
+  EVIDENCE: تشغيل GitHub Actions رقم 43416977566 على commit 9a010cc2 نجح، وخطوتا HTTP ومسودات الصلاحيات مرّتا في حاويات مؤقتة؛ لم يتوفر تنزيل السجل التفصيلي في بيئة العمل لكن حالة كل خطوة ناجحة. لا يُغني الاختبار عن مراجعة مخطط الإنتاج وإصداراته وخطة النشر.
+
+- [x] G101: اختبار API الحساب الفعلي مع PostgREST معزول
+  CHECK: تشغيل خطوة Exercise actual account API with local PostgREST في .github/workflows/postgrest-account-guard.yml؛ git diff --check.
+  EXPECT: معالج API وlib/db يستدعيان PostgREST حقيقيًا في حاوية اختبار فقط، مع جلسة محاكاة، والتحقق من تعارض الحفظ، وربط المالك، وردّ مفقود بعد التثبيت، وإيقاف عميل قديم؛ لا بيانات حقيقية ولا نشر.
+  EVIDENCE: GitHub Actions رقم 43418021104 على commit 82cda46f نجح للخطوة الفعلية بعد فشل سابق واختبارين يعدّلان الإعدادات؛ بيانات الخطوات ناجحة، لكن تنزيل السجل التفصيلي غير متاح من بيئة العمل. لا يختبر Supabase Auth أو بيئة الإنتاج أو اتصال القنوات أثناء فصلها.
+
+- **AUTOPILOT-DRAFT-BATCH — دفعة مسودات مؤكدة قبل النشر المباشر**
+  CHECK: `node tests/queue_atomic_safety_test.js && node tests/queue_draft_cron_guard_test.js`؛ CI المعزول: `tests/postgrest_draft_queue_integration_test.js` و`tests/postgrest_publish_claim_integration_test.js`.
+  EXPECT: علامة تشغيل مشروطة، ثم POST واحد لمهام `draft`، والتحقق من تطابق كل صف بما فيه المالك والوجهة والمحتوى والتوقيت قبل استدعاء النشر. رد ناقص أو مشوّه أو مفقود لا يُعاد ولا يتبعه نشر من تلك المحاولة؛ الكرون الاعتيادي يستعلم عن `scheduled` لا المسودات. يختبر PostgREST المؤقت الإدراج والرد المفقود بعد commit ويختبر claim الفعلي لمسودة مع حجب المزود، لا قاعدة الإنتاج أو مزودًا حقيقيًا. يمكن لكاتب آخر تغيير المسودة أو نشرها؛ وقد تتوقف المهمة وتبقى للمراجعة دون نشر آلي.
+
+- **MANUAL-PUBLISH-DRAFT — تأكيد مهمة النشر اليدوي الفوري**
+  CHECK: `node tests/manual_new_publish_guard_test.js`؛ CI المعزول: `tests/postgrest_manual_publish_integration_test.js`.
+  EXPECT: طلب النشر الفوري الجديد يُدرج `draft` ويؤكد حقول الصف قبل استدعاء الناشر؛ رد الإدراج غير المؤكد لا يطلق المحاولة ولا يُعاد، والكرون لا يلتقط المسودة. الجدولة المستقبلية تظل `scheduled` وقد تُنفَّذ رغم فقد الرد؛ رسالة الفشل تنبه لمراجعة القائمة والمنصة. لا يمنع هذا تكرار طلبات مستقلة أو تدخل كاتب آخر أو النشر عند فقد رد بعد بدء المحاولة. الاختبارات بمزود محاكى وPostgREST مؤقت لا إنتاجي.
+
+- **MANUAL-EXACT-PLATFORM — قناة يدوية مطابقة لمنصتها**
+  CHECK: `node tests/manual_new_publish_guard_test.js` و`tests/postgrest_manual_publish_integration_test.js` في CI المعزول.
+  EXPECT: التحقق من معرف القناة وملكيتها ومنصتها قبل إنشاء مهمة يدوية؛ يُرفض معرف فيسبوك كهدف إنستغرام لأن الناشر يبحث في اتصالات إنستغرام فقط. فشل القراءة يمنع الإدراج، ولا يُغيّر هذا فصل القناة أو وجهتها بعد التحقق. اختبار PostgREST يستخدم صفوف قنوات اصطناعية ومزودًا محجوبًا.
+
+- **ACCOUNT-CALM-LAYOUT — صفحة حساب هادئة وتحذيرات لا تختفي**
+  CHECK: `npm run pretest` و`tests/account_layout_browser_test.js` بمقاسي 390 و1280 في CI، و`tests/progress_ui_test.js` واختبارات المسودة وتغيير الحساب والفصل.
+  EXPECT: حالة الأتمتة والتنبيهات وملخص آخر تشغيل والقنوات ظاهرة، والإعدادات والسجل والمراجعات والأدوات تفتح عند الحاجة بلوحة المفاتيح أو اللمس. عدد المهام أو تعذّر قراءتها ظاهر في ملخص المراجعة مع وصفه كلقطة محدودة. طي الإعدادات لا يمحو المسودة أو الملف ويُظهر شارة التعديل غير المحفوظ؛ تغيير الحساب يمحو الشارة والبيانات السابقة. التحذيرات عن الوجهات وفصل القناة ونتائج النشر غير المؤكدة تظل متاحة؛ العرض لا يجعل عمليات النشر أو الفصل ذرية. الاختبار بحساب وبيانات وشبكة محاكاة فقط.

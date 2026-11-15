@@ -16,7 +16,9 @@ try{const context=await browser.newContext({viewport:{width:Number(process.env.R
 await page.locator('#cookieOk').click();await page.evaluate(()=>QRAuthUI.open());
 assert.equal(await page.locator('#loginOverlay').isVisible(),true,'نافذة الدخول تظهر بعد إغلاق الشريط');
 await page.evaluate(()=>QRAuthUI.close());
-await page.evaluate(()=>{document.getElementById('view-home').hidden=true;document.getElementById('view-account').hidden=false;const app=window.PublishApp;app.available=[{key:'youtube',name:'يوتيوب',publish:true}];app.connections=[{platform:'youtube'},{platform:'youtube'}];app.data={config:{enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'rotate'}},options:{content_modes:['mix','famous','sequential','article','fixed'],reciters:[{id:'Alafasy_128kbps',name:'مشاري العفاسي'}],backgrounds:['rotate','grad-gold']}};app.renderStatus(app.data);app.renderAutoPanel(app.data);app.api=async(action,body)=>{window.__saved={action,body};return {ok:true,config:body}}});
+await page.evaluate(()=>{document.getElementById('view-home').hidden=true;document.getElementById('view-account').hidden=false;const app=window.PublishApp;app.available=[{key:'youtube',name:'يوتيوب',publish:true}];app.connections=[{platform:'youtube'},{platform:'youtube'}];app.data={config:{settings_revision:'11111111-1111-4111-8111-111111111111',enabled:true,platforms:['youtube'],all_channels:true,template:{content_mode:'mix',reciter_mode:'rotate',background:'rotate'}},options:{content_modes:['mix','famous','sequential','article','fixed'],reciters:[{id:'Alafasy_128kbps',name:'مشاري العفاسي'}],backgrounds:['rotate','grad-gold']}};app.renderStatus(app.data);app.renderAutoPanel(app.data);app.api=async(action,body)=>{window.__saved={action,body};return {ok:true,config:{...body,settings_revision:crypto.randomUUID()}}}});
+await page.locator('#acctCustomize > summary').click();
+await page.locator('#acctAppearance > summary').click();
 await page.waitForFunction(()=>document.querySelector('#acctSurah')?.options.length===114);const before=await page.evaluate(()=>JSON.stringify({s:Selection.surah,from:Selection.from,to:Selection.to,reciter:Selection.reciter}));
 await page.selectOption('#selContentMode','fixed');await page.selectOption('#acctSurah','2');await page.fill('#acctFrom','255');await page.fill('#acctTo','256');await page.selectOption('#acctReciter','Alafasy_128kbps');await page.selectOption('#selBackground','grad-gold');await page.selectOption('#acctStyle','banner');await page.selectOption('#acctTranslation','en.sahih');await page.selectOption('#acctRatio','1:1');await page.selectOption('#acctQuality','720');await page.selectOption('#acctAccent','rose');await page.locator('#acctFont').fill('120');await page.locator('#acctWatermark').uncheck();await page.locator('#acctMotion').uncheck();await page.fill('#acctDed','صدقة جارية');
 // تحديث الحساب والتنقل لا يمسّان حقولًا أو ملفًا لم يُحفظا؛ لا طلب نشر فعلي.
@@ -37,16 +39,20 @@ await page.evaluate(()=>{window.location.hash='#/account'});await page.waitForTi
 assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');
 assert.equal(await page.locator('#acctBackgroundFile').evaluate(el=>el.files[0]?.name),'private.png');
 await page.evaluate(async()=>{window.fetch=async()=>{throw Error('offline')};await PublishApp.init()});
-assert.match(await page.locator('#acctNotice').innerText(),/تعذّر الاتصال/);
+assert.match(await page.locator('#acctNotice').innerText(),/تعذّر الاتصال/);assert.match(await page.locator('#acctNotice').innerText(),/المعروضة قديمة/);
 assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');
-await page.evaluate(()=>{window.fetch=window.__origFetch;window.AuthApp=window.__origAuth;PublishApp.startProgressPolling=window.__origPoll});
+await page.evaluate(async()=>{window.fetch=async()=>({ok:false,status:500,json:async()=>({error:'fixture'})});await PublishApp.init()});
+assert.match(await page.locator('#acctNotice').innerText(),/قديمة/);assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');
+await page.evaluate(async()=>{window.fetch=async()=>({ok:true,status:200,json:async()=>({})});await PublishApp.init()});
+assert.match(await page.locator('#acctNotice').innerText(),/غير مكتملة/);assert.match(await page.locator('#acctNotice').innerText(),/قديمة/);assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');
+await page.evaluate(()=>{window.fetch=window.__origFetch;PublishApp.startProgressPolling=window.__origPoll}); // Keep the simulated account authenticated until its tests finish.
 await page.setInputFiles('#acctBackgroundFile',[]);await page.selectOption('#selBackground','grad-gold');
 await page.waitForFunction(()=>document.querySelector('#acctPreviewNote')?.textContent.includes('معاينة تقريبية'));assert(await page.locator('#acctAudio').getAttribute('src'));await page.evaluate(()=>PublishApp.renderConnections('mock'));assert.equal(await page.locator('#acctDed').inputValue(),'صدقة جارية');assert.equal(await page.locator('#acctFrom').inputValue(),'255');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'mobile overflow');assert.equal(await page.evaluate(()=>JSON.stringify({s:Selection.surah,from:Selection.from,to:Selection.to,reciter:Selection.reciter})),before,'معاينة الحساب لا تعدّل صانع الرئيسية');
 await page.evaluate(()=>PublishApp.saveSettings()); const body=await page.evaluate(()=>window.__saved.body);assert.equal(body.enabled,true);assert.equal(body.all_channels,true);assert.deepEqual(body.platforms,['youtube']);assert.deepEqual([body.template.surah,body.template.from,body.template.to],[2,255,256]);assert.equal(body.template.design.style,'banner');assert.equal(body.template.design.translation,'en.sahih');assert.equal(body.template.design.dedText,'صدقة جارية');assert.equal(body.template.design.showWatermark,false);
 // تعديل أحدث أثناء الحفظ يجب أن يبقى غير محفوظ، ولا يضيع مع تحديث القنوات.
 await page.evaluate(()=>{PublishApp.api=(action,body)=>new Promise(resolve=>{window.__pendingBody=body;window.__resolveSave=resolve});window.__pendingSave=PublishApp.saveSettings()});
 await page.fill('#acctDed','تعديل بعد بدء الحفظ');
-await page.evaluate(async()=>{window.__resolveSave({ok:true,config:window.__pendingBody});await window.__pendingSave;await PublishApp.renderConnections('mock')});
+await page.evaluate(async()=>{window.__resolveSave({ok:true,config:{...window.__pendingBody,settings_revision:crypto.randomUUID()}});await window.__pendingSave;await PublishApp.renderConnections('mock')});
 assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');assert.equal(await page.evaluate(()=>PublishApp._autoDirty),true);assert.match(await page.locator('#acctEditState').innerText(),/غير محفوظة/);
 await page.evaluate(()=>PublishApp.renderAccount(PublishApp.data));assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');
 // طلب قراءة بدأ قبل الحفظ لا يعيد رسم الإعدادات القديمة عند وصوله متأخرًا.
@@ -55,8 +61,8 @@ await page.evaluate(async()=>{
  window.AuthApp={getUserId:async()=> 'race-user',getToken:async()=> 'mock'};app.startProgressPolling=()=>{};
  window.fetch=url=>String(url)==='/api/autopilot'?new Promise(resolve=>window.__resolveRead=resolve):window.__raceFetch(url);
  window.__raceRead=app.init();await new Promise(r=>setTimeout(r,0));
- app.api=async(action,body)=>({ok:true,config:body});await app.saveSettings();
- window.__resolveRead({ok:true,json:async()=>({config:{enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}},runs:[]})});await window.__raceRead;
+ app.api=async(action,body)=>({ok:true,config:{...body,settings_revision:crypto.randomUUID()}});await app.saveSettings();
+ window.__resolveRead({ok:true,json:async()=>({config:{settings_revision:'33333333-3333-4333-8333-333333333333',enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}},runs:[]})});await window.__raceRead;
  window.fetch=window.__raceFetch;window.AuthApp=window.__raceAuth;app.startProgressPolling=window.__racePoll;
 });
 assert.equal(await page.locator('#acctDed').inputValue(),'تعديل بعد بدء الحفظ');
@@ -74,9 +80,9 @@ await page.evaluate(async()=>{
 });
 assert.equal(await page.evaluate(()=>window.__requests.length),2);
 assert.equal(await page.locator('#acctDed').count(),0,'تُزال حقول الحساب السابق قبل تحميل الجديد');
-await page.evaluate(async()=>{const cfg={enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}};window.__requests[1]({ok:true,json:async()=>({config:cfg,runs:[]})});await window.__second;window.__requests[0]({ok:true,json:async()=>({config:{...cfg,enabled:true},runs:[]})});await window.__first});
+await page.evaluate(async()=>{const cfg={settings_revision:'33333333-3333-4333-8333-333333333333',enabled:false,platforms:[],template:{content_mode:'mix',background:'rotate'}};window.__requests[1]({ok:true,json:async()=>({config:cfg,runs:[]})});await window.__second;window.__requests[0]({ok:true,json:async()=>({config:{...cfg,enabled:true},runs:[]})});await window.__first});
 assert.equal(await page.evaluate(()=>PublishApp._accountOwner),'user-b');assert.equal(await page.locator('#acctEnabled').isChecked(),false);
-await page.evaluate(()=>{window.fetch=window.__origFetch2;window.AuthApp=window.__origAuth2;PublishApp.startProgressPolling=window.__origPoll2;PublishApp.renderConnections=window.__origConnections});
+await page.evaluate(()=>{window.fetch=window.__origFetch2;window.AuthApp=window.__origAuth;PublishApp.startProgressPolling=window.__origPoll2;PublishApp.renderConnections=window.__origConnections});
 // تطبيق نفس الإعدادات داخل نسخة الصانع التي يستخدمها الرندر.
 await page.evaluate(__test.applyAutomatedSelection,{s:2,from:255,to:256,r:'Alafasy_128kbps',bg:'grad-gold',style:'card',trans:'none',runIndex:0,design:body.template.design});const state=await page.evaluate(()=>({selection:{...Selection},render:{...Creator.renderer.state},canvas:[document.querySelector('#reelCanvas').width,document.querySelector('#reelCanvas').height],bg:Creator.renderer.bgUrl}));for(const k of ['translation','showTrans','style','ratio','quality','accent','fontSize','showWatermark','motion'])assert.equal(state.selection[k],body.template.design[k],k);assert.deepEqual([state.selection.surah,state.selection.from,state.selection.to],[2,255,256]);assert.equal(state.selection.dedText,'صدقة جارية');assert.equal(state.render.style,'banner');assert.equal(state.render.verses[0].a,255);assert.equal(state.render.customTrans.length>0,true);assert.equal(state.bg,'grad:grad-gold');assert.deepEqual(state.canvas,[560,560]);assert.deepEqual(errors,[]);
 if(process.env.REEL_TEST_EXPORT==='1') {

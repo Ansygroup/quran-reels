@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const { default: binary } = await import(pathToFileURL(require.resolve('@sparticuz/chromium')).href);
     browser = await chromium.launch({ executablePath: await binary.executablePath(), headless: true, args: [...binary.args, '--disable-gpu'] });
-    const context = await browser.newContext({ viewport: { width: 900, height: 1200 }, serviceWorkers: 'block' });
+    const context = await browser.newContext({ viewport: { width: Number(process.env.REEL_TEST_WIDTH || 900), height: 1200 }, serviceWorkers: 'block' });
     await context.route('**/*', route => {
       let url; try { url = new URL(route.request().url()); } catch { return route.abort(); }
       return url.origin === origin ? route.continue() : route.abort();
@@ -54,12 +54,31 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(() => document.querySelector('#acctPreviewNote')?.textContent.includes('تعذّر تحميل المعاينة'), null, { timeout: 10000 });
     const failed = await page.evaluate(() => ({ data: Quran.data, loading: Quran._loading, options: document.querySelector('#acctSurah').options.length }));
     assert.equal(failed.data, null); assert.equal(failed.loading, null); assert.equal(failed.options, 0); assert.equal(requests, 1);
-    await page.fill('#acctDed', 'تجربة محلية');
+    assert.equal(await page.locator('#acctCustomize').evaluate(e => e.open), false);
+    assert.match(await page.locator('#acctCustomizeSummary').innerText(), /تعذّر تحميل المعاينة/);
+    await page.locator('#acctCustomize > summary').click();
+    assert.equal(await page.locator('#acctAppearance').evaluate(e => e.open), false);
+    assert.match(await page.locator('#acctAppearanceSummary').innerText(), /تعذّر تحميل المعاينة/);
+    // Retry through a visible control while appearance stays folded.
+    await page.selectOption('#selContentMode', 'fixed');
     await page.waitForFunction(() => document.querySelector('#acctSurah')?.options.length === 114 &&
       !document.querySelector('#acctPreviewNote').textContent.includes('تعذّر'), null, { timeout: 15000 });
     const recovered = await page.evaluate(() => ({ n: Quran.surahs.length, text: Quran.ayah(1, 1), calls: window.testApiCalls,
       sameSelection: JSON.stringify({ s: Selection.surah, from: Selection.from, to: Selection.to }) === window.testSelection }));
     assert.equal(recovered.n, 114); assert(recovered.text.length > 0); assert.equal(recovered.calls, 0); assert(recovered.sameSelection);
+    assert.equal(await page.locator('#acctAppearance').evaluate(e => e.open), false);
+    assert.match(await page.locator('#acctAppearanceSummary').innerText(), /صورة الخلفية، الترجمة/);
+    await page.fill('#acctFrom', '999');
+    await page.waitForFunction(() => document.querySelector('#acctCustomizeSummary').textContent.includes('اختار آيات صحيحة'));
+    await page.locator('#acctCustomize > summary').click();
+    assert.match(await page.locator('#acctCustomizeSummary').innerText(), /اختار آيات صحيحة/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    await page.locator('#acctCustomize > summary').click();
+    await page.fill('#acctFrom', '1');
+    await page.waitForFunction(() => !document.querySelector('#acctCustomizeSummary').classList.contains('warn'));
+    await page.locator('#acctCustomize > summary').click();
+    assert.match(await page.locator('#acctCustomizeSummary').innerText(), /المحتوى، الشكل والمنصات/);
+    assert.equal(await page.locator('#acctCustomizeSummary').evaluate(e => e.classList.contains('warn')), false);
     assert.equal(requests, 2); assert.deepEqual(pageErrors, []);
     console.log('Account preview PASS: local Quran fetch failure, visible warning, retry and recovery without saving or posting');
   } finally {

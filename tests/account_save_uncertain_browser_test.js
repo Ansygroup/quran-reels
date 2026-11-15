@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
       document.querySelector('#view-home').hidden = true; document.querySelector('#view-account').hidden = false;
       const app = PublishApp; app._accountOwner = 'user-a';
       window.AuthApp = { getUserId:async()=> 'user-a', getToken:async()=> 'mock' };
-      app.data = {config:{enabled:true,platforms:['youtube'],all_channels:false,template:{content_mode:'mix',reciter_mode:'rotate',reciter:'',background:'rotate',privacy:'public'}},options:{reciters:[],content_modes:['mix'],backgrounds:['rotate']}};
+      app.data = {config:{settings_revision:'11111111-1111-4111-8111-111111111111',enabled:true,platforms:['youtube'],all_channels:false,template:{content_mode:'mix',reciter_mode:'rotate',reciter:'',background:'rotate',privacy:'public'}},options:{reciters:[],content_modes:['mix'],backgrounds:['rotate']}};
       app.available=[{key:'youtube',name:'يوتيوب',publish:true}]; app.connections=[{platform:'youtube'}];
       app.renderStatus(app.data); app.renderAutoPanel(app.data); app.bindEvents(); app.startProgressPolling=()=>{};
       app.prepareAccountImage=async()=> 'data:image/jpeg;base64,mocked';
@@ -33,14 +33,15 @@ const server = http.createServer((req, res) => {
       window.fetch=async(url,opts={})=>{
         if (String(url)==='/api/autopilot' && opts.method==='POST') {
           const body=JSON.parse(opts.body); window.posts.push(body);
+          if (window.fetchMode==='conflict' && body.action==='save') return {ok:false,status:409,json:async()=>({code:'settings_conflict',error:'conflict'})};
           if (window.fetchMode==='validation') return {ok:false,status:400,json:async()=>({error:'invalid'})};
-          if (body.action==='save') { window.savedConfig={...body,template:{...body.template,background_image_id:'e6babd90-5848-4327-a948-b282b87dad08'}}; }
-          if (body.action==='set_enabled') window.savedConfig.enabled=body.enabled;
+          if (body.action==='save') { window.savedConfig={...body,settings_revision:crypto.randomUUID(),template:{...body.template,background_image_id:'e6babd90-5848-4327-a948-b282b87dad08'}}; }
+          if (body.action==='set_enabled') { window.savedConfig.enabled=body.enabled; window.savedConfig.settings_revision=crypto.randomUUID(); }
           if (window.fetchMode==='lost') throw Error('response lost');
           if (window.fetchMode==='server-error') return {ok:false,status:503,json:async()=>({error:'uncertain'})};
           if (window.fetchMode==='bad-success') return {ok:true,status:200,json:async()=>({ok:true})};
           if (window.fetchMode==='mismatch') return {ok:true,status:200,json:async()=>({ok:true,config:{...window.savedConfig,enabled:false}})};
-          return {ok:true,status:200,json:async()=>({ok:true,config:window.savedConfig,enabled:body.enabled})};
+          return {ok:true,status:200,json:async()=>({ok:true,config:window.savedConfig,enabled:body.enabled,stale:false})};
         }
         if (String(url)==='/api/autopilot') {
           if (window.fetchMode==='offline') throw Error('offline');
@@ -50,6 +51,8 @@ const server = http.createServer((req, res) => {
         return orig(url,opts);
       };
     });
+    await page.locator('#acctCustomize > summary').click();
+    await page.locator('#acctAppearance > summary').click();
     await page.locator('#acctBackgroundFile').setInputFiles({name:'private.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0pQAAAAASUVORK5CYII=','base64')});
     await page.fill('#acctDed','مسودة لم تضِع');
     await page.locator('#autoSave').click();
@@ -110,16 +113,45 @@ const server = http.createServer((req, res) => {
     await page.locator('#acctEnabled + i').click();
     await page.waitForFunction(()=>window.posts.at(-1)?.action==='set_enabled' && window.posts.at(-1)?.enabled===true && !PublishApp._settingsPending);
     assert.equal(await page.locator('#acctEnabled').isChecked(),true);
-    assert.deepEqual(Object.keys(await page.evaluate(()=>posts.at(-1))).sort(),['action','enabled']);
+    assert.deepEqual(Object.keys(await page.evaluate(()=>posts.at(-1))).sort(),['action','enabled','expected_revision']);
     assert.equal(await page.locator('#acctDed').inputValue(),'مسودة بعد الحفظ');
+    // A stale draft is preserved; an explicit pause is still possible before review.
+    await page.evaluate(()=>window.fetchMode='conflict'); await page.locator('#autoSave').click();
+    assert.equal(await page.locator('#acctRecovery').isVisible(),true);
+    await page.evaluate(()=>window.fetchMode='success'); await page.locator('#acctPauseSafe').click();
+    assert.equal(await page.evaluate(()=>savedConfig.enabled),false);
+    assert.equal(await page.locator('#acctDed').inputValue(),'مسودة بعد الحفظ');
+    assert.equal(await page.locator('#autoSave').isDisabled(),true);
+    await page.locator('#acctRecheck').click(); await page.locator('#acctResume').click();
+    assert.equal(await page.locator('#acctEnabled').isChecked(),false);
     // The article button explicitly says publish and cancellation sends nothing.
     assert.match(await page.locator('#autoGenArticle').textContent(),/نشر/);
     page.once('dialog', d => d.dismiss()); await page.evaluate(()=>PublishApp.randomArticle(document.querySelector('#autoGenArticle')));
-    const articleBefore = before + 3; // one successful save and two toggles
+    const articleBefore = await page.evaluate(()=>posts.length);
     assert.equal(await page.evaluate(()=>posts.length),articleBefore);
     page.once('dialog', d => d.accept()); await page.evaluate(()=>PublishApp.randomArticle(document.querySelector('#autoGenArticle')));
     assert.equal(await page.evaluate(()=>posts.at(-1).action),'article_random');
     assert.equal(await page.evaluate(()=>posts.length),articleBefore+1);
+    // After relinking the UI describes a review, not an automatic repost.
+    await page.evaluate(()=>{const app=PublishApp;app.renderAccount({...app.data,reauth:['youtube'],pending_review:{available:true,truncated:false,items:[{id:'fake-pending',status:'scheduled',platform:'youtube',title:'فيديو مجدول',channel:null,target_recorded:false,publish_at:'2026-11-07T00:00:00Z'}]},failed_review:{available:true,truncated:false,items:[{id:'fake-attempt',platform:'youtube',title:'فيديو تجريبي',channel:null,target_recorded:false,created_at:'2026-11-07T00:00:00Z'}]}});app.api=async(action)=>{window.__reviewAction=action;return {ok:false,error:'راجع القناة قبل إعادة النشر'}};window.toast=(msg)=>{window.__reviewMessage=msg}});
+    await page.locator('#acctPendingDisclosure > summary').click();
+    await page.locator('#acctFailedDisclosure > summary').click();
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/قد تُختار قناة أخرى/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/لا تلغي المهام/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/قد لا تشمل كل المهام/);
+    assert.match(await page.locator('#acctPendingReview').innerText(),/اختار وجهته بالفعل/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/الوجهة الأصلية غير محددة/);
+    await page.evaluate(()=>{PublishApp.renderPendingReview({available:true,items:[{id:'p1',platform:'youtube',status:'scheduled',channel:null}]});PublishApp.renderFailedReview({available:true,items:[null]})});
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/تعذّر تحميل/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/تعذّر تحميل/);
+    await page.evaluate(()=>{PublishApp.renderPendingReview({available:true,items:[]});PublishApp.renderFailedReview({available:true,items:[]})});
+    assert.match(await page.locator('#acctPendingReviewList').innerText(),/لا يثبت ذلك خلو الطابور/);
+    assert.match(await page.locator('#acctFailedReviewList').innerText(),/لا يثبت ذلك خلو السجل/);
+    assert.match(await page.locator('#acctReauth').innerText(),/لا تُعاد المحاولات الفاشلة تلقائيًا/);
+    assert.match(await page.locator('#btnRetryPublish').innerText(),/افحص/);
+    await page.locator('#btnRetryPublish').click();await page.waitForFunction(()=>window.__reviewAction==='retry_publish');
+    assert.match(await page.evaluate(()=>window.__reviewMessage),/راجع القناة/);
+    assert.equal(await page.evaluate(()=>posts.length),articleBefore+1,'review test sends no publish request');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
     assert.deepEqual(errors,[]); await ctx.close();
     console.log('ALL OK: ambiguous save, failed/malformed reads, explicit review, local errors and article cancel; mocked network, no publishing');

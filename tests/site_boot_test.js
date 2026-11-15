@@ -108,6 +108,9 @@ setTimeout(async () => {
   chk("الخطوات والأسئلة محفوظة", d.querySelectorAll("#steps .step-card").length === 4 && d.querySelectorAll("#faq .faq-item").length >= 10);
   // كل سؤال يربط إجابته ويعلن حالتها، دون التأثير على بقية الأسئلة.
   const faqItems = [...d.querySelectorAll("#faqList .faq-item")];
+  const accountFaq = faqItems.find(item => item.querySelector('.faq-q')?.textContent.includes('هل ربط حساباتي آمن؟'));
+  const scheduleFaq = faqItems.find(item => item.querySelector('.faq-q')?.textContent.includes('هل يمكن للموقع أن ينشر فيديوهاتي تلقائيًا؟'));
+  chk("الأسئلة الظاهرة توضّح حدود الفصل والجدولة", Boolean(accountFaq && /لا ينبغي افتراض نجاح حذفها/.test(accountFaq.textContent) && scheduleFaq && /04:15 UTC/.test(scheduleFaq.textContent) && /غير متاحة حاليًا/.test(scheduleFaq.textContent)));
   chk("كل سؤال مرتبط بإجابة مخفية وحالته مغلقة", faqItems.every(item => {
     const button = item.querySelector(".faq-q"), answer = item.querySelector(".faq-a");
     return button.getAttribute("aria-expanded") === "false" && answer.hidden && button.getAttribute("aria-controls") === answer.id && d.getElementById(answer.id) === answer;
