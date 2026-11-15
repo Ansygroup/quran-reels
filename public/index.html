@@ -300,8 +300,9 @@
               </div>
 
               <!-- زر الإنشاء -->
-              <div class="create-bar" style="margin-top:20px">
-                <button class="btn btn-gold btn-lg" id="btnCreate">⬇ إنشاء الفيديو الآن</button>
+              <p class="hint" id="createRightsNotice" style="margin-top:20px">التلاوات من EveryAyah؛ لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح. تحقّق من حقوق التسجيل والترجمة والصور قبل النشر. <a href="/terms/">تفاصيل الاستخدام</a></p>
+              <div class="create-bar" style="margin-top:12px">
+                <button class="btn btn-gold btn-lg" id="btnCreate" aria-describedby="createRightsNotice">⬇ إنشاء الفيديو الآن</button>
               </div>
               <div class="limits-note">
                 <span>♾️ بدون حد يومي</span>
@@ -338,13 +339,14 @@
         <h3>تم إنشاء الفيديو ✨</h3>
         <div class="export-visual"><video id="resultVideo" playsinline controls preload="metadata" style="width:100%;height:100%;display:block;background:#000"></video></div>
         <p id="resultMeta"></p>
+        <p class="hint" id="exportRightsNotice">التلاوات من EveryAyah؛ لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح. تحقّق من حقوق التسجيل والترجمة والصور قبل مشاركة الفيديو أو نشره؛ قد تظهر مطالبة على يوتيوب. <a href="/terms/">تفاصيل الاستخدام</a></p>
         <div class="switch-row" style="margin-top:6px">
           <div class="t">إشعار عند اكتمال التحميل<small>إن كان مسموحًا في المتصفح</small></div>
           <label class="switch"><input type="checkbox" id="chkNotify"><i></i></label>
         </div>
         <div class="result-actions">
-          <a class="btn btn-gold" id="btnDownload" download>⬇ تحميل الفيديو</a>
-          <button class="btn btn-ghost" id="btnShare">📲 مشاركة</button>
+          <a class="btn btn-gold" id="btnDownload" aria-describedby="exportRightsNotice" download>⬇ تحميل الفيديو</a>
+          <button class="btn btn-ghost" id="btnShare" aria-describedby="exportRightsNotice">📲 مشاركة</button>
           <button class="btn btn-em" id="btnSchedule">🗓 الجدولة اليدوية غير متاحة حاليًا</button>
           <button class="btn btn-ghost" id="btnNew">✨ فيديو جديد</button>
         </div>
@@ -519,12 +521,14 @@
             <small class="hint" id="acctNextRun">—</small>
           </div>
           <label class="switch" title="تشغيل/إيقاف الأتمتة">
-            <input type="checkbox" id="acctEnabled" data-act="toggle-enabled" disabled aria-label="تشغيل الأتمتة اليومية">
+            <input type="checkbox" id="acctEnabled" data-act="toggle-enabled" disabled aria-label="تشغيل الأتمتة اليومية" aria-describedby="acctRightsNotice">
             <i></i>
           </label>
         </div>
       </div>
     </div>
+
+    <div class="acct-notice" id="acctRightsNotice">التلاوات من EveryAyah؛ لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح. قبل ربط قناة أو تشغيل الأتمتة، تحقّق من حقوق التسجيلات والترجمات والصور؛ قد تظهر مطالبة على يوتيوب. <a href="/terms/">تفاصيل الاستخدام</a></div>
 
     <div class="acct-notice" id="acctRecovery" role="status" hidden>
       <p>تعذّر تأكيد النتيجة أو تغيّرت الإعدادات في مكان آخر؛ قد يكون الخادم نفّذ الطلب. مسودتك باقية هنا، والأتمتة لا تتوقف بسبب هذا التنبيه.</p>

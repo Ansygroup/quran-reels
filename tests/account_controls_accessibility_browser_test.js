@@ -18,6 +18,23 @@ const server = http.createServer((req, res) => {
     await ctx.route('**/*', r => r.request().url().startsWith(origin + '/') ? r.continue() : r.abort());
     const page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(origin, { waitUntil: 'domcontentloaded' }); await page.waitForFunction(() => typeof Creator !== 'undefined' && Creator.ready);
+    const createNotice = page.locator('#createRightsNotice');
+    assert.equal(await createNotice.isVisible(), true, 'notice is visible without opening reciter selection');
+    assert.match(await createNotice.innerText(), /لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح/);
+    assert.equal(await page.locator('#btnCreate').getAttribute('aria-describedby'), 'createRightsNotice');
+    // Exercise the result state with a synthetic blob, not an actual render or upload.
+    await page.evaluate(async () => {
+      document.querySelector('#exportOverlay').hidden = false;
+      await Creator._onExportDone({ blob: new Blob(['synthetic'], { type:'video/webm' }), mime:'video/webm' });
+    });
+    const exportNotice = page.locator('#exportRightsNotice');
+    assert.equal(await exportNotice.isVisible(), true, 'notice is visible for the default reciter after export');
+    assert.match(await exportNotice.innerText(), /لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح/);
+    assert.equal(await page.locator('#btnDownload').getAttribute('aria-describedby'), 'exportRightsNotice');
+    assert.equal(await page.locator('#btnShare').getAttribute('aria-describedby'), 'exportRightsNotice');
+    await exportNotice.scrollIntoViewIfNeeded();
+    assert.equal(await page.locator('#exportRightsNotice a').getAttribute('href'), '/terms/');
+    await page.locator('#btnNew').click();
     await page.evaluate(() => {
       document.querySelector('#view-home').hidden = true; document.querySelector('#view-account').hidden = false; document.querySelector('#cookieBar').hidden = true;
       const a = PublishApp; a._accountOwner = 'owner'; a._connectionsState = 'loaded';
@@ -26,6 +43,11 @@ const server = http.createServer((req, res) => {
       a.data = { config:{ settings_revision:'11111111-1111-4111-8111-111111111111',enabled:false,platforms:['youtube'],all_channels:false,template:{content_mode:'mix',background:'rotate'} }, available:a.available,options:{content_modes:['mix','fixed'],backgrounds:['rotate'],reciters:[]},runs:[],stats:{published:0,scheduled:0,failed:0} };
       a.renderAccount(a.data); a.bindEvents();
     });
+    const accountNotice = page.locator('#acctRightsNotice');
+    assert.equal(await accountNotice.isVisible(), true, 'notice is visible without opening account settings');
+    assert.match(await accountNotice.innerText(), /قبل ربط قناة أو تشغيل الأتمتة/);
+    assert.equal(await page.locator('#acctEnabled').getAttribute('aria-describedby'), 'acctRightsNotice');
+    assert.equal(await accountNotice.locator('a').getAttribute('href'), '/terms/');
     await page.locator('#acctCustomize > summary').focus(); await page.keyboard.press('Enter');
     const group = page.getByRole('group', { name:'المنصات التي يُنشر عليها', exact:true });
     assert.equal(await group.count(), 1, 'platform choices have an accessible group name');
