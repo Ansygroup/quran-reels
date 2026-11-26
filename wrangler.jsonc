@@ -9,9 +9,5 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*", "/proxy", "/proxy/*"]
-  },
-  "vars": {
-    "SUPABASE_URL": "https://lbblhpscncqsyzvuujpw.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiYmxocHNjbmNxc3l6dnV1anB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNjY3MTYsImV4cCI6MjEwODY0MjcxNn0.UuY_X1xdQn8wYkEtdrrLbM28Tr1OBcxJH1_FHrNmYd0"
   }
 }
