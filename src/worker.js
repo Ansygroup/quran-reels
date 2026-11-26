@@ -73,7 +73,7 @@ export default {
       return proxy(request, url);
     }
     if (p === "/api/ip") return ip(request);
-    if (p === "/api/app-config") return json(200, { supabase: { url: env.SUPABASE_URL || "", anon: env.SUPABASE_ANON_KEY || "" } }, "public, max-age=3600, s-maxage=3600");
+    if (p === "/api/app-config") return json(200, { supabase: { url: env.SUPABASE_URL || "", anon: env.SUPABASE_ANON_KEY || "" }, firebase: { apiKey: "AIzaSyDYsG94Kt9OCaIhin8bwutbvwOgF9gsbHU", projectId: "chatora-auth", googleClientId: "439876481352-7qatrbmruve0d8gqkp3rvfdmu9vohvg4.apps.googleusercontent.com" } }, "public, max-age=3600, s-maxage=3600");
     if (p.startsWith("/api/")) return json(503, { error: "This feature is temporarily unavailable.", code: "unavailable" });
     return env.ASSETS.fetch(request);
   },
