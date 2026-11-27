@@ -695,6 +695,13 @@ const Creator = {
       else {
         toast("حدث خطأ أثناء الإنشاء — جرّب جودة أقل", "err");
         $("#expStage").textContent = "حدث خطأ: " + (e.message || e);
+        if (!document.querySelector("[data-compat]")) {
+          const b = document.createElement("button");
+          b.setAttribute("data-compat", "1"); b.className = "btn btn-gold"; b.type = "button";
+          b.textContent = "إعادة المحاولة بوضع التوافق";
+          b.onclick = () => { b.remove(); window.__qrCompat = true; this.startExport(); };
+          $("#expStage").after(b);
+        }
       }
       this.exporting = false;
       if (this._savedDims) { this._savedDims = null; this._resizeCanvas(); }
@@ -753,7 +760,7 @@ const Creator = {
     $("#expResult").hidden = false;
     $("#expPct").textContent = "100%";
     $("#resultVideo").src = url;
-    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب${this._audioIssue ? " · " + this._audioIssue : ""}`;
+    $("#resultMeta").textContent = `${name} · ${(res.blob.size / 1048576).toFixed(1)} م.ب${this._audioIssue ? " · " + this._audioIssue : ""}${res.hasAudio === false ? " · ⚠ لا يوجد مسار صوت في الملف" : ""}`;
     const dl = $("#btnDownload");
     dl.href = url; dl.download = name;
     $("#btnShare").onclick = async () => {
