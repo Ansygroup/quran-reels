@@ -778,7 +778,7 @@ const Creator = {
       try { new Notification("اكتمل الفيديو ✨", { body: "ريلزك القرآني جاهز للتحميل" }); } catch {}
     }
     const sb = $("#btnSchedule");
-    if (sb) sb.onclick = () => { if (typeof QRPublish !== "undefined") QRPublish.scheduleFromExport(res.blob, name); };
+    if (sb) { sb.textContent = "📤 رفع إلى يوتيوب"; sb.onclick = () => { if (typeof QRPublish !== "undefined") QRPublish.scheduleFromExport(res.blob, name); }; }
     $("#btnNew").onclick = () => {
       $("#exportOverlay").hidden = true;
       URL.revokeObjectURL(url);
