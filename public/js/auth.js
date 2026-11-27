@@ -63,6 +63,14 @@ const QRAuth = (() => {
     };
   }
 
+  /* هل تغيّرت الجلسة المخزّنة منذ بدء التجديد؟ (تبويب آخر قد يكون خرج قبل وصول حدث storage) */
+  function superseded(snapshot) {
+    let cur = null; try { cur = JSON.parse(localStorage.getItem(LS) || "null"); } catch { cur = null; }
+    if (s === snapshot && (cur?.refresh_token || "") === (snapshot.refresh_token || "")) return false;
+    if (s === snapshot) { s = cur; emit(); }
+    return true;
+  }
+
   async function refresh() {
     if (refreshInFlight) return refreshInFlight;
     const snapshot = s;
@@ -74,8 +82,10 @@ const QRAuth = (() => {
           method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: snapshot.refresh_token }).toString(),
         });
+        if (superseded(snapshot)) return null; /* خرج المستخدم أو تبدّلت الجلسة (هنا أو في تبويب آخر) أثناء الانتظار: تجاهل الرد المتأخر */
         if (!r.ok) { if (r.status === 400 || r.status === 401) save(null); return null; }
         const d = await r.json();
+        if (superseded(snapshot)) return null;
         const next = normalise(d);
         if (!next) return null;
         next.user = { ...snapshot.user, id: next.user.id || snapshot.user.id };
@@ -155,6 +165,12 @@ const QRAuth = (() => {
   }
 
   async function signOut() {
+    /* تبويب آخر بدّل الحساب قبل وصول حدث storage: لا نخرج الحساب الأحدث بالخطأ */
+    let cur = null; try { cur = JSON.parse(localStorage.getItem(LS) || "null"); } catch { cur = null; }
+    if (s && cur && (cur.refresh_token || "") !== (s.refresh_token || "")) {
+      s = cur; emit();
+      return { local_cleared: false, session_changed: true, current_user: s.user, remote: "not_attempted" };
+    }
     const had = !!s;
     save(null);
     return { local_cleared: true, remote: had ? "not_needed" : "not_attempted" };
