@@ -13,21 +13,21 @@ const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://local
  browser=await chromium.launch({executablePath:await chrome.executablePath(),args:chrome.args,headless:true});
  const ctx=await browser.newContext({viewport:{width:Number(process.env.REEL_TEST_WIDTH||390),height:844},serviceWorkers:'block'});
  await ctx.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.abort());
- const seed=await ctx.newPage();await seed.goto(origin);await seed.evaluate(()=>localStorage.setItem('qr_session',JSON.stringify({access_token:'token-a',refresh_token:'refresh-a',expires_at:Date.now()-1000,user:{id:'a',email:'a@example.test'}})));await seed.close();
+ const seed=await ctx.newPage();await seed.goto(origin);await seed.evaluate(()=>localStorage.setItem('qr_fb_session',JSON.stringify({access_token:'token-a',refresh_token:'refresh-a',expires_at:Date.now()-1000,user:{id:'a',email:'a@example.test'}})));await seed.close();
  const a=await ctx.newPage();
  await a.addInitScript(()=>{const add=window.addEventListener;window.__heldStorage=[];window.addEventListener=function(type,listener,options){if(type==='storage')return add.call(this,type,event=>window.__heldStorage.push(()=>listener.call(window,event)),options);return add.call(this,type,listener,options)}});
  await a.goto(origin);const b=await ctx.newPage();await b.goto(origin);
  await a.evaluate(()=>{
-  window.fetch=async url=>{if(String(url)==='/api/app-config')return {json:async()=>({supabase:{url:'https://auth.test',anon:'fixture'}})};
-   if(String(url).includes('/token?'))return new Promise(resolve=>window.__completeRefresh=()=>resolve({ok:true,status:200,json:async()=>({access_token:'late-a',refresh_token:'late-r',user:{id:'a'}})}));throw Error('unexpected fixture request')};
+  window.fetch=async url=>{if(String(url)==='/api/app-config')return {json:async()=>({firebase:{apiKey:'fixture'}})};
+   if(String(url).includes('securetoken.googleapis.com'))return new Promise(resolve=>window.__completeRefresh=()=>resolve({ok:true,status:200,json:async()=>({id_token:'late-a',refresh_token:'late-r',user_id:'a',expires_in:'3600'})}));throw Error('unexpected fixture request')};
   window.__tokenPromise=fixtureAuth.token();
  });
  await a.waitForFunction(()=>typeof window.__completeRefresh==='function');
- await b.evaluate(()=>{window.fetch=async url=>String(url)==='/api/app-config'?{json:async()=>({supabase:{url:'https://auth.test',anon:'fixture'}})}:{ok:true,status:204};});
- const out=await b.evaluate(()=>fixtureAuth.signOut());assert.equal(out.local_cleared,true);assert.equal(out.remote,'confirmed');
+ await b.evaluate(()=>{window.fetch=async url=>String(url)==='/api/app-config'?{json:async()=>({firebase:{apiKey:'fixture'}})}  :{ok:true,status:204};});
+ const out=await b.evaluate(()=>fixtureAuth.signOut());assert.equal(out.local_cleared,true);assert.equal(out.remote,'not_needed');
  await a.evaluate(()=>window.__completeRefresh());
  assert.equal(await a.evaluate(()=>window.__tokenPromise),null);
- assert.equal(await a.evaluate(()=>localStorage.getItem('qr_session')),null);
+ assert.equal(await a.evaluate(()=>localStorage.getItem('qr_fb_session')),null);
  assert.equal(await a.evaluate(()=>fixtureAuth.user()),null);
  // The stored event was deliberately not delivered before the response.
  await a.waitForFunction(()=>window.__heldStorage.length>0);assert(await a.evaluate(()=>window.__heldStorage.length)>0);
