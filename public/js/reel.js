@@ -103,7 +103,7 @@ const AyahPlayer = {
       if (!this.cache.has(key)) {
         const num = String(ch.surah).padStart(3, "0");
         try {
-          const buf = await this._fetchAudio(ch.info.base + num + ".mp3", 60000, signal);
+          const buf = await this._fetchAudio(ch.info.urlFor ? ch.info.urlFor(num) : ch.info.base + num + ".mp3", 60000, signal);
           if (signal?.aborted) throw new Error("aborted");
           const audio = await this._awaitAudio(this.ctx.decodeAudioData(buf), signal);
           if (signal?.aborted) throw new Error("aborted");
