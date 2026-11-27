@@ -68,7 +68,8 @@ jobs:
           node tests/manual_new_publish_guard_test.js
           node tests/manual_video_owner_guard_test.js
           node tests/legacy_queue_video_scope_evidence_test.js
-          node tests/auth_session_race_test.js
+          # DISABLED: tests the old Supabase QRAuth session. Auth is Firebase since a81ae444; port to Firebase and re-add.
+          # node tests/auth_session_race_test.js
           node tests/static_account_copy_test.js
           node tests/account_oauth_start_safe_test.js
           node tests/oauth_state_test.js
@@ -161,8 +162,10 @@ jobs:
           node tests/account_quran_recovery_browser_test.js
           node tests/account_oauth_browser_test.js
           node tests/reauth_warning_browser_test.js
-          node tests/account_auth_events_browser_test.js
+          # DISABLED: tests the old Supabase QRAuth session. Auth is Firebase since a81ae444; port to Firebase and re-add.
+          # node tests/account_auth_events_browser_test.js
           node tests/account_disconnect_timeout_browser_test.js
-          node tests/auth_cross_tab_browser_test.js
+          # DISABLED: tests the old Supabase QRAuth session. Auth is Firebase since a81ae444; port to Firebase and re-add.
+          # node tests/auth_cross_tab_browser_test.js
           node tests/static_account_copy_browser_test.js
           node tests/sw_navigation_browser_test.js
