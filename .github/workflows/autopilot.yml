@@ -1,0 +1,25 @@
+name: autopilot
+on:
+  schedule:
+    - cron: "20 * * * *"
+  workflow_dispatch: {}
+concurrency:
+  group: autopilot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cloudflare-deploy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Render and upload due reels
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_ORIGIN: https://quranreels.chatora.us.ci
+        run: node scripts/gha_autopilot.js
