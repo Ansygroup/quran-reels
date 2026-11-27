@@ -96,7 +96,7 @@ const save = (env, uid, rec) => env.KV.put(kvKey(uid), JSON.stringify(rec));
 const publicConn = (c) => ({ id: c.id, platform: "youtube", account_name: c.account_name, extra: { channel: c.account_name }, scopes: SCOPES.join(" "), expires_at: c.expires_at, updated_at: c.updated_at, is_default: !!c.is_default, has_refresh: !!c.refresh });
 
 function origin(url) { return url.origin; }
-const redirectUri = (url) => origin(url) + "/api/oauth/callback";
+const redirectUri = (url, env) => (String(env && env.SITE_ORIGIN || "").replace(/\/+$/, "") || origin(url)) + "/api/oauth/callback";
 const ready = (env) => !!(env.KV && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.TOKEN_ENC_KEY);
 const back = (to, extra) => new Response(null, { status: 302, headers: { location: to, "cache-control": "no-store", ...(extra || {}) } });
 const clearState = `${ST_COOKIE}=; Max-Age=0; Path=/api/oauth; HttpOnly; Secure; SameSite=Lax`;
@@ -108,7 +108,7 @@ async function start(request, env, url) {
   if (p !== "youtube") return json(403, { error: "هذه المنصة غير متاحة حاليًا" });
   if (!ready(env)) return json(503, { error: "ربط يوتيوب غير مهيأ على الخادم" });
   const rand = "youtube." + b64u.enc(crypto.getRandomValues(new Uint8Array(16)));
-  const params = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri(url), response_type: "code", scope: SCOPES.join(" "), state: rand, access_type: "offline", prompt: "consent", include_granted_scopes: "true" });
+  const params = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri(url, env), response_type: "code", scope: SCOPES.join(" "), state: rand, access_type: "offline", prompt: "consent", include_granted_scopes: "true" });
   const target = AUTH_URL + "?" + params;
   const cookie = await stateCookie(env, u.uid, rand);
   if (request.method === "POST") return json(200, { url: target }, { "set-cookie": cookie });
@@ -125,10 +125,10 @@ async function callback(request, env, url) {
   if (!saved || saved.r !== st) return fail("state");
   let j;
   try {
-    const r = await fetch(TOKEN_URL, { method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri(url), grant_type: "authorization_code" }) });
+    const r = await fetch(TOKEN_URL, { method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri(url, env), grant_type: "authorization_code" }) });
     j = await r.json();
-    if (!r.ok || !j.access_token) return fail("token");
-  } catch { return fail("token"); }
+    if (!r.ok || !j.access_token) return fail("token_" + String(j.error || r.status).replace(/[^a-z0-9_]/gi, "").slice(0, 40));
+  } catch { return fail("token_fetch"); }
   let item;
   try {
     const r = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", { redirect: "error", headers: { authorization: "Bearer " + j.access_token } });
@@ -136,13 +136,16 @@ async function callback(request, env, url) {
     item = r.ok && Array.isArray(ch.items) ? ch.items[0] : null;
   } catch { item = null; }
   if (!item || !/^[A-Za-z0-9_-]{10,64}$/.test(item.id || "")) return fail("channel");
-  const rec = await load(env, saved.u);
-  const old = rec.conns.find(c => c.account_id === item.id);
-  const conn = {
+  let rec, old, conn;
+  try {
+  rec = await load(env, saved.u);
+  old = rec.conns.find(c => c.account_id === item.id);
+  conn = {
     id: old ? old.id : crypto.randomUUID(), account_id: item.id, account_name: item.snippet?.title || "قناة يوتيوب",
     access: await seal(env, j.access_token), refresh: j.refresh_token ? await seal(env, j.refresh_token) : (old ? old.refresh : ""),
     expires_at: Date.now() + (Number(j.expires_in) || 3600) * 1000, updated_at: new Date().toISOString(), is_default: old ? old.is_default : rec.conns.length === 0,
   };
+  } catch (e) { return fail(/32 bytes|base64|atob/i.test(String(e && e.message)) ? "enckey" : "seal"); }
   rec.conns = rec.conns.filter(c => c.account_id !== item.id).concat(conn);
   if (!rec.conns.some(c => c.is_default)) rec.conns[0].is_default = true;
   try { await save(env, saved.u, rec); } catch { return fail("store"); }
