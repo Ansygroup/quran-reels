@@ -45,6 +45,18 @@ const Creator = {
     const ch = this._chapterInfo();
     const ids = ["#txtFrom", "#txtTo", "#stepFromP", "#stepFromM", "#stepToP", "#stepToM"];
     ids.forEach(id => { const x = $(id); if (x) x.disabled = !!ch; });
+    const notice = $("#reciterRightsNotice");
+    if (notice) {
+      if (!this._rightsDefault) this._rightsDefault = notice.innerHTML;
+      if (ch) {
+        const lic = ch.licenses[String(Selection.surah)] || "CC BY-SA 4.0";
+        notice.innerHTML = "هذه التلاوة مرخّصة للنشر وتحقيق الربح — التلاوة: عاقب عزيز (" + lic + "، المصدر: ويكيميديا كومنز). " + (lic === "CC0" ? "النسب مستحسن وليس إلزاميًا." : "يلزم ذكر «Aaqib Azeez, CC BY-SA 4.0» عند النشر.") + ' <a href="/terms/">تفاصيل الاستخدام</a>';
+        notice.classList.add("ok");
+      } else {
+        notice.innerHTML = this._rightsDefault;
+        notice.classList.remove("ok");
+      }
+    }
     if (!ch) return;
     const count = Quran.ayahCount(Selection.surah);
     Selection.from = 1;
