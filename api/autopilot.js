@@ -5,7 +5,7 @@ const { validateTemplate } = require("../lib/reel_settings");
 const { getUserId } = require("../lib/sess");
 const { q1, rest } = require("../lib/db");
 const { json, configured } = require("../lib/oauth");
-const { RECITERS, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest, publishReadyToday } = require("../lib/autopilot");
+const { RECITERS, allowedReciters, CONTENT_MODES, BACKGROUND_IDS, parseTemplate, generateAndPublish, renderSelfTest, recordSelfTest, publishReadyToday } = require("../lib/autopilot");
 
 // قائمة المنصات من مصدر واحد (اسم + هل النشر مدعوم فعلًا)
 const { NAMES: PLATFORM_NAMES, LIST: PLATFORM_LIST, validatePlatforms } = require("../lib/platforms");
@@ -269,7 +269,7 @@ async function accountData(uid) {
     connected: connectedPlatforms.length > 0,
     platforms: connectedPlatforms,
     channel: channelNames || "لا توجد قنوات مرتبطة",
-    reciters: RECITERS,
+    reciters: allowedReciters(),
     /* كل منصة مع: هل النشر مدعوم (publish) · أي مزوّد ربط (connect) ·
      * وهل مفاتيحه مضبوطة الآن (ready) — الواجهة لا تَعِد بما لا يعمل */
     available: PLATFORM_LIST.map(p => ({
@@ -293,7 +293,7 @@ async function accountData(uid) {
     options: {
       content_modes: [...CONTENT_MODES],
       backgrounds: [...BACKGROUND_IDS],
-      reciters: RECITERS.map((r) => ({ id: r.id, name: r.name })),
+      reciters: allowedReciters().map((r) => ({ id: r.id, name: r.name })),
     },
   };
 }
@@ -406,7 +406,7 @@ const handler = async (req, res) => {
       
       /* اختيار القارئ: كان مثبتًا على rotate فلا يمكن تخصيص الصوت إطلاقًا */
       const reciterId = String(templateInput.reciter || "");
-      const wantFixed = templateInput.reciter_mode === "fixed" && RECITERS.some((r) => r.id === reciterId);
+      const wantFixed = templateInput.reciter_mode === "fixed" && allowedReciters().some((r) => r.id === reciterId);
       if (templateInput.reciter_mode === "fixed" && !wantFixed) return json(res, 400, { error: "اختار قارئًا صالحًا" });
       if (templateInput.background && templateInput.background !== "custom" && !BACKGROUND_IDS.has(templateInput.background)) return json(res, 400, { error: "اختار خلفية صالحة للأتمتة" });
       const template = {
