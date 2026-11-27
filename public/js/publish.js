@@ -1297,10 +1297,60 @@ window.PublishApp = {
   afterLogin() { return this.init(); },
   wireGlobals() { /* لا شيء مطلوب الآن — تُبقي النداء آمنًا */ },
   /* جدولة من صانع الريلز بعد التصدير: تحتاج رفع الفيديو إلى التخزين أولًا */
-  scheduleFromExport() {
-    const msg = "جدولة الفيديو المُصدَّر يدويًا غير متاحة حاليًا. يمكنك تحميل الفيديو ونشره بنفسك، أو ضبط النشر التلقائي من صفحة حسابي.";
-    if (typeof toast === "function") toast(msg);
-    else alert(msg);
+  /* رفع الفيديو المُصدَّر إلى يوتيوب مباشرة من المتصفح (رفع قابل للاستئناف).
+   * الخادم يعطي توكن وصول قصير العمر فقط؛ الملف لا يمرّ عليه. الافتراضي «خاص» ويمكن ضبط موعد نشر. */
+  async scheduleFromExport(blob, name) {
+    const say = (m, kind) => { if (typeof toast === "function") toast(m, kind); else alert(m); };
+    try {
+      if (!blob || !blob.size) return say("لا يوجد فيديو للرفع", "err");
+      const token = await window.AuthApp.getToken();
+      if (!token) return say("سجّل الدخول أولًا من صفحة الحساب", "err");
+      const tr = await fetch("/api/youtube/token", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{}" });
+      const tj = await tr.json().catch(() => ({}));
+      if (!tr.ok || !tj.access_token) return say(tr.status === 404 ? "اربط قناة يوتيوب أولًا من صفحة الحساب" : (tj.error || "تعذّر الاتصال بيوتيوب؛ أعد ربط القناة"), "err");
+      const title = (window.prompt("عنوان الفيديو على يوتيوب (حتى 100 حرف):", "ريلز قرآن — " + (name || "").replace(/\.[a-z0-9]+$/i, "")) || "").trim().slice(0, 100);
+      if (!title) return say("أُلغي الرفع");
+      let privacy = (window.prompt("الخصوصية: private (خاص) أو unlisted (غير مدرج) أو public (علني)\nيُنصح بالخاص أولًا — تقدر تنشره من YouTube Studio.", "private") || "").trim().toLowerCase();
+      if (!["private", "unlisted", "public"].includes(privacy)) return say("خصوصية غير صالحة — أُلغي الرفع", "err");
+      let publishAt = "";
+      if (privacy === "private") {
+        const when = (window.prompt("موعد نشر تلقائي (اختياري) بتوقيت جهازك، مثل 2026-12-01 18:30 — اتركه فارغًا للبقاء خاصًا:", "") || "").trim();
+        if (when) {
+          const d = new Date(when.replace(" ", "T"));
+          if (isNaN(d.getTime()) || d.getTime() < Date.now() + 15 * 60e3) return say("الموعد غير صالح أو قريب جدًا (15 دقيقة على الأقل)", "err");
+          publishAt = d.toISOString();
+        }
+      }
+      const meta = { snippet: { title, description: "قرآن كريم — تلاوة عاقب عزيز (CC0 / CC BY-SA 4.0).", categoryId: "22" }, status: { privacyStatus: privacy, selfDeclaredMadeForKids: false } };
+      if (publishAt) meta.status.publishAt = publishAt;
+      say("جارٍ بدء الرفع إلى يوتيوب…");
+      const init = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tj.access_token}`, "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": blob.type || "video/webm", "X-Upload-Content-Length": String(blob.size) },
+        body: JSON.stringify(meta),
+      });
+      if (!init.ok) {
+        const e = await init.json().catch(() => ({}));
+        const reason = e?.error?.errors?.[0]?.reason || "";
+        return say(reason === "quotaExceeded" ? "تجاوزت حصة يوتيوب اليومية؛ حاول غدًا" : reason === "youtubeSignupRequired" ? "الحساب ليس له قناة يوتيوب" : "رفضت يوتيوب بدء الرفع (" + init.status + (reason ? " — " + reason : "") + ")", "err");
+      }
+      const loc = init.headers.get("Location");
+      if (!loc || !/^https:\/\/(www\.)?googleapis\.com\//.test(loc)) return say("تعذّر الحصول على رابط الرفع", "err");
+      const result = await new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open("PUT", loc);
+        x.setRequestHeader("Content-Type", blob.type || "video/webm");
+        x.upload.onprogress = ev => { if (ev.lengthComputable && typeof toast === "function" && ev.loaded < ev.total) { /* تقدّم صامت لتجنب إغراق الإشعارات */ } };
+        x.onload = () => { try { const j = JSON.parse(x.responseText || "{}"); x.status >= 200 && x.status < 300 && j.id ? resolve(j) : reject(new Error(j?.error?.message || "HTTP " + x.status)); } catch (e) { reject(e); } };
+        x.onerror = () => reject(new Error("انقطع الاتصال أثناء الرفع"));
+        x.send(blob);
+      });
+      const msg = privacy === "private" ? (publishAt ? "✓ رُفع الفيديو وسيُنشر تلقائيًا في الموعد" : "✓ رُفع الفيديو كخاص — انشره من YouTube Studio") : "✓ رُفع الفيديو";
+      say(msg + " — https://youtu.be/" + result.id);
+      return result.id;
+    } catch (e) {
+      say("تعذّر الرفع: " + String(e && e.message || e).slice(0, 120), "err");
+    }
   },
 
   /* ============================================================
