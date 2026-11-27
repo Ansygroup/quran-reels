@@ -144,8 +144,6 @@ const HEAD_EXTRA = `<meta property="og:site_name" content="قرآن ريلز">
 <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="stylesheet" href="/css/style.css?v=3">
 <link rel="stylesheet" href="/css/articles.css?v=1">
-<script defer src="/_vercel/insights/script.js"></script>
-<script defer src="/_vercel/speed-insights/script.js"></script>`;
 
 const HEADER = `<div class="topbar">☽ صدقة جارية على نبيّنا محمد ﷺ · الموقع مجاني 100%</div>
 <header class="site-header">
@@ -449,8 +447,6 @@ ${legacyPublishing}
 <link rel="apple-touch-icon" href="/img/icon-192.png?v=2">
 <link rel="stylesheet" href="/css/style.css?v=3">
 <link rel="stylesheet" href="/css/articles.css?v=1">
-<script defer src="/_vercel/insights/script.js"></script>
-<script defer src="/_vercel/speed-insights/script.js"></script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"CollectionPage","name":"مكتبة مقالات قرآن ريلز","url":"${loc}","inLanguage":"ar","isPartOf":{"@type":"WebSite","name":"قرآن ريلز","url":"${ORIGIN}/"},"mainEntity":{"@type":"ItemList","name":"محاور المكتبة","numberOfItems":${GROUPS.size},"itemListElement":[
 ${hubLD}
