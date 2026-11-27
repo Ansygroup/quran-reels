@@ -666,9 +666,9 @@ registerTool("radio", {
     const audio = $s("[data-audio]");
     const list = $s("[data-list]");
 
-    RADIOS.forEach(r => {
+    VISIBLE_RADIOS.forEach(r => {
       const c = el("div", { class: "mini-card", style: "cursor:pointer" },
-        `<div class="m-title">🎙 ${esc(r.n)}</div><div class="m-sub">بث مباشر — اضغط للتشغيل</div>`);
+        `<div class="m-title">🎙 ${esc(r.n)}</div><div class="m-sub">بث خارجي مباشر (external live stream) — اضغط للتشغيل</div>`);
       c.addEventListener("click", () => {
         $s("[data-now]").textContent = r.n;
         $s("[data-state]").textContent = "جارٍ التشغيل…";
