@@ -33,6 +33,7 @@ jobs:
           NODE_PATH: ${{ runner.temp }}/qr-test-deps/node_modules
         run: |
           node tests/publish_client_dom.js
+          node tests/upload_dialog_test.js
           node tests/progress_ui_test.js
           node tests/multichannel_test.js
           node tests/account_dashboard_review_test.js
