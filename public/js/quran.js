@@ -81,7 +81,7 @@ const Quran = {
 /* ---------- بنية المقطع المختار ---------- */
 const Selection = {
   surah: 112, from: 1, to: 4,
-  reciter: "Alafasy_128kbps",
+  reciter: "aaqib-azeez-murattal",
   translation: "none",
   bg: "bg-mosque-night",
   dedMode: "none", dedText: "",
