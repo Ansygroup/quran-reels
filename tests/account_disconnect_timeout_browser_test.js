@@ -8,7 +8,7 @@ const server=http.createServer((req,res)=>{const u=new URL(req.url,'http://local
 (async()=>{let browser;try{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin=`http://127.0.0.1:${server.address().port}`;
  browser=await chromium.launch({executablePath:await chrome.executablePath(),args:chrome.args,headless:true});
- const ctx=await browser.newContext({viewport:{width:Number(process.env.REEL_TEST_WIDTH||390),height:844},serviceWorkers:'block'});await ctx.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.abort());
+ const ctx=await browser.newContext({viewport:{width:Number(process.env.REEL_TEST_WIDTH||390),height:844},serviceWorkers:'block'});await ctx.addInitScript(()=>{try{localStorage.setItem('qr_fb_session',JSON.stringify({access_token:'fixture',refresh_token:'fixture',expires_at:Date.now()+36e5,user:{id:'u',email:'fixture@example.test',name:'fixture'}}))}catch{}});await ctx.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.abort());
  const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(origin);await page.waitForFunction(()=>typeof Creator!=='undefined'&&Creator.ready);
  await page.evaluate(()=>{
   document.querySelector('#view-home').hidden=true;document.querySelector('#view-account').hidden=false;
