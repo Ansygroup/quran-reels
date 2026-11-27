@@ -3,6 +3,7 @@
   "name": "quran-reels",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
   "kv_namespaces": [{ "binding": "KV", "id": "dd82da751dee4191a82383f1574d472d" }],
   "assets": {
     "directory": "./public",
