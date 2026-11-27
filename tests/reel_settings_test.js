@@ -15,8 +15,12 @@ const design={translation:'en.sahih',showTrans:true,style:'minimal',ratio:'1:1',
 const input={content_mode:'fixed',surah:2,from:255,to:256,reciter_mode:'fixed',reciter:RECITERS[0].id,background:'grad-gold',design};
 assert.equal(validateTemplate(input),null);
 const template=parseTemplate(input);assert.deepEqual(template.design,design);assert.deepEqual([template.surah,template.from,template.to],[2,255,256]);
-const recipe=chooseRecipe(template,9);assert.deepEqual([recipe.s,recipe.from,recipe.to],[2,255,256]);
-assert.notEqual(chooseRecipe(template,0).r, chooseRecipe(template,1).r, 'القارئ التلقائي يدور حتى مع تثبيت الآيات');
+const recipe=chooseRecipe(template,9);
+// RECITERS_PUBLIC_ONLY: only the licensed Aaqib Azeez whole-surah audio is allowed, never ayah ranges.
+assert.equal(recipe.r,'aaqib-azeez-murattal');assert.equal(recipe.from,1);assert.equal(recipe.to,catalog.surahCounts[recipe.s-1]);
+const short=chooseRecipe(parseTemplate({...input,surah:112,from:1,to:4}),0);assert.deepEqual([short.s,short.from,short.to,short.r],[112,1,4,'aaqib-azeez-murattal']);
+assert.equal(parseTemplate({...input,reciter:'Alafasy_128kbps'}).reciter_mode,'rotate','hidden reciter must be rejected');
+assert.equal(parseTemplate({...input,reciter:'aaqib-azeez-murattal'}).reciter,'aaqib-azeez-murattal');
 for(const patch of [{surah:115},{surah:1,from:1,to:8},{from:0},{from:9,to:8},{surah:2,from:1,to:41},{from:1.5}]) assert(validateTemplate({...input,...patch}));
 for(const patch of [{style:'bogus'},{quality:5},{fontSize:71},{showWatermark:'false'},{translation:'bad'},{dedText:'x'.repeat(181)}]) assert(validateTemplate({...input,design:{...design,...patch}}));
 assert.equal(validateTemplate(parseTemplate({content_mode:'mix'})),null);
