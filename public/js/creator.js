@@ -84,7 +84,7 @@ const Creator = {
   _populateReciters() {
     const sel = $("#selReciter");
     sel.innerHTML = "";
-    RECITERS.forEach((r, i) => {
+    VISIBLE_RECITERS.forEach((r, i) => {
       sel.appendChild(el("option", { value: r.folder }, r.n + (r.tag ? ` — ${r.tag}` : "") + (r.chapter ? "" : " — حقوق غير موثّقة، للاستخدام الشخصي")));
     });
   },
