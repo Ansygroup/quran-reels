@@ -125,13 +125,13 @@ async function callback(request, env, url) {
   if (!saved || saved.r !== st) return fail("state");
   let j;
   try {
-    const r = await fetch(TOKEN_URL, { method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri(url, env), grant_type: "authorization_code" }) });
+    const r = await fetch(TOKEN_URL, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri(url, env), grant_type: "authorization_code" }) });
     j = await r.json();
     if (!r.ok || !j.access_token) return fail("token_" + String(j.error || r.status).replace(/[^a-z0-9_]/gi, "").slice(0, 40));
-  } catch { return fail("token_fetch"); }
+  } catch (e) { return fail("token_fetch_" + String(e && e.message || "").replace(/[^a-z0-9]+/gi, "_").slice(0, 40)); }
   let item;
   try {
-    const r = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", { redirect: "error", headers: { authorization: "Bearer " + j.access_token } });
+    const r = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", { redirect: "manual", headers: { authorization: "Bearer " + j.access_token } });
     const ch = await r.json();
     item = r.ok && Array.isArray(ch.items) ? ch.items[0] : null;
   } catch { item = null; }
@@ -158,7 +158,7 @@ async function freshToken(env, uid, id) {
   if (!c) return { status: 404, error: "لا توجد قناة مرتبطة" };
   if (c.expires_at > Date.now() + 90e3) return { conn: c, token: await open(env, c.access) };
   if (!c.refresh) return { status: 409, error: "انتهى الربط؛ أعد ربط القناة" };
-  const r = await fetch(TOKEN_URL, { method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: await open(env, c.refresh), grant_type: "refresh_token" }) });
+  const r = await fetch(TOKEN_URL, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: await open(env, c.refresh), grant_type: "refresh_token" }) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) return { status: j.error === "invalid_grant" ? 409 : 502, error: j.error === "invalid_grant" ? "انتهى الربط؛ أعد ربط القناة" : "تعذّر تجديد الجلسة" };
   c.access = await seal(env, j.access_token);
