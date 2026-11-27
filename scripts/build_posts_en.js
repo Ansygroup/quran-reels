@@ -17,8 +17,7 @@ for (const s of SPECS) {
   if (s.faq) s.faq = s.faq.map(([q, a]) => [r(q), r(a)]);
 }
 const GENERATED = "<!-- generated -->";
-const HEAD_EXTRA = `<script defer src="/_vercel/insights/script.js" data-sdkn="@vercel/analytics" data-sdkv="1.5.0"></script>
-<script defer src="/_vercel/speed-insights/script.js"></script>`;
+const HEAD_EXTRA = ``;
 
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function faqJsonLd(faq){return JSON.stringify({"@context":"https://schema.org","@type":"FAQPage","mainEntity":faq.map(([q,a])=>({"@type":"Question","name":q,"acceptedAnswer":{"@type":"Answer","text":a}}))}).replace(/</g,"\\u003c");}
