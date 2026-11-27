@@ -26,7 +26,7 @@ globalThis.fetch = async (u, o = {}) => {
   return new Response("{}", { status: 404 });
 };
 const store = new Map();
-const env = { KV: { get: async (k, t) => store.has(k) ? JSON.parse(store.get(k)) : null, put: async (k, v) => { store.set(k, v); } }, GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "sec", TOKEN_ENC_KEY: Buffer.alloc(32, 7).toString("base64") };
+const env = { KV: { get: async (k, t) => store.has(k) ? JSON.parse(store.get(k)) : null, put: async (k, v) => { store.set(k, v); }, list: async ({ prefix }) => ({ keys: [...store.keys()].filter(k => k.startsWith(prefix)).map(name => ({ name })) }) }, CRON_SECRET: "s".repeat(40), GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "sec", TOKEN_ENC_KEY: Buffer.alloc(32, 7).toString("base64") };
 const site = "https://quranreels.chatora.us.ci";
 const req = (path, method = "GET", token, body, cookie) => { const u = new URL(site + path); return [new Request(u, { method, body: body ? JSON.stringify(body) : undefined, headers: { ...(token ? { authorization: "Bearer " + token } : {}), ...(cookie ? { cookie } : {}) } }), u]; };
 const call = async (path, method, token, body, cookie) => { const [r, u] = req(path, method, token, body, cookie); return handleYt(r, env, u, u.pathname); };
@@ -67,7 +67,47 @@ r = await call("/api/youtube/token", "POST", T, { id }); ok((await r.json()).acc
 ok((await call("/api/youtube/token", "POST", await tok({ sub: "uidB" }), { id })).status === 404, "other user must not reach this channel");
 r = await call("/api/autopilot", "GET", T); const ap = await r.json();
 ok(ap.config.enabled === false && ap.reciters.length === 1 && ap.reciters[0].id === "aaqib-azeez-murattal" && ap.config.template.reciter === "aaqib-azeez-murattal" && ap.connected === true, "autopilot view");
-ok((await call("/api/autopilot", "POST", T, { enabled: true })).status === 503, "autopilot write must be refused");
+// autopilot settings: save, conflict, validation
+ok(ap.options.autopilot_available === true && ap.config.template.privacy === "private", "autopilot default private + available");
+const tpl = { content_mode: "mix", background: "rotate", reciter: "someone-else", privacy: "unlisted" };
+r = await call("/api/autopilot", "POST", T, { action: "save", expected_revision: null, enabled: true, platforms: ["youtube"], all_channels: false, template: tpl });
+let sv = await r.json();
+ok(r.status === 200 && sv.ok && sv.config.enabled === true && sv.config.template.reciter === "aaqib-azeez-murattal" && sv.config.template.privacy === "unlisted" && /^[0-9a-f-]{36}$/.test(sv.config.settings_revision), "save should work, force Aaqib: " + JSON.stringify(sv));
+const rev1 = sv.config.settings_revision;
+r = await call("/api/autopilot", "POST", T, { action: "save", expected_revision: null, enabled: true, template: tpl });
+ok(r.status === 409 && (await r.json()).code === "settings_conflict", "stale revision should conflict");
+r = await call("/api/autopilot", "POST", T, { action: "save", expected_revision: rev1, enabled: true, template: { content_mode: "fixed", surah: 2, from: 1, to: 99 } });
+ok(r.status === 400, "invalid fixed range should be refused");
+r = await call("/api/autopilot", "POST", T, { action: "save", expected_revision: rev1, enabled: true, template: { ...tpl, design: { style: { x: 1 } } } });
+ok(r.status === 400, "nested design refused");
+r = await call("/api/autopilot", "POST", T, { action: "run", enabled: true });
+ok(r.status === 409, "manual run unavailable");
+r = await call("/api/autopilot", "POST", T, { action: "set_enabled", expected_revision: rev1, enabled: false });
+sv = await r.json(); ok(sv.ok && sv.config.enabled === false && sv.config.template.privacy === "unlisted", "set_enabled keeps template");
+const rev2 = sv.config.settings_revision;
+r = await call("/api/autopilot", "POST", T, { action: "set_enabled", expected_revision: rev2, enabled: true });
+ok((await r.json()).config.enabled === true, "re-enable");
+// cron API
+ok((await call("/api/cron/due", "GET")).status === 401, "cron without secret");
+ok((await call("/api/cron/due", "GET", T)).status === 401, "cron with a user token is refused");
+ok((await call("/api/cron/due", "GET", "x".repeat(40))).status === 401, "cron wrong secret");
+const SEC = "s".repeat(40);
+const realDate = Date;
+r = await call("/api/cron/due", "GET", SEC); let due = await r.json();
+const cairoHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", hour12: false }).format(new Date()));
+if (cairoHour >= 8) {
+  ok(due.due.length === 1 && due.due[0].uid === "uidA" && due.due[0].template.privacy === "unlisted", "due should list the user: " + JSON.stringify(due));
+  r = await call("/api/cron/due", "GET", SEC); ok((await r.json()).due.length === 0, "claim prevents double pickup");
+}
+r = await call("/api/cron/token", "POST", SEC, { uid: "uidA" }); const ct = await r.json();
+ok(r.status === 200 && ct.access_token && ct.channel === "قناتي", "cron token: " + JSON.stringify(ct));
+r = await call("/api/cron/token", "POST", SEC, { uid: "bad uid!" }); ok(r.status === 400, "bad uid");
+r = await call("/api/cron/done", "POST", SEC, { uid: "uidA", ok: true, video_id: "abcDEF12345" });
+ok(r.status === 200, "done ok");
+r = await call("/api/autopilot", "GET", T); const ap2 = await r.json();
+ok(ap2.last_daily && ap2.runs[0].title.includes("abcDEF12345"), "last video shown: " + JSON.stringify(ap2.runs));
+r = await call("/api/cron/due", "GET", SEC); ok((await r.json()).due.length === 0, "not due again the same day");
+
 r = await call("/api/gw?op=disconnect", "POST", T, { id }); const d = await r.json();
 ok(d.ok === true && d.deleted === true, "disconnect shape");
 ok((await (await call("/api/gw?op=list", "GET", T)).json()).connections.length === 0, "list after disconnect");
