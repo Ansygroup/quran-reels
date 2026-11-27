@@ -27,6 +27,7 @@ async function proxy(request, url) {
   let tp;
   try { tp = new URL(target); } catch { return text(400, "bad url"); }
   if (!okHost(tp)) return text(403, "host not allowed");
+  if (RECITERS_PUBLIC_ONLY && /(^|\.)everyayah\.com$/i.test(tp.hostname)) return text(403, "reciter audio unavailable");
   const range = request.headers.get("range");
   let cur = tp.toString(), r = null;
   for (let hop = 0; hop < 4; hop++) {
@@ -94,13 +95,14 @@ const REWRITE_TYPES = /^(text\/html|application\/xml|text\/xml|text\/plain|appli
 // One switch: set RECITERS_PUBLIC_ONLY = false here and in public/js/data.js (and lib/autopilot.js) to bring them back.
 const RECITERS_PUBLIC_ONLY = true;
 const HIDDEN_NOTICE_AR = '<p class="lead" style="max-width:760px;margin:0 auto 18px">ملاحظة: خيار الصوت والصانع لهذا القارئ متوقف مؤقتًا حتى يتم توثيق حقوق التلاوة. المتاح حاليًا هو القارئ المرخّص عاقب عزيز. <a href="/ar/quran-video-maker/">افتح الصانع</a></p>';
+const NOINDEX_PAGES = new Set(["/ar/reciters", "/ar/best-quran-reciters-video", "/articles/best-quran-reciters-video", "/en/articles/best-quran-reciters-video"]);
 function publicOnlyText(body, p, ct) {
   const isHtml = /text\/html/i.test(ct), isXml = /xml/i.test(ct);
-  if (isXml && p === "/sitemap.xml") body = body.replace(/<url>(?:(?!<\/url>)[\s\S])*?<loc>[^<]*\/ar\/reciter\/[^<]*<\/loc>[\s\S]*?<\/url>\s*/g, "");
+  if (isXml && p === "/sitemap.xml") body = body.replace(/<url>(?:(?!<\/url>)[\s\S])*?<loc>[^<]*(?:\/ar\/reciter\/|\/ar\/reciters\/|\/best-quran-reciters-video\/)[^<]*<\/loc>[\s\S]*?<\/url>\s*/g, "");
   const rep = [
     ["تصفّح 47 قارئًا للقرآن، بينهم العفاسي وعبدالباسط والسديس والمنشاوي. استمع إلى التلاوات واختر قارئًا لفيديوك القرآني.", "فهرس قرّاء القرآن: القارئ المرخّص عاقب عزيز متاح في الصانع، وبقية القرّاء متوقفون مؤقتًا حتى توثيق حقوق التلاوة."],
     ["<b id=\"statReciters\">47</b><span>قارئًا مشهورًا</span>", "<b id=\"statReciters\">1</b><span>قارئ مرخّص</span>"],
-    ["47 صفحة قارئ فردية (`/ar/reciter/<slug>/`) بروابط مسبق تعبئة `/?r=<folder>` تفتح المولّد مُهيّأً بصوته.", "صفحات قرّاء معلوماتية بلا صوت (غير مفهرسة)؛ القارئ المتاح في الصانع حاليًا: عاقب عزيز (مرخّص)."],
+    ["47 صفحة قارئ فردية (`/ar/reciter/<slug>/`) بروابط مسبق تعبئة `/?r=<folder>` تفتح المولّد مُهيّأً بصوته.", "فهرس القرّاء وصفحاتهم معلوماتية بلا صوت وغير مفهرسة؛ القارئ المتاح في الصانع حاليًا: عاقب عزيز (مرخّص)."],
     ["نعم — كل القرّاء الـ47 متاحة", "نعم — القارئ المرخّص عاقب عزيز متاح"],
     ["فهرس القرّاء الـ47", "فهرس القرّاء"], ["فهرس الأصوات الـ47", "فهرس الأصوات"], ["من القرّاء الـ47", "من القرّاء"], ["القرّاء الـ47", "القرّاء"],
     ["All 47 reciters", "The licensed reciter"],
@@ -108,9 +110,19 @@ function publicOnlyText(body, p, ct) {
     ["47 قارئًا مشهورًا", "قارئ مرخّص"], ["47 قارئًا معروفًا", "قارئ مرخّص"], ["47 قارئًا", "قارئ مرخّص"],
     ["47 reciters", "a licensed reciter"], ["47 qari", "qari berlisensi"],
     ["٤٧ قارئًا", "قارئ مرخّص"],
+    ["و`best-quran-reciters-video`", ""],
+    ["التلاوات من EveryAyah؛ لم نتحقق من تراخيص جميع التسجيلات للنشر أو الربح.", "التلاوة المتاحة حاليًا هي لعاقب عزيز المرخّصة؛ بقية التلاوات متوقفة مؤقتًا حتى توثيق حقوقها."],
+    ["EveryAyah للتلاوات", "أرشيف الإنترنت لتلاوة عاقب عزيز"],
+    ["مكتبات تلاوات مفتوحة (everyayah وغيرها) بجودات متعددة", "تلاوة مرخّصة بجودة عالية"],
   ];
   for (const r of rep) if (body.includes(r[0])) body = body.split(r[0]).join(r[1]);
+  if (isHtml || /text\/plain|json/i.test(ct)) {
+    body = body.replace(/<a\b[^>]*href="https:\/\/everyayah\.com"[^>]*>EveryAyah<\/a>/gi, "أرشيف الإنترنت (تلاوة عاقب عزيز)");
+    body = body.replace(/<link rel="dns-prefetch" href="https:\/\/everyayah\.com">\s*/gi, "");
+    body = body.replace(/everyayah(\.com)?/gi, "مكتبة التلاوات");
+  }
   if (isHtml) {
+    if (NOINDEX_PAGES.has(p)) body = body.replace(/<meta name="robots" content="[^"]*">/, '<meta name="robots" content="noindex, follow">');
     body = body.replace(/<a\b[^>]*href="\/\?r=(?!aaqib)[^"]*"[^>]*>[\s\S]*?<\/a>/g, "");
     body = body.replace(/(src|href)="(\/?js\/[a-z0-9-]+\.js\?v=\d+)"/g, '$1="$2&pub=1"');
     if (/^\/ar\/reciter\/[^/]+$/.test(p) || p === "/ar/reciters") {
@@ -127,7 +139,7 @@ async function serveAsset(request, env, p) {
   const headers = new Headers(res.headers);
   const am = /^\/articles\/([^/]+)(?:\/|$)/.exec(p);
   if (am && !KEEP_ARTICLES.has(am[1]) && /text\/html/i.test(ct)) headers.set("X-Robots-Tag", "noindex, follow");
-  if (RECITERS_PUBLIC_ONLY && /^\/ar\/reciter\/[^/]+$/.test(p) && /text\/html/i.test(ct)) headers.set("X-Robots-Tag", "noindex, follow");
+  if (RECITERS_PUBLIC_ONLY && (/^\/ar\/reciter\/[^/]+$/.test(p) || NOINDEX_PAGES.has(p)) && /text\/html/i.test(ct)) headers.set("X-Robots-Tag", "noindex, follow");
   if (!REWRITE_TYPES.test(ct) || res.status !== 200 || request.method === "HEAD") return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   let body = (await res.text()).split(OLD_HOST).join(NEW_HOST);
   if (RECITERS_PUBLIC_ONLY) body = publicOnlyText(body, p, ct);
