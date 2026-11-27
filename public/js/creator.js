@@ -506,14 +506,14 @@ const Creator = {
     try {
       if (!this.prepared) {
         note.innerHTML = `<span class="spin" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite"></span> جارٍ تحميل التلاوة…`;
-        const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
-          note.textContent = `تحميل التلاوة… ${toAr(d)}/${toAr(t)}`;
+        const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t, info) => {
+          note.textContent = info ? `تحميل التلاوة… ${toAr(info.pct)}٪ (${toAr(info.mb.toFixed(1))} م.ب)` : `تحميل التلاوة… ${toAr(d)}/${toAr(t)}`;
         });
         this.prepared = res.failed === 0;
         this._audioIssue = "";
         if (res.ok === 0) {
           AyahPlayer.prepareSilent(Selection.list());
-          this._audioIssue = "تعذّر تحميل الصوت — المعاينة بدون صوت. أوقفها ثم شغّلها لإعادة المحاولة.";
+          this._audioIssue = "تعذّر تحميل الصوت — المعاينة بدون صوت. أوقفها ثم شغّلها لإعادة المحاولة." + (/^licensed-chapter:/.test(AyahPlayer.lastPrepareError || "") ? " (" + AyahPlayer.lastPrepareError.replace(/^licensed-chapter:\s*/, "") + ")" : "");
         } else if (res.failed > 0) {
           this._audioIssue = `تعذّر تحميل ${toAr(res.failed)} آية — سيتم تخطّيها. أوقف المعاينة ثم شغّلها لإعادة المحاولة.`;
         }
@@ -705,10 +705,10 @@ const Creator = {
   async _prepareForExport(signal) {
     const note = $("#expStage");
     try {
-      const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t) => {
+      const res = await AyahPlayer.prepare(Selection.reciter, Selection.list(), (d, t, info) => {
         if (signal?.aborted) return;
         $("#expBar").style.width = Math.round((d / t) * 15) + "%";
-        note.textContent = `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
+        note.textContent = info ? `تحضير التلاوة… ${toAr(info.pct)}٪` : `تحضير التلاوة… ${toAr(d)}/${toAr(t)}`;
       }, signal);
       if (signal?.aborted) throw new Error("aborted");
       this.prepared = res.failed === 0;
