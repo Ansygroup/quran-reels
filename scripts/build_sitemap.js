@@ -21,7 +21,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const PUBLIC = path.join(ROOT, "public");
-const SITE = "https://quran-reels-tau.vercel.app";
+const SITE = "https://quranreels.chatora.us.ci";
 const MAP = path.join(PUBLIC, "sitemap.xml");
 const CHECK = process.argv.includes("--check");
 
@@ -71,11 +71,18 @@ if (fs.existsSync(MAP)) {
   }
 }
 
+/* SEO: only the first ARTICLE_KEEP hand-written articles (articles-index.json order) stay indexable;
+   the template-generated rest carry X-Robots-Tag noindex (src/worker.js) and are left out of the sitemap. */
+const ARTICLE_KEEP = 300;
+const articleDirsOnDisk = new Set(fs.readdirSync(path.join(PUBLIC, "articles")));
+const keepArticles = new Set(JSON.parse(fs.readFileSync(path.join(PUBLIC, "articles-index.json"), "utf8")).map((x) => x[0]).filter((s) => articleDirsOnDisk.has(s)).slice(0, ARTICLE_KEEP));
 const pages = walk(PUBLIC).filter(indexable);
 const entries = [];
 for (const file of pages) {
   const p = urlPathOf(file);
   if (/\s/.test(p)) continue;
+  const am = /^\/articles\/([^/]+)\/$/.exec(p);
+  if (am && !keepArticles.has(decodeURIComponent(am[1]))) continue;
   const lastmod = existing.get(decodeURIComponent(p)) || lastmodOf(file);
   entries.push({ path: p, lastmod });
 }
