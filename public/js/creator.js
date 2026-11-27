@@ -29,11 +29,48 @@ const Creator = {
     this._populateQuick();
     this._bind();
     this._applySelectionToUI();
+    this._applyChapterReciterLock();
     await this._applyBackground();
     this._syncVerses(true);
     this._loop();
     setInterval(() => this._updateClocks(), 500);
     this.ready = true;
+  },
+
+  /* ---------------- القارئ المرخّص (سورة كاملة) ---------------- */
+  _chapterInfo() {
+    return (typeof CHAPTER_RECITERS !== "undefined" && CHAPTER_RECITERS[Selection.reciter]) || null;
+  },
+  _applyChapterReciterLock() {
+    const ch = this._chapterInfo();
+    const ids = ["#txtFrom", "#txtTo", "#stepFromP", "#stepFromM", "#stepToP", "#stepToM"];
+    ids.forEach(id => { const x = $(id); if (x) x.disabled = !!ch; });
+    const notice = $("#reciterRightsNotice");
+    if (notice) {
+      if (!this._rightsDefault) this._rightsDefault = notice.innerHTML;
+      if (ch) {
+        const lic = ch.licenses[String(Selection.surah)] || "CC BY-SA 4.0";
+        notice.innerHTML = "هذه التلاوة مرخّصة للنشر وتحقيق الربح — التلاوة: عاقب عزيز (" + lic + "، المصدر: ويكيميديا كومنز). " + (lic === "CC0" ? "النسب مستحسن وليس إلزاميًا." : "يلزم ذكر «Aaqib Azeez, CC BY-SA 4.0» عند النشر.") + ' <a href="/terms/">تفاصيل الاستخدام</a>';
+        notice.classList.add("ok");
+      } else {
+        notice.innerHTML = this._rightsDefault;
+        notice.classList.remove("ok");
+      }
+    }
+    if (!ch) return;
+    const count = Quran.ayahCount(Selection.surah);
+    Selection.from = 1;
+    Selection.to = count;
+    const fromEl = $("#txtFrom"), toEl = $("#txtTo");
+    if (fromEl) fromEl.value = 1;
+    if (toEl) toEl.value = count;
+    const lic = ch.licenses[String(Selection.surah)];
+    this._audioIssue = lic
+      ? ""
+      : "تلاوة هذه السورة غير متاحة بعد لهذا القارئ (سورة القصص قيد إعادة التسجيل).";
+    toast(lic
+      ? "قارئ مرخّص: يشغّل السورة كاملة — التلاوة: عاقب عزيز (" + lic + ")"
+      : this._audioIssue, 4500);
   },
 
   /* ---------------- تعبئة العناصر ---------------- */
@@ -126,6 +163,7 @@ const Creator = {
       $("#txtFrom").value = Selection.from;
       $("#txtTo").value = Selection.to;
       $("#selFamous").value = "";
+      this._applyChapterReciterLock();
       this._syncVerses();
       save();
     });
@@ -158,6 +196,7 @@ const Creator = {
       Selection.reciter = e.target.value;
       this.prepared = false;
       this._audioIssue = "";
+      this._applyChapterReciterLock();
       save();
     });
 
