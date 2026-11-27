@@ -5,7 +5,9 @@ const vm = require('node:vm');
 const {catalog,validateTemplate}=require('../lib/reel_settings');
 const {parseTemplate,chooseRecipe,RECITERS}=require('../lib/autopilot');
 const source=fs.readFileSync('public/js/data.js','utf8');
-const browserCatalog=vm.runInNewContext(source+';({reciters:RECITERS.map(r=>r.folder), translations:TRANSLATIONS.map(t=>t.id), backgrounds:BACKGROUNDS.map(b=>b.id)})');
+const browserCatalog=vm.runInNewContext(source+';({reciters:RECITERS.filter(r=>!r.chapter).map(r=>r.folder), translations:TRANSLATIONS.map(t=>t.id), backgrounds:BACKGROUNDS.map(b=>b.id)})');
+// Chapter reciters (licensed full-surah audio) stay out of the automation catalog
+// until the pipeline supports chapter audio, so parity covers per-ayah reciters only.
 for (const key of ['translations','backgrounds']) assert.deepEqual(catalog[key],Array.from(browserCatalog[key]));
 assert.deepEqual(catalog.reciters.map(r=>r.id),Array.from(browserCatalog.reciters));
 assert.equal(RECITERS.length,47);
