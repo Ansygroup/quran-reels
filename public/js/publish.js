@@ -224,6 +224,7 @@ window.PublishApp = {
       if (seq !== this._initSeq || await window.AuthApp.getUserId() !== uid || seq !== this._initSeq) return;
     } catch {
       if (seq === this._initSeq) {
+        const lbl = document.getElementById("acctStateLabel"); if (lbl) lbl.textContent = "الخدمة غير متاحة مؤقتًا";
         const notice = document.getElementById("acctNotice");
         if (notice) { notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1"; notice.textContent = "تعذّر الاتصال لتحميل الحساب؛ قد تكون الحالة والسجل والمهام المعروضة قديمة. حاول مرة أخرى؛ تعديلاتك غير المحفوظة باقية في الصفحة."; }
       }
@@ -231,10 +232,11 @@ window.PublishApp = {
     }
     if (seq !== this._initSeq || this._settingsPending) return;
     if (!res.ok) {
+      if (res.status >= 500) { const lbl = document.getElementById("acctStateLabel"); if (lbl) lbl.textContent = "الخدمة غير متاحة مؤقتًا"; }
       const notice = document.getElementById("acctNotice");
       if (notice) {
         notice.hidden = false; notice.style.display = "block"; notice.dataset.loadError = "1";
-        notice.textContent = res.status === 401
+        notice.textContent = res.status === 503 ? "الخدمة غير متاحة مؤقتًا؛ حاول بعد قليل." : res.status === 401
           ? "سجّل الدخول مجددًا؛ قد تكون الحالة والسجل والمهام المعروضة قديمة."
           : "تعذّر تحديث الحساب؛ قد تكون الحالة والسجل والمهام المعروضة قديمة. حاول مرة أخرى؛ تعديلاتك غير المحفوظة باقية.";
       }
