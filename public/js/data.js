@@ -61,7 +61,9 @@ RECITERS.forEach(r => { if (!r.folder) r.folder = r.n2 || r.id; });
    ذكر «عاقب عزيز»)، وملفات CC BY-SA 4.0 تشترط النسب «Aaqib Azeez, CC BY-SA 4.0».
    سجل الرخص لكل ملف: docs/audio-license-log.tsv. سورة القصص (28) غير متاحة بعد.
    هذا القارئ يشغّل السورة كاملة فقط (لا يوجد توقيت موثوق لكل آية بعد). */
-const AAQIB_BASE = "https://audio.quranreels.chatora.us.ci/aaqib-azeez/murattal/";
+const AAQIB_BASE_CC0 = "https://archive.org/download/quran-murattal-aaqib-azeez-cc0/";
+const AAQIB_BASE_BYSA = "https://archive.org/download/quran-murattal-aaqib-azeez-by-sa/";
+const AAQIB_BASE = AAQIB_BASE_CC0;
 const AAQIB_CHAPTER_LICENSE = {
   "1": "CC0",
   "2": "CC0",
@@ -178,7 +180,14 @@ const AAQIB_CHAPTER_LICENSE = {
   "114": "CC0"
 };
 const CHAPTER_RECITERS = {
-  "aaqib-azeez-murattal": { base: AAQIB_BASE, licenses: AAQIB_CHAPTER_LICENSE },
+  "aaqib-azeez-murattal": {
+    base: AAQIB_BASE_CC0,
+    licenses: AAQIB_CHAPTER_LICENSE,
+    urlFor: function (num) {
+      const lic = this.licenses[String(parseInt(num, 10))];
+      return (lic === "CC BY-SA 4.0" ? AAQIB_BASE_BYSA : AAQIB_BASE_CC0) + num + ".mp3";
+    },
+  },
 };
 RECITERS.push({ id: "aaqib-azeez-murattal", folder: "aaqib-azeez-murattal", chapter: true, n: "عاقب عزيز — تلاوة مرخّصة (سورة كاملة)", tag: "مرخّص للنشر والربح" });
 
