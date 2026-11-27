@@ -173,7 +173,7 @@ registerTool("looper", {
     Quran.surahs.forEach(s => selS.appendChild(el("option", { value: s.n }, `${toAr(s.n)}. ${Quran.shortName(s.n)} (${toAr(s.count)})`)));
     selS.value = 112; $s("[data-t]").value = 4;
     const selR = $s("[data-rec]");
-    RECITERS.forEach(r => selR.appendChild(el("option", { value: r.folder }, r.n)));
+    VISIBLE_RECITERS.forEach(r => selR.appendChild(el("option", { value: r.folder }, r.n)));
     selR.value = Selection.reciter;
 
     let rep = 0, target = 5, playing = false, prepared = false;
