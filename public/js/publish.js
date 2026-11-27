@@ -1297,6 +1297,52 @@ window.PublishApp = {
   afterLogin() { return this.init(); },
   wireGlobals() { /* لا شيء مطلوب الآن — تُبقي النداء آمنًا */ },
   /* جدولة من صانع الريلز بعد التصدير: تحتاج رفع الفيديو إلى التخزين أولًا */
+  /* نافذة الرفع داخل الصفحة (بدل window.prompt): عنوان، خصوصية (الافتراضي خاص)، موعد نشر اختياري.
+   * تُرجع Promise بـ {title, privacy, publishAt} أو null عند الإلغاء. الحد الأدنى للجدولة 15 دقيقة. */
+  uploadDialog({ name, channel } = {}) {
+    return new Promise(resolve => {
+      const old = document.getElementById("ytUploadDlg"); if (old) old.remove();
+      const prev = document.activeElement;
+      const ov = document.createElement("div");
+      ov.id = "ytUploadDlg"; ov.className = "overlay show"; ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-labelledby", "ytDlgH");
+      const defTitle = ("ريلز قرآن — " + String(name || "").replace(/\.[a-z0-9]+$/i, "")).trim().slice(0, 100);
+      ov.innerHTML = `<div class="modal" style="text-align:right">
+        <h3 id="ytDlgH">رفع إلى يوتيوب</h3>
+        <p data-yt="channel"></p>
+        <label style="display:block;margin-top:12px">عنوان الفيديو<input data-yt="title" maxlength="100" style="width:100%;margin-top:4px" autocomplete="off"></label>
+        <label style="display:block;margin-top:12px">الخصوصية<select data-yt="privacy" style="width:100%;margin-top:4px"><option value="private" selected>خاص (موصى به)</option><option value="unlisted">غير مدرج</option><option value="public">علني</option></select></label>
+        <label data-yt="whenwrap" style="display:block;margin-top:12px">موعد نشر تلقائي (اختياري، بتوقيت جهازك)<input data-yt="when" type="datetime-local" style="width:100%;margin-top:4px"></label>
+        <p data-yt="err" role="alert" style="color:#ff8a8a;min-height:1.2em"></p>
+        <div style="display:flex;gap:10px;justify-content:flex-start;margin-top:8px"><button type="button" class="btn btn-em" data-yt="ok">رفع</button><button type="button" class="btn" data-yt="cancel">إلغاء</button></div></div>`;
+      const q = k => ov.querySelector(`[data-yt="${k}"]`);
+      q("channel").textContent = channel ? "القناة: " + channel : "سيُرفع إلى القناة الافتراضية المرتبطة";
+      q("title").value = defTitle;
+      const sync = () => { q("whenwrap").style.display = q("privacy").value === "private" ? "block" : "none"; };
+      q("privacy").onchange = sync; sync();
+      const done = v => { document.removeEventListener("keydown", onKey, true); ov.remove(); try { prev && prev.focus && prev.focus(); } catch {} resolve(v); };
+      const onKey = e => {
+        if (e.key === "Escape") { e.preventDefault(); done(null); }
+        else if (e.key === "Tab") { const f = [...ov.querySelectorAll("input,select,button")].filter(x => x.offsetParent !== null || x.style.display !== "none"); if (!f.length) return; const i = f.indexOf(document.activeElement); const n = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === f.length - 1 ? 0 : i + 1); e.preventDefault(); f[n].focus(); }
+      };
+      document.addEventListener("keydown", onKey, true);
+      q("cancel").onclick = () => done(null);
+      ov.addEventListener("click", e => { if (e.target === ov) done(null); });
+      q("ok").onclick = () => {
+        const title = q("title").value.trim().slice(0, 100), privacy = q("privacy").value;
+        if (!title) { q("err").textContent = "اكتب عنوانًا للفيديو"; q("title").focus(); return; }
+        let publishAt = "";
+        if (privacy === "private" && q("when").value) {
+          const d = new Date(q("when").value);
+          if (isNaN(d.getTime()) || d.getTime() < Date.now() + 15 * 60e3) { q("err").textContent = "الموعد غير صالح أو قريب جدًا (15 دقيقة على الأقل)"; q("when").focus(); return; }
+          publishAt = d.toISOString();
+        }
+        done({ title, privacy, publishAt });
+      };
+      document.body.appendChild(ov);
+      q("title").focus();
+    });
+  },
+
   /* رفع الفيديو المُصدَّر إلى يوتيوب مباشرة من المتصفح (رفع قابل للاستئناف).
    * الخادم يعطي توكن وصول قصير العمر فقط؛ الملف لا يمرّ عليه. الافتراضي «خاص» ويمكن ضبط موعد نشر. */
   async scheduleFromExport(blob, name) {
@@ -1308,19 +1354,11 @@ window.PublishApp = {
       const tr = await fetch("/api/youtube/token", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{}" });
       const tj = await tr.json().catch(() => ({}));
       if (!tr.ok || !tj.access_token) return say(tr.status === 404 ? "اربط قناة يوتيوب أولًا من صفحة الحساب" : (tj.error || "تعذّر الاتصال بيوتيوب؛ أعد ربط القناة"), "err");
-      const title = (window.prompt("عنوان الفيديو على يوتيوب (حتى 100 حرف):", "ريلز قرآن — " + (name || "").replace(/\.[a-z0-9]+$/i, "")) || "").trim().slice(0, 100);
-      if (!title) return say("أُلغي الرفع");
-      let privacy = (window.prompt("الخصوصية: private (خاص) أو unlisted (غير مدرج) أو public (علني)\nيُنصح بالخاص أولًا — تقدر تنشره من YouTube Studio.", "private") || "").trim().toLowerCase();
-      if (!["private", "unlisted", "public"].includes(privacy)) return say("خصوصية غير صالحة — أُلغي الرفع", "err");
-      let publishAt = "";
-      if (privacy === "private") {
-        const when = (window.prompt("موعد نشر تلقائي (اختياري) بتوقيت جهازك، مثل 2026-12-01 18:30 — اتركه فارغًا للبقاء خاصًا:", "") || "").trim();
-        if (when) {
-          const d = new Date(when.replace(" ", "T"));
-          if (isNaN(d.getTime()) || d.getTime() < Date.now() + 15 * 60e3) return say("الموعد غير صالح أو قريب جدًا (15 دقيقة على الأقل)", "err");
-          publishAt = d.toISOString();
-        }
-      }
+      let channel = "";
+      try { const lr = await fetch("/api/gw?op=list", { headers: { Authorization: `Bearer ${token}` } }); const lj = await lr.json(); const cs = (lj.connections || []).filter(c => c.platform === "youtube"); channel = ((cs.find(c => c.is_default) || cs[0] || {}).account_name) || ""; } catch { /* الاسم اختياري */ }
+      const choice = await this.uploadDialog({ name, channel });
+      if (!choice) return say("أُلغي الرفع");
+      const { title, privacy, publishAt } = choice;
       const meta = { snippet: { title, description: "قرآن كريم — تلاوة عاقب عزيز (CC0 / CC BY-SA 4.0).", categoryId: "22" }, status: { privacyStatus: privacy, selfDeclaredMadeForKids: false } };
       if (publishAt) meta.status.publishAt = publishAt;
       say("جارٍ بدء الرفع إلى يوتيوب…");
