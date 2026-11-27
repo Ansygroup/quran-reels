@@ -191,6 +191,14 @@ const CHAPTER_RECITERS = {
 };
 RECITERS.push({ id: "aaqib-azeez-murattal", folder: "aaqib-azeez-murattal", chapter: true, n: "عاقب عزيز — تلاوة مرخّصة (سورة كاملة)", tag: "مرخّص للنشر والربح" });
 
+/* ---------- إخفاء القرّاء غير الموثّقين من الواجهة العامة ----------
+   الرخصة موثّقة لعاقب عزيز فقط. كل القرّاء الآخرين يبقون في RECITERS (البيانات محفوظة)
+   لكن عليهم hidden:true وrights:"unverified".
+   لإرجاعهم كلهم: اجعل RECITERS_PUBLIC_ONLY = false (وفي src/worker.js اجعل RECITERS_PUBLIC_ONLY = false أيضًا). */
+const RECITERS_PUBLIC_ONLY = true;
+RECITERS.forEach(r => { if (r.chapter) { r.rights = "licensed"; } else { r.hidden = true; r.rights = "unverified"; } });
+const VISIBLE_RECITERS = RECITERS.filter(r => !(RECITERS_PUBLIC_ONLY && r.hidden));
+
 /* ---------- الترجمات ---------- */
 const TRANSLATIONS = [
   { id: "none", n: "بدون ترجمة (عربي فقط)" },
