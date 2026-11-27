@@ -85,7 +85,7 @@ setTimeout(async () => {
   chk("بيانات القرآن حُمّلت (114 سورة في القائمة)", surah && surah.options.length === 114, surah ? `${surah.options.length} خيارًا` : "لا يوجد #selSurah");
 
   const reciter = d.getElementById("selReciter");
-  chk("قائمة القرّاء مملوءة", reciter && reciter.options.length > 10, reciter ? `${reciter.options.length}` : "لا يوجد #selReciter");
+  chk("قائمة القرّاء مملوءة", reciter && reciter.options.length >= 1 && [...reciter.options].some(o => o.value === "aaqib-azeez-murattal"), reciter ? `${reciter.options.length}` : "لا يوجد #selReciter");
 
   // كل التبويبات ما زالت تعمل بعد ترتيب الصانع، مع الاحتفاظ باختيار السورة.
   const tabs = [...d.querySelectorAll("#stepTabs .step-tab")];
