@@ -152,15 +152,14 @@
     msg.textContent = "جارٍ الإرسال…";
     try {
       const cfg = await (await fetch("/api/app-config")).json();
-      const s = cfg && cfg.supabase;
-      if (!s || !s.url || !s.anon) throw new Error("config");
-      const r = await fetch(s.url + "/rest/v1/rpc/submit_contact", {
+      const fb = cfg && cfg.firebase;
+      if (!fb || !fb.apiKey || !fb.projectId) throw new Error("config");
+      const r = await fetch("https://firestore.googleapis.com/v1/projects/" + fb.projectId + "/databases/(default)/documents/contact_messages?key=" + encodeURIComponent(fb.apiKey), {
         method: "POST",
-        headers: { apikey: s.anon, Authorization: "Bearer " + s.anon, "Content-Type": "application/json" },
-        body: JSON.stringify({ p_name: name, p_email: email, p_message: message, p_user_agent: (navigator.userAgent || "").slice(0, 300) })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: { name: { stringValue: name.slice(0, 100) }, email: { stringValue: email.slice(0, 200) }, message: { stringValue: message.slice(0, 3000) }, ua: { stringValue: (navigator.userAgent || "").slice(0, 300) }, at: { stringValue: new Date().toISOString() } } })
       });
-      const j = r.ok ? await r.json() : null;
-      if (!r.ok || !j || !j.ok) throw new Error(r.status);
+      if (!r.ok) throw new Error(r.status);
       f.reset(); msg.textContent = "وصلتنا رسالتك — شكرًا لك! ✉️";
     } catch { msg.textContent = "تعذّر الإرسال الآن؛ جرّب بعد قليل من فضلك."; }
   });

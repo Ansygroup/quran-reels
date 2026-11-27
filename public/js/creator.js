@@ -85,7 +85,7 @@ const Creator = {
     const sel = $("#selReciter");
     sel.innerHTML = "";
     RECITERS.forEach((r, i) => {
-      sel.appendChild(el("option", { value: r.folder }, r.n + (r.tag ? ` — ${r.tag}` : "")));
+      sel.appendChild(el("option", { value: r.folder }, r.n + (r.tag ? ` — ${r.tag}` : "") + (r.chapter ? "" : " — حقوق غير موثّقة، للاستخدام الشخصي")));
     });
   },
   _populateTranslations() {

@@ -1730,6 +1730,7 @@ window.QRAuthUI = (function () {
         const b = $("authBtn"), exit = $("acctSignOut"), status = $("acctSignOutStatus");
         if (b) b.textContent = u ? "🟢 حسابي" : "🔑 دخول";
         if (exit) exit.hidden = !u;
+        { const av = $("view-account"); if (av) av.style.visibility = u ? "" : "hidden"; }
         if (u?.id) { signOutAttempt++; if (status) status.hidden = true; close(); }
         // Logout should not automatically reopen the login dialog.
         if (u?.id && /^#\/account(\?|$)/.test(window.location.hash || "")) window.PublishApp.init();
@@ -1737,6 +1738,7 @@ window.QRAuthUI = (function () {
       const b = $("authBtn"), exit = $("acctSignOut");
       if (b) b.textContent = QRAuth.user() ? "🟢 حسابي" : "🔑 دخول";
       if (exit) exit.hidden = !QRAuth.user();
+      { const av = $("view-account"); if (av) av.style.visibility = QRAuth.user() ? "" : "hidden"; }
     } catch {}
   }
 

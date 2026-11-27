@@ -388,70 +388,48 @@ registerTool("khatma", {
 /* ---------------- سحابة الختمة: مزامنة Supabase (اختيارية، مع تراجع صامت للتخزين المحلي) ---------------- */
 const KhatmaCloud = (() => {
   let cfg = null, pending = null;
-  const load = () => pending || (async () => {
+  const load = () => pending || (pending = (async () => {
     try {
       const r = await fetch("/api/app-config", { cache: "no-store" });
       const j = await r.json();
-      if (j && j.supabase && j.supabase.url && j.supabase.anon) cfg = j.supabase;
+      if (j && j.firebase && j.firebase.apiKey && j.firebase.projectId) cfg = j.firebase;
     } catch {}
     return cfg;
-  })();
-  const headers = () => ({ apikey: cfg.anon, Authorization: "Bearer " + cfg.anon, "Content-Type": "application/json" });
+  })());
+  const base = () => `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents`;
+  const key = () => "?key=" + encodeURIComponent(cfg.apiKey);
+  const pid = (planId, member) => (String(planId) + "~" + encodeURIComponent(member)).replace(/%/g, "_").slice(0, 200);
+  const send = (path, fields) => fetch(`${base()}/${path}${key()}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }),
+  }).catch(() => {});
   return {
     ready: async () => !!(await load()),
     async getRows(planId) {
       try {
-        const r = await fetch(`${cfg.url}/rest/v1/khatma_progress?plan_id=eq.${encodeURIComponent(planId)}`, { headers: headers() });
+        const r = await fetch(`${base()}:runQuery${key()}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "khatma_progress" }], where: { fieldFilter: { field: { fieldPath: "plan_id" }, op: "EQUAL", value: { stringValue: String(planId) } } }, limit: 200 } }),
+        });
         if (!r.ok) return null;
-        return await r.json();
+        const j = await r.json();
+        return j.filter(x => x.document).map(x => {
+          const f = x.document.fields || {};
+          return { plan_id: planId, member: f.member && f.member.stringValue || "", done: Number(f.done && f.done.integerValue || 0) };
+        });
       } catch { return null; }
     },
     putRow(planId, member, done) {
-      // PATCH ثم INSERT (بدل upsert) — متوافق مع صلاحيات الأعمدة المحدودة
-      const path = `${cfg.url}/rest/v1/khatma_progress?plan_id=eq.${encodeURIComponent(planId)}&member=eq.${encodeURIComponent(member)}`;
-      const doInsert = () => fetch(`${cfg.url}/rest/v1/khatma_progress`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ plan_id: planId, member, done }),
-      }).then(r => {
-        if (!r.ok && r.status === 409) {
-          fetch(path, { method: "PATCH", headers: headers(), body: JSON.stringify({ done }) }).catch(() => {});
-        }
-        return r;
-      }).catch(() => {});
-      fetch(path, {
-        method: "PATCH",
-        headers: { ...headers(), Prefer: "return=representation" },
-        body: JSON.stringify({ done }),
-      }).then(r => (r.ok ? r.text() : "")).then(txt => {
-        const rows = txt ? (() => { try { return JSON.parse(txt); } catch { return null; } })() : [];
-        if (!Array.isArray(rows) || rows.length === 0) doInsert();
-      }).catch(() => doInsert());
+      return send("khatma_progress/" + pid(planId, member), {
+        plan_id: { stringValue: String(planId) }, member: { stringValue: String(member).slice(0, 40) }, done: { integerValue: String(Math.max(0, Math.floor(Number(done) || 0))) },
+      });
     },
     putPlan(planId, plan) {
-      const path = `${cfg.url}/rest/v1/khatma_plans?plan_id=eq.${encodeURIComponent(planId)}`;
-      const doInsert = () => fetch(`${cfg.url}/rest/v1/khatma_plans`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ plan_id: planId, plan }),
-      }).then(r => {
-        if (!r.ok && r.status === 409) {
-          fetch(path, { method: "PATCH", headers: headers(), body: JSON.stringify({ plan }) }).catch(() => {});
-        }
-        return r;
-      }).catch(() => {});
-      fetch(path, {
-        method: "PATCH",
-        headers: { ...headers(), Prefer: "return=representation" },
-        body: JSON.stringify({ plan }),
-      }).then(r => (r.ok ? r.text() : "")).then(txt => {
-        const rows = txt ? (() => { try { return JSON.parse(txt); } catch { return null; } })() : [];
-        if (!Array.isArray(rows) || rows.length === 0) doInsert();
-      }).catch(() => doInsert());
+      return send("khatma_plans/" + encodeURIComponent(planId), {
+        plan_id: { stringValue: String(planId) }, plan: { stringValue: JSON.stringify(plan).slice(0, 7900) },
+      });
     },
   };
 })();
-
 /* ---------------- ختمة جماعية (رابط) ---------------- */
 registerTool("group-khatma", {
   name: "ختمة جماعية", icon: "👥", desc: "أنشئ خطة ختمة وشاركها برابط — كل واحد يتتبع نسخته",

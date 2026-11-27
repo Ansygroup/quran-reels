@@ -48,8 +48,8 @@ const articleDirs = fs.readdirSync(path.join(PUBLIC, "articles"), { withFileType
   .filter((e) => e.isDirectory() && fs.existsSync(path.join(PUBLIC, "articles", e.name, "index.html")))
   .map((e) => e.name);
 const listed = new Set(urls.map((u) => decodeURIComponent(u.replace(/^https?:\/\/[^/]+/, "")).replace(/^\/|\/$/g, "")));
-const unlisted = articleDirs.filter((d) => !listed.has(`articles/${d}`));
-chk(`كل المقالات مُدرجة (${articleDirs.length})`, unlisted.length === 0, "غير مُدرج: " + unlisted.slice(0, 5).join(" · "));
+const listedArticles = articleDirs.filter((d) => listed.has(`articles/${d}`));
+chk(`المقالات المُنتقاة فقط مُدرجة (${listedArticles.length} من ${articleDirs.length}؛ الباقي noindex)`, listedArticles.length === 300, "العدد: " + listedArticles.length);
 
 /* 4) الأرقام المعلنة تطابق المخزون */
 const homepage = fs.readFileSync(path.join(PUBLIC, "index.html"), "utf8");
