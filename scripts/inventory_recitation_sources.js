@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'public/js/data.js'), 'utf8');
 const context = vm.createContext({});
 vm.runInContext(source, context, { timeout: 1000 });
-const rows = vm.runInContext('RECITERS.map(({id, n, folder}) => ({id, name: n, folder}))', context);
+const rows = vm.runInContext('RECITERS.map(({id, n, folder, chapter}) => ({id, name: n, folder, chapter: !!chapter}))', context);
 const output = {
   description: 'Configured folder inventory, not proof of existence, identity or license. Recording rights require individual verification.',
   source: 'public/js/data.js',
