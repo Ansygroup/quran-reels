@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),http=require('n
 const {chromium}=require('playwright-core'),chrome=require('@sparticuz/chromium').default;
 const root=path.resolve(__dirname,'../public');
 const server=http.createServer((req,res)=>{
- const u=new URL(req.url,'http://localhost');if(u.pathname.startsWith('/api/'))return res.writeHead(200,{'Content-Type':'application/json'}).end(u.pathname==='/api/app-config'?JSON.stringify({supabase:{url:'https://auth.test',anon:'test-key'}}):'{}');
+ const u=new URL(req.url,'http://localhost');if(u.pathname.startsWith('/api/'))return res.writeHead(200,{'Content-Type':'application/json'}).end(u.pathname==='/api/app-config'?JSON.stringify({firebase:{apiKey:'test-key'}}):'{}');
  const f=path.resolve(root,'.'+(u.pathname==='/'?'/index.html':u.pathname));if(!f.startsWith(root+path.sep))return res.writeHead(403).end();
  fs.readFile(f,(e,data)=>e?res.writeHead(404).end():res.writeHead(200,{'Content-Type':({'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json'})[path.extname(f)]||'application/octet-stream'}).end(data));
 });
@@ -24,10 +24,10 @@ const server=http.createServer((req,res)=>{
    }
    if(String(url).includes('op=list'))return {ok:true,json:async()=>({connections:[]})};
    if(String(url).includes('/auth/v1/logout')) { window.__logoutCount=(window.__logoutCount||0)+1; window.__logoutRequest={url:String(url),authorization:opts.headers?.Authorization}; if(!window.__delayLogout)return {ok:true,status:204}; return new Promise(resolve=>window.__finishLogout=(ok)=>resolve({ok,status:ok?204:503,json:async()=>({})})); }
-   if(String(url)==='/api/app-config')return {ok:true,json:async()=>({supabase:{url:'https://auth.test',anon:'test-key'}})};
+   if(String(url)==='/api/app-config')return {ok:true,json:async()=>({firebase:{apiKey:'test-key'}})};
    return original(url,opts);
   };
-  window.__emitUser=(id)=>{const session=id?{access_token:'token-'+id,refresh_token:'refresh-'+id,expires_at:Date.now()+3600000,user:{id,email:id+'@example.test'}}:null;const value=session?JSON.stringify(session):null;if(value)localStorage.setItem('qr_session',value);else localStorage.removeItem('qr_session');window.dispatchEvent(new StorageEvent('storage',{key:'qr_session',newValue:value}));};
+  window.__emitUser=(id)=>{const session=id?{access_token:'token-'+id,refresh_token:'refresh-'+id,expires_at:Date.now()+3600000,user:{id,email:id+'@example.test'}}:null;const value=session?JSON.stringify(session):null;if(value)localStorage.setItem('qr_fb_session',value);else localStorage.removeItem('qr_fb_session');window.dispatchEvent(new StorageEvent('storage',{key:'qr_fb_session',newValue:value}));};
  });
  await page.evaluate(()=>window.__emitUser('a'));await page.waitForFunction(()=>document.querySelector('#queueList').textContent.includes('تفاصيل الحساب الأول'));
  assert.equal(await page.evaluate(()=>PublishApp._accountOwner),'a');
@@ -47,22 +47,17 @@ const server=http.createServer((req,res)=>{
  // A different tab changes storage after the confirmation starts, before a
  // storage event arrives. The button must not sign out the newer session.
  const countBefore=await page.evaluate(()=>window.__logoutCount||0);
- await page.evaluate(()=>{window.__savedConfirm=window.confirm;window.confirm=()=>{const session={access_token:'token-b',refresh_token:'refresh-b',expires_at:Date.now()+3600000,user:{id:'b',email:'b@example.test'}};localStorage.setItem('qr_session',JSON.stringify(session));return true}});
+ await page.evaluate(()=>{window.__savedConfirm=window.confirm;window.confirm=()=>{const session={access_token:'token-b',refresh_token:'refresh-b',expires_at:Date.now()+3600000,user:{id:'b',email:'b@example.test'}};localStorage.setItem('qr_fb_session',JSON.stringify(session));return true}});
  await page.locator('#acctSignOut').click();
  await page.waitForFunction(()=>document.querySelector('#acctSignOutStatus').textContent.includes('تغيّرت الجلسة'));
  assert.equal(await page.evaluate(()=>QRAuth.user().id),'b');assert.equal(await page.evaluate(()=>window.__logoutCount||0),countBefore);
  await page.evaluate(()=>{window.confirm=window.__savedConfirm;window.__emitUser('a')});await page.waitForFunction(()=>document.querySelector('#queueList').textContent.includes('تفاصيل الحساب الأول'));
  page.once('dialog',dialog=>dialog.dismiss());await page.locator('#acctSignOut').click();assert.equal(await page.evaluate(()=>QRAuth.user().id),'a');
- page.once('dialog',dialog=>dialog.accept());await page.locator('#acctSignOut').click();
- await page.waitForFunction(()=>typeof window.__finishLogout==='function');
- assert.equal(await page.evaluate(()=>QRAuth.user()),null);assert.equal(await page.locator('#queueList').textContent(),'');assert.equal(await page.locator('#loginOverlay').isVisible(),false);
- assert.match((await page.evaluate(()=>window.__logoutRequest)).url,/logout\?scope=local/);assert.equal((await page.evaluate(()=>window.__logoutRequest)).authorization,'Bearer token-a');
- await page.evaluate(()=>window.__finishLogout(false));await page.waitForFunction(()=>document.querySelector('#acctSignOutStatus').textContent.includes('لم يتأكد'));
- assert.match(await page.locator('#acctSignOutStatus').textContent(),/الأتمتة والمهام لا تتوقف/);
- // A later response for A must not display its result over B.
- await page.evaluate(()=>{window.__finishLogout=null;window.__emitUser('a')});await page.waitForFunction(()=>!document.querySelector('#acctSignOut').hidden);
- page.once('dialog',dialog=>dialog.accept());await page.locator('#acctSignOut').click();await page.waitForFunction(()=>typeof window.__finishLogout==='function');
- await page.evaluate(()=>{window.__emitUser('b');window.__finishLogout(true)});await page.waitForTimeout(100);
- assert.equal(await page.evaluate(()=>QRAuth.user().id),'b');assert.equal(await page.locator('#acctSignOutStatus').isVisible(),false);assert.deepEqual(errors,[]);
- await ctx.close();console.log('ALL OK: real browser auth events clear old account immediately; late response ignored; no network or publishing');
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#acctSignOut').click();
+ await page.waitForFunction(()=>QRAuth.user()===null);
+ assert.equal(await page.locator('#queueList').textContent(),'');assert.equal(await page.locator('#loginOverlay').isVisible(),false);
+ await page.waitForFunction(()=>document.querySelector('#acctSignOutStatus').textContent.includes('تم مسح الجلسة المحلية'));
+ assert.match(await page.locator('#acctSignOutStatus').textContent(),/الأتمتة والمهام لا تتوقف/);assert.equal(await page.evaluate(()=>window.__logoutCount||0),0,'Firebase sign-out is local, no remote request');
+ assert.deepEqual(errors,[]);
+ await ctx.close();console.log('ALL OK: real browser auth events clear old account immediately; other-tab session change protected; no network or publishing');
 }finally{if(browser)await browser.close();server.close()}})().catch(e=>{console.error(e);server.close();process.exitCode=1});
