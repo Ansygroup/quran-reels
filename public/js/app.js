@@ -120,7 +120,7 @@ async function mountTool(id) {
 document.addEventListener("DOMContentLoaded", async () => {
   // السنة — عناصر اختيارية: غيابها كان يوقف بقية الإقلاع (الراوتر + الصانع)
   const yearEl = $("#year"); if (yearEl) yearEl.textContent = new Date().getFullYear();
-  const statReciters = $("#statReciters"); if (statReciters) statReciters.textContent = toAr(RECITERS.length);
+  const statReciters = $("#statReciters"); if (statReciters) statReciters.textContent = toAr(VISIBLE_RECITERS.length);
 
   // القائمة الجوّالة
   $("#burger")?.addEventListener("click", () => $("#mainNav")?.classList.toggle("open"));
@@ -238,7 +238,7 @@ function handlePending() {
     sessionStorage.removeItem("qr_pending_reel");
     try {
       const { s, a, from, to, r } = JSON.parse(reel);
-      if (r && typeof RECITERS !== "undefined" && RECITERS.some(x => x.folder === r)) {
+      if (r && typeof RECITERS !== "undefined" && VISIBLE_RECITERS.some(x => x.folder === r)) {
         try {
           Selection.reciter = r;
           const sr = $("#selReciter");
