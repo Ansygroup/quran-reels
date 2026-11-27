@@ -92,6 +92,35 @@ const AyahPlayer = {
     this.lastPrepareError = "";
     this.estimates = ayat.map(v => this.estimate(v.s, v.a));
     this.ensureCtx();
+    // وضع السورة الكاملة للقارئ المرخّص (عاقب عزيز): ملف واحد لكل سورة على تخزيننا.
+    // لا تتوفر توقيتات موثوقة لكل آية لهذا التسجيل، لذا تُقسَّط المدد التقديرية
+    // على المدة الحقيقية للملف، والواجهة تقيّد الاختيار بالسورة كاملة.
+    this._chapter = (typeof CHAPTER_RECITERS !== "undefined" && CHAPTER_RECITERS[reciter] && ayat.length)
+      ? { info: CHAPTER_RECITERS[reciter], surah: ayat[0].s } : null;
+    if (this._chapter) {
+      const ch = this._chapter;
+      const key = reciter + "/ch" + ch.surah;
+      if (!this.cache.has(key)) {
+        const num = String(ch.surah).padStart(3, "0");
+        try {
+          const buf = await this._fetchAudio(ch.info.base + num + ".mp3", 60000, signal);
+          if (signal?.aborted) throw new Error("aborted");
+          const audio = await this._awaitAudio(this.ctx.decodeAudioData(buf), signal);
+          if (signal?.aborted) throw new Error("aborted");
+          this.cache.set(key, audio);
+        } catch (e) {
+          if (signal?.aborted) throw new Error("aborted");
+          this.lastPrepareError = "licensed-chapter: " + String((e && e.message) || e).slice(0, 120);
+          return { ok: 0, total: ayat.length, failed: ayat.length };
+        }
+      }
+      const audio = this.cache.get(key);
+      const sum = this.estimates.reduce((a, b) => a + b, 0) || 1;
+      const scale = audio.duration / sum;
+      this.estimates = this.estimates.map(e2 => e2 * scale);
+      onProgress && onProgress(ayat.length, ayat.length);
+      return { ok: ayat.length, total: ayat.length, failed: 0 };
+    }
     const deadline = Date.now() + 45000; // ميزانية إرشادية للوسيط، وليست سقفًا كليًا للمحاولات البديلة.
     let done = 0;
     const errs = [];
@@ -171,12 +200,44 @@ const AyahPlayer = {
     this.index = Math.max(0, Math.min(fromIndex, this.ayat.length - 1));
     this.offset = fromOffset;
     this.playing = true; this.paused = false;
+    this._chapterPausedAt = null;
     this._startCurrent();
     this._loop();
     this.onState && this.onState(true);
   },
 
+  /** تشغيل ملف السورة الكامل من إزاحة داخله (وضع القارئ المرخّص) */
+  _playChapter(chapterOffset) {
+    const buf = this.cache.get(this.reciter + "/ch" + this._chapter.surah);
+    if (!buf) { this.playing = false; this.onEnd && this.onEnd(); this.onState && this.onState(false); return; }
+    this.stopSource();
+    const off = Math.min(Math.max(0, chapterOffset || 0), buf.duration - 0.05);
+    // حدّث الفهرس الحالي من الإزاحة
+    let i = 0;
+    while (i < this.ayat.length - 1 && off >= this.elapsedBefore(i + 1)) i++;
+    this.index = i;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.gain);
+    src.start(0, off);
+    this._chapterStart = this.ctx.currentTime - off;
+    this._src = src;
+    this.onAyah && this.onAyah(this.index);
+    src.onended = () => {
+      if (this._src !== src || !this.playing || this.paused) return;
+      this.playing = false; this._src = null;
+      this.onEnd && this.onEnd();
+      this.onState && this.onState(false);
+    };
+  },
+
   _startCurrent() {
+    if (this._chapter && !this.silent) {
+      const chOff = this._chapterPausedAt != null ? this._chapterPausedAt : this.elapsedBefore(this.index) + (this.offset || 0);
+      this._chapterPausedAt = null;
+      this._playChapter(chOff);
+      return;
+    }
     if (this.silent) {
       this._silentStart = performance.now() - this.offset * 1000;
       this.onAyah && this.onAyah(this.index);
@@ -217,6 +278,16 @@ const AyahPlayer = {
     const step = () => {
       if (!this.playing || this.paused) return;
       let ayahElapsed;
+      if (this._chapter && !this.silent) {
+        const chElapsed = this.ctx.currentTime - this._chapterStart;
+        let i = this.index;
+        while (i < this.ayat.length - 1 && chElapsed >= this.elapsedBefore(i + 1)) i++;
+        if (i !== this.index) { this.index = i; this.onAyah && this.onAyah(i); }
+        ayahElapsed = chElapsed - this.elapsedBefore(this.index);
+        this.onTick && this.onTick(Math.min(chElapsed, this.totalDuration()), this.totalDuration(), this.index, ayahElapsed);
+        if (this.playing) this._raf = requestAnimationFrame(step);
+        return;
+      }
       if (this.silent) {
         ayahElapsed = (performance.now() - this._silentStart) / 1000;
         /* في الوضع الصامت لا يوجد onended يُحرّك الآية التالية، فكان `return`
@@ -248,7 +319,10 @@ const AyahPlayer = {
   pause() {
     if (!this.playing || this.paused) return;
     this.paused = true;
-    if (!this.silent) {
+    if (this._chapter && !this.silent) {
+      this._chapterPausedAt = Math.max(0, this.ctx.currentTime - this._chapterStart);
+      this.stopSource();
+    } else if (!this.silent) {
       this.offset = Math.max(0, this.ctx.currentTime - this.startedAt);
       this.stopSource();
     } else {
@@ -295,6 +369,11 @@ const AyahPlayer = {
   },
 
   elapsed() {
+    if (this._chapter && !this.silent) {
+      if (!this.playing) return this.elapsedBefore(this.index);
+      const e = this.paused && this._chapterPausedAt != null ? this._chapterPausedAt : this.ctx.currentTime - this._chapterStart;
+      return Math.min(Math.max(e, 0), this.totalDuration());
+    }
     if (this.silent || !this.playing) return this.elapsedBefore(this.index) + (this.paused ? this.offset : 0);
     const e = this.ctx.currentTime - this.startedAt;
     return this.elapsedBefore(this.index) + Math.min(Math.max(e, 0), this.durationAt(this.index));
