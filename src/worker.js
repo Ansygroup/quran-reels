@@ -147,6 +147,39 @@ async function serveAsset(request, env, p) {
   return new Response(body, { status: res.status, statusText: res.statusText, headers });
 }
 
+// The YouTube OAuth, channel, publish and autopilot routes run on the Vercel deployment (Supabase DB, headless Chrome).
+// The worker forwards them with cookies and Authorization intact. Reciter choice is enforced here too.
+const API_PROXY_ENABLED = false; // flip to true after the Vercel backend runs this branch and accepts Firebase tokens
+const API_ORIGIN = "https://quran-reels-tau.vercel.app";
+const API_ROUTES = /^\/api\/(autopilot|gw|oauth|social|publish|contact)$/;
+const AAQIB_ID = "aaqib-azeez-murattal";
+async function forwardApi(request, url, p) {
+  let body;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    body = await request.text();
+    if (p === "/api/autopilot" && RECITERS_PUBLIC_ONLY && body) {
+      let j = null;
+      try { j = JSON.parse(body); } catch {}
+      const t = j && typeof j === "object" ? (j.template || j) : null;
+      if (t && typeof t === "object") {
+        const r = typeof t.reciter === "string" ? t.reciter : "";
+        if ((t.reciter_mode === "fixed" || r) && r !== AAQIB_ID) return json(400, { error: "القارئ المتاح حاليًا هو عاقب عزيز فقط" });
+      }
+    }
+  }
+  const h = new Headers();
+  for (const k of ["authorization", "cookie", "content-type", "accept", "accept-language", "user-agent"]) { const v = request.headers.get(k); if (v) h.set(k, v); }
+  h.set("x-forwarded-host", url.host);
+  let r;
+  try { r = await fetch(API_ORIGIN + p + url.search, { method: request.method, headers: h, body, redirect: "manual" }); }
+  catch { return json(503, { error: "This feature is temporarily unavailable.", code: "unavailable" }); }
+  const out = new Headers(r.headers);
+  out.delete("content-encoding"); out.delete("content-length");
+  const loc = out.get("location");
+  if (loc && loc.startsWith(API_ORIGIN)) out.set("location", loc.slice(API_ORIGIN.length) || "/");
+  return new Response(request.method === "HEAD" ? null : r.body, { status: r.status, headers: out });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -161,6 +194,7 @@ export default {
     }
     if (p === "/api/ip") return ip(request);
     if (p === "/api/app-config") return json(200, { firebase: { apiKey: "AIzaSyBBnc-2ZHZZVny_AS83LRON5070AllrM38", projectId: "booming-banner-477420-h3", googleClientId: "174209487989-e09fq602et8pvn9ooaj0pqpj6t4ubd04.apps.googleusercontent.com" } }, "public, max-age=3600, s-maxage=3600");
+    if (API_PROXY_ENABLED && API_ROUTES.test(p)) return forwardApi(request, url, p);
     if (p.startsWith("/api/")) return json(503, { error: "This feature is temporarily unavailable.", code: "unavailable" });
     return serveAsset(request, env, p);
   },
