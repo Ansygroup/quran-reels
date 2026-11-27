@@ -25,7 +25,7 @@ const server = http.createServer((req, res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const { default: binary } = await import(pathToFileURL(require.resolve('@sparticuz/chromium')).href);
     browser = await chromium.launch({ executablePath: await binary.executablePath(), headless: true, args: [...binary.args, '--disable-gpu'] });
-    const context = await browser.newContext({ viewport: { width: Number(process.env.REEL_TEST_WIDTH || 900), height: 1200 }, serviceWorkers: 'block' });
+    const context = await browser.newContext({ viewport: { width: Number(process.env.REEL_TEST_WIDTH || 900), height: 1200 }, serviceWorkers: 'block' });await context.addInitScript(()=>{try{localStorage.setItem('qr_fb_session',JSON.stringify({access_token:'fixture',refresh_token:'fixture',expires_at:Date.now()+36e5,user:{id:'u',email:'fixture@example.test',name:'fixture'}}))}catch{}});
     await context.route('**/*', route => {
       let url; try { url = new URL(route.request().url()); } catch { return route.abort(); }
       return url.origin === origin ? route.continue() : route.abort();
