@@ -317,9 +317,10 @@ const FAMOUS = [
 const RADIOS = [
   { id: "mix", n: "إذاعة القرآن متعدد القراء", url: "https://qurango.net/radio/mix" },
   { id: "tarateel", n: "إذاعة التراتيل", url: "https://qurango.net/radio/tarateel" },
-  { id: "maher", n: "إذاعة ماهر المعيقلي", url: "https://qurango.net/radio/maher" },
-  { id: "ajmi", n: "إذاعة أحمد العجمي", url: "https://qurango.net/radio/ajmi" },
+  { id: "maher", n: "إذاعة ماهر المعيقلي", url: "https://qurango.net/radio/maher", hidden: true, rights: "unverified" },
+  { id: "ajmi", n: "إذاعة أحمد العجمي", url: "https://qurango.net/radio/ajmi", hidden: true, rights: "unverified" },
 ];
+const VISIBLE_RADIOS = RADIOS.filter(r => !(RECITERS_PUBLIC_ONLY && r.hidden));
 
 /* ---------- أسماء الله الحسنى ---------- */
 const ASMA = [
