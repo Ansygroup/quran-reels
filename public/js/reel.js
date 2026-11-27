@@ -874,6 +874,53 @@ const ReelRecorder = {
     return "";
   },
 
+  /* كل الصيغ المدعومة بالترتيب؛ وضع التوافق يقدّم webm ويستبعد mp4 المعطوب في بعض المتصفحات. */
+  pickMimes(compat) {
+    const cands = compat
+      ? ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp9,opus", "video/webm"]
+      : ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm;codecs=h264,opus", "video/webm"];
+    return cands.filter(m => { try { return !!(window.MediaRecorder && MediaRecorder.isTypeSupported(m)); } catch { return false; } });
+  },
+
+  /* MediaRecorder يكتب webm بلا مدّة (Infinity)؛ نضيف عنصر Duration إلى Info ونتحقق من وجود مسار صوت. */
+  async fixWebmDuration(blob, seconds) {
+    try {
+      if (!/webm/i.test(blob.type) || !(seconds > 0)) return { blob, audio: null, fixed: false };
+      const head = new Uint8Array(await blob.slice(0, 4096).arrayBuffer());
+      const find = (arr, pat, from = 0) => { outer: for (let i = from; i <= arr.length - pat.length; i++) { for (let j = 0; j < pat.length; j++) if (arr[i + j] !== pat[j]) continue outer; return i; } return -1; };
+      const audio = find(head, [0x83, 0x81, 0x02]) >= 0;
+      const vint = (pos, keep) => {
+        const f = head[pos]; let n = 1;
+        for (let m = 0x80; n <= 8 && !(f & m); m >>= 1) n++;
+        if (n > 8 || pos + n > head.length) return null;
+        let v = keep ? f : f & (0xFF >> n);
+        for (let i = 1; i < n; i++) v = v * 256 + head[pos + i];
+        return { v, n };
+      };
+      /* مشي هيكلي: EBML ثم Segment ثم أبناؤه حتى Info (لا بحث بايتات؛ SeekHead يحتوي نفس المعرّف) */
+      let pos = 0, info = -1, start = 0, len = 0, segEnd = Infinity;
+      for (let guard = 0; guard < 60 && pos < head.length - 8; guard++) {
+        const id = vint(pos, true); if (!id) break;
+        const sz = vint(pos + id.n, false); if (!sz) break;
+        const body = pos + id.n + sz.n;
+        if (id.v === 0x18538067) { pos = body; continue; }
+        if (id.v === 0x1549A966) { info = pos + id.n; start = body; len = sz.v; break; }
+        pos = body + sz.v;
+      }
+      if (info < 0 || start + len > head.length) return { blob, audio, fixed: false };
+      const end = start + len;
+      if (find(head.subarray(start, end), [0x44, 0x89]) >= 0) return { blob, audio, fixed: false };
+      const dur = new Uint8Array(11); dur[0] = 0x44; dur[1] = 0x89; dur[2] = 0x88;
+      /* TimecodeScale الافتراضي 1ms */
+      new DataView(dur.buffer).setFloat64(3, seconds * 1000);
+      const newLen = len + 11;
+      const sizeBytes = new Uint8Array(8); sizeBytes[0] = 0x01;
+      for (let i = 7, v = newLen; i >= 1; i--) { sizeBytes[i] = v % 256; v = Math.floor(v / 256); }
+      const out = new Blob([head.slice(0, info), sizeBytes, head.slice(start, end), dur, blob.slice(end)], { type: blob.type });
+      return { blob: out, audio, fixed: true };
+    } catch { return { blob, audio: null, fixed: false }; }
+  },
+
   // قد يترك المتصفح resume معلّقًا حتى تفاعل المستخدم؛ لا نبدأ التسجيل قبل نجاحه.
   async waitForAudio(ctx, signal) {
     const error = () => new Error("تعذّر تشغيل محرّك الصوت — اضغط إنشاء مجددًا وتحقق من إعدادات المتصفح");
@@ -902,7 +949,7 @@ const ReelRecorder = {
   /**
    * تسجيل لحظي: يشغّل التلاوة ويسجّل الكانفاس مع الصوت حتى النهاية.
    */
-  async record({ canvas, renderer, player, onProgress, onStage, signal }) {
+  async record({ canvas, renderer, player, onProgress, onStage, signal, compat }) {
     this._abort = false;
     if (!window.MediaRecorder || !canvas || typeof canvas.captureStream !== "function") {
       throw new Error("متصفحك لا يدعم تسجيل الفيديو — جرّب Chrome أو Edge أو Safari حديثًا");
@@ -916,17 +963,24 @@ const ReelRecorder = {
     const audioCtx = audioRequired ? player.ctx : null;
     if (audioRequired && audioCtx?.state !== "running") await this.waitForAudio(audioCtx, signal);
     if (!audioAvailable()) throw audioError();
-    const mime = this.pickMime();
+    let mime = "";
     const total = player.totalDuration();
     const stream = canvas.captureStream(30);
     let rec;
     try {
       audioTracks.forEach(t => stream.addTrack(t));
       if (audioRequired && !audioTracks.every(t => stream.getAudioTracks().includes(t))) throw audioError();
-      rec = new MediaRecorder(stream, {
-        mimeType: mime || undefined,
-        videoBitsPerSecond: canvas.height >= 1900 ? 9_000_000 : 5_000_000,
-      });
+      /* isTypeSupported قد يقول true ثم يرمي المُنشئ؛ نجرّب كل صيغة ثم بلا صيغة قبل الفشل. */
+      const opts = canvas.height >= 1900 ? 9_000_000 : 5_000_000;
+      let lastErr = null;
+      for (const cand of [...this.pickMimes(compat || (typeof window !== "undefined" && window.__qrCompat)), ""]) {
+        try {
+          rec = new MediaRecorder(stream, cand ? { mimeType: cand, videoBitsPerSecond: opts } : { videoBitsPerSecond: opts });
+          mime = cand || rec.mimeType || "";
+          break;
+        } catch (e) { lastErr = e; rec = null; }
+      }
+      if (!rec) { const err = new Error("تعذّر بدء تسجيل الفيديو في هذا المتصفح" + (lastErr && lastErr.message ? " (" + lastErr.message + ")" : "") + " — جرّب «إعادة المحاولة بوضع التوافق»"); err.compat = true; throw err; }
       onStage && onStage("recording");
       renderer.state.elapsed = 0;
       renderer.state.total = total;
@@ -972,12 +1026,12 @@ const ReelRecorder = {
         if (settled) return;
         if (!finishing) { fail(new Error("توقف تسجيل الفيديو قبل اكتماله")); return; }
         if (!audioAvailable()) { fail(audioError()); return; }
-        const blob = new Blob(chunks, { type: mime || "video/webm" });
-        if (!blob.size) { fail(new Error("ملف الفيديو الناتج فارغ")); return; }
+        const raw = new Blob(chunks, { type: mime || "video/webm" });
+        if (!raw.size) { fail(new Error("ملف الفيديو الناتج فارغ")); return; }
         settled = true;
         cleanup();
         onProgress && onProgress(1, total, total);
-        resolve({ blob, mime: mime || "video/webm" });
+        this.fixWebmDuration(raw, total).then(r => resolve({ blob: r.blob, mime: mime || "video/webm", hasAudio: r.audio, durationFixed: r.fixed }));
       };
       audioTracks.forEach(t => t.addEventListener("ended", onAudioEnded));
       audioCtx?.addEventListener("statechange", onAudioState);
