@@ -105,6 +105,19 @@ const AyahPlayer = {
     }
   },
 
+  /** سورة كاملة: عبر نطاقنا أولًا (/audio/ يمرّ على كاش Cloudflare)، ثم archive.org مباشرة، ثم محاولة أخيرة عبر نطاقنا. */
+  async _fetchChapter(url, signal, onBytes) {
+    const m = /^https:\/\/archive\.org\/download\/quran-murattal-aaqib-azeez-(cc0|by-sa)\/(\d{3})\.mp3$/.exec(url);
+    const tries = m ? ["/audio/" + m[1] + "/" + m[2] + ".mp3", url, "/audio/" + m[1] + "/" + m[2] + ".mp3"] : [url, url];
+    let lastErr;
+    for (const u of tries) {
+      if (signal?.aborted) throw new Error("aborted");
+      try { return await this._fetchStream(u, signal, onBytes, 20000); }
+      catch (e) { if (signal?.aborted) throw new Error("aborted"); lastErr = e; }
+    }
+    throw lastErr;
+  },
+
   // فك الترميز لا يدعم الإلغاء؛ نتوقف عن انتظار نتيجته ونمنع حفظها المتأخر.
   _awaitAudio(promise, signal) {
     if (!signal) return promise;
@@ -142,7 +155,7 @@ const AyahPlayer = {
       if (!this.cache.has(key)) {
         const num = String(ch.surah).padStart(3, "0");
         try {
-          const buf = await this._fetchStream(ch.info.urlFor ? ch.info.urlFor(num) : ch.info.base + num + ".mp3", signal, (got, len) => {
+          const buf = await this._fetchChapter(ch.info.urlFor ? ch.info.urlFor(num) : ch.info.base + num + ".mp3", signal, (got, len) => {
             const pct = len ? Math.min(99, Math.round((got / len) * 100)) : 0;
             onProgress && onProgress(Math.min(ayat.length - 1, Math.floor((pct / 100) * ayat.length)), ayat.length, { pct: pct, mb: got / 1048576 });
           });
