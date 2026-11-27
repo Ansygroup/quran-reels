@@ -97,6 +97,8 @@ const Selection = {
   restore() {
     const s = store.get("sel");
     if (s) Object.assign(this, s);
+    /* قارئ مخفي محفوظ من زيارة سابقة يُستبدل بالقارئ المرخّص */
+    if (typeof VISIBLE_RECITERS !== "undefined" && !VISIBLE_RECITERS.some(r => r.folder === this.reciter)) this.reciter = "aaqib-azeez-murattal";
   },
   save() {
     store.set("sel", {
