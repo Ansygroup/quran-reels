@@ -1041,7 +1041,9 @@ window.PublishApp = {
     const other = this.available.filter((p) => !connected(p) && !selected.includes(p.key));
     const showInitially = conns.length ? important : [...important, ...other.filter((p) => p.publish && p.ready !== false)];
     const secondary = other.filter((p) => !showInitially.includes(p));
-    wrap.innerHTML = showInitially.map(block).join("") + (secondary.length
+    const reconnect = conns.some((c) => c.platform === "youtube") ? ""
+      : '<p class="hint warn" id="reconnect-banner">ربطك القديم لم يُنقل، اربط قناتك مرة واحدة.</p>';
+    wrap.innerHTML = reconnect + showInitially.map(block).join("") + (secondary.length
       ? `<details class="chan-more" id="acctMorePlatforms" ${moreWasOpen ? "open" : ""}>
           <summary>ربط منصات تانية <small>(${secondary.length})</small></summary>
           <div class="chan-more-list">${secondary.map(block).join("")}</div>
