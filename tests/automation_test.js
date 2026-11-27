@@ -110,7 +110,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
     /const \{ all \} = await dueConfigs\(cairoDate\(\), 1\)/.test(src), "autopilot.js");
 
   /* 8) اختيار القارئ صار قابلًا للحفظ */
-  const valid = A.RECITERS[0].id;
+  const valid = A.RECITERS_PUBLIC_ONLY ? A.PUBLIC_RECITERS[0].id : A.RECITERS[0].id;
   const fixed = A.parseTemplate({ reciter_mode: "fixed", reciter: valid });
   chk("قارئ محدّد يُحفظ في القالب", fixed.reciter_mode === "fixed" && fixed.reciter === valid, JSON.stringify(fixed));
   const bad = A.parseTemplate({ reciter_mode: "fixed", reciter: "not-a-reciter" });
@@ -124,7 +124,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
 
   const apiSrc = fs.readFileSync(path.join(ROOT, "api", "autopilot.js"), "utf8");
   chk("مسار الحفظ يقبل reciter_mode/reciter مع التحقق",
-    /wantFixed = templateInput\.reciter_mode === "fixed" && RECITERS\.some/.test(apiSrc) && /reciter: wantFixed \? reciterId : ""/.test(apiSrc), "api/autopilot.js");
+    /wantFixed = templateInput\.reciter_mode === "fixed" && allowedReciters\(\)\.some/.test(apiSrc) && /reciter: wantFixed \? reciterId : ""/.test(apiSrc), "api/autopilot.js");
 
   /* 9) اللوحة الجديدة تعرض كل ما يحتاجه المستخدم ليفهم ويعمل بنفسه */
   const ui = fs.readFileSync(path.join(ROOT, "public", "js", "publish.js"), "utf8");
@@ -137,7 +137,7 @@ const reset = () => { sql.length = 0; restCalls.length = 0; rowsFor = () => []; 
 
   /* 10) الشارة الجديدة للنسخ */
   chk("نسخة الواجهة مرفوعة في الماركب والكاش",
-    /publish\.js\?v=64/.test(html) && /qr-v94/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
+    /publish\.js\?v=64/.test(html) && /qr-v95/.test(fs.readFileSync(path.join(ROOT, "public", "sw.js"), "utf8")), "sw/index");
 
   console.log(errs.length ? `ERRORS ${errs.length}` : `ALL OK (${pass} checks)`);
   if (errs.length) console.log(errs.map((e) => " - " + e).join("\n"));
