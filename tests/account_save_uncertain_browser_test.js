@@ -15,7 +15,7 @@ const server = http.createServer((req, res) => {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({executablePath:await chrome.executablePath(), args:chrome.args, headless:true});
   try {
-    const ctx = await browser.newContext({viewport:{width:Number(process.env.REEL_TEST_WIDTH || 390),height:844},serviceWorkers:'block'});
+    const ctx = await browser.newContext({viewport:{width:Number(process.env.REEL_TEST_WIDTH || 390),height:844},serviceWorkers:'block'});await ctx.addInitScript(()=>{try{localStorage.setItem('qr_fb_session',JSON.stringify({access_token:'fixture',refresh_token:'fixture',expires_at:Date.now()+36e5,user:{id:'u',email:'fixture@example.test',name:'fixture'}}))}catch{}});
     await ctx.route('**/*', r => r.request().url().startsWith(origin + '/') ? r.continue() : r.abort());
     const page = await ctx.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
