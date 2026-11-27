@@ -53,6 +53,26 @@ async function proxy(request, url) {
   return new Response(request.method === "HEAD" ? null : r.body, { status: r.status, headers: h });
 }
 
+// Same-origin cached copy of the two Aaqib Azeez archive.org items (CC0 and CC BY-SA 4.0). Only these items, only 001-114.mp3.
+const AUDIO_ITEMS = { "cc0": "quran-murattal-aaqib-azeez-cc0", "by-sa": "quran-murattal-aaqib-azeez-by-sa" };
+async function audio(request, p) {
+  if (request.method !== "GET" && request.method !== "HEAD") return text(405, "method not allowed", { allow: "GET, HEAD" });
+  const m = /^\/audio\/(cc0|by-sa)\/(\d{3})\.mp3$/.exec(p);
+  const n = m ? parseInt(m[2], 10) : 0;
+  if (!m || n < 1 || n > 114) return text(404, "not found");
+  const h = { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QuranReels/1.0", Accept: "*/*" };
+  const range = request.headers.get("range");
+  if (range) h.Range = range;
+  let r;
+  try {
+    r = await fetch("https://archive.org/download/" + AUDIO_ITEMS[m[1]] + "/" + m[2] + ".mp3", { headers: h, redirect: "follow", cf: { cacheEverything: true, cacheTtl: 2592000, cacheTtlByStatus: { "200-299": 2592000, "400-599": 0 } } });
+  } catch (e) { return text(502, "upstream error: " + (e && e.message ? e.message : "fetch failed")); }
+  if (!r.ok && r.status !== 206) return text(502, "upstream error: status " + r.status);
+  const out = new Headers({ "content-type": "audio/mpeg", "accept-ranges": "bytes", "access-control-allow-origin": "*", "cache-control": "public, max-age=86400, s-maxage=2592000" });
+  for (const k of ["content-length", "content-range"]) { const v = r.headers.get(k); if (v) out.set(k, v); }
+  return new Response(request.method === "HEAD" ? null : r.body, { status: r.status, headers: out });
+}
+
 function ip(request) {
   const cf = request.cf || {};
   const lat = parseFloat(cf.latitude), lon = parseFloat(cf.longitude);
@@ -88,6 +108,10 @@ export default {
     if (p === "/proxy" || p === "/api/proxy") {
       if (limited(request.headers.get("cf-connecting-ip") || "x")) return text(429, "rate limit");
       return proxy(request, url);
+    }
+    if (p.startsWith("/audio/")) {
+      if (limited(request.headers.get("cf-connecting-ip") || "x")) return text(429, "rate limit");
+      return audio(request, p);
     }
     if (p === "/api/ip") return ip(request);
     if (p === "/api/app-config") return json(200, { firebase: { apiKey: "AIzaSyBBnc-2ZHZZVny_AS83LRON5070AllrM38", projectId: "booming-banner-477420-h3", googleClientId: "174209487989-e09fq602et8pvn9ooaj0pqpj6t4ubd04.apps.googleusercontent.com" } }, "public, max-age=3600, s-maxage=3600");
