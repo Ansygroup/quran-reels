@@ -66,6 +66,45 @@ const AyahPlayer = {
     }
   },
 
+  /** تنزيل ملف كبير (سورة كاملة) بالبث: مهلة «ركود» تتجدد مع كل بايت يصل بدل مهلة كلية قصيرة،
+   * وسقف كلي أوسع، وتقدّم فعلي، وأسباب فشل واضحة (HTTP n أو انتهاء المهلة أو انقطاع). */
+  async _fetchStream(url, signal, onBytes, stallMs = 25000, totalMs = 240000) {
+    const ctrl = new AbortController();
+    const onAbort = () => ctrl.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    let reason = "";
+    const t0 = Date.now();
+    let stall = setTimeout(() => { reason = "timeout: no data for " + Math.round(stallMs / 1000) + "s"; ctrl.abort(); }, stallMs);
+    const total = setTimeout(() => { reason = "timeout: over " + Math.round(totalMs / 1000) + "s"; ctrl.abort(); }, totalMs);
+    try {
+      if (signal?.aborted) throw new Error("aborted");
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const len = Number(r.headers.get("content-length")) || 0;
+      if (!r.body || !r.body.getReader) { const b = await r.arrayBuffer(); onBytes && onBytes(b.byteLength, b.byteLength); return b; }
+      const rd = r.body.getReader();
+      const parts = []; let got = 0;
+      for (;;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        parts.push(value); got += value.length;
+        clearTimeout(stall);
+        stall = setTimeout(() => { reason = "timeout: no data for " + Math.round(stallMs / 1000) + "s"; ctrl.abort(); }, stallMs);
+        onBytes && onBytes(got, len);
+      }
+      const out = new Uint8Array(got); let o = 0;
+      for (const c of parts) { out.set(c, o); o += c.length; }
+      return out.buffer;
+    } catch (e) {
+      if (signal?.aborted) throw new Error("aborted");
+      if (reason) throw new Error(reason + " (" + Math.round((Date.now() - t0) / 1000) + "s)");
+      throw e;
+    } finally {
+      clearTimeout(stall); clearTimeout(total);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  },
+
   // فك الترميز لا يدعم الإلغاء؛ نتوقف عن انتظار نتيجته ونمنع حفظها المتأخر.
   _awaitAudio(promise, signal) {
     if (!signal) return promise;
@@ -103,7 +142,10 @@ const AyahPlayer = {
       if (!this.cache.has(key)) {
         const num = String(ch.surah).padStart(3, "0");
         try {
-          const buf = await this._fetchAudio(ch.info.urlFor ? ch.info.urlFor(num) : ch.info.base + num + ".mp3", 60000, signal);
+          const buf = await this._fetchStream(ch.info.urlFor ? ch.info.urlFor(num) : ch.info.base + num + ".mp3", signal, (got, len) => {
+            const pct = len ? Math.min(99, Math.round((got / len) * 100)) : 0;
+            onProgress && onProgress(Math.min(ayat.length - 1, Math.floor((pct / 100) * ayat.length)), ayat.length, { pct: pct, mb: got / 1048576 });
+          });
           if (signal?.aborted) throw new Error("aborted");
           const audio = await this._awaitAudio(this.ctx.decodeAudioData(buf), signal);
           if (signal?.aborted) throw new Error("aborted");
