@@ -1,5 +1,5 @@
 /* Quran Reels service worker — offline shell + data, network-only for proxy/API. */
-const CACHE = "qr-v97";
+const CACHE = "qr-v98";
 const SHELL = [
   "/",
   "/css/style.css?v=18",
