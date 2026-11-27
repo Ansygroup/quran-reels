@@ -180,7 +180,7 @@ const AAQIB_CHAPTER_LICENSE = {
 const CHAPTER_RECITERS = {
   "aaqib-azeez-murattal": { base: AAQIB_BASE, licenses: AAQIB_CHAPTER_LICENSE },
 };
-RECITERS.push({ id: "aaqib-azeez-murattal", folder: "aaqib-azeez-murattal", n: "عاقب عزيز — تلاوة مرخّصة (سورة كاملة)", tag: "مرخّص للنشر والربح" });
+RECITERS.push({ id: "aaqib-azeez-murattal", folder: "aaqib-azeez-murattal", chapter: true, n: "عاقب عزيز — تلاوة مرخّصة (سورة كاملة)", tag: "مرخّص للنشر والربح" });
 
 /* ---------- الترجمات ---------- */
 const TRANSLATIONS = [
